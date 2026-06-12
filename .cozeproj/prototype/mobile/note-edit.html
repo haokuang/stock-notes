@@ -3,7 +3,7 @@
 
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
 
   <link href="https://lf-code-agent.coze.cn/obj/x-ai-cn/fonts/google/google-all-fonts.css" rel="stylesheet" />
 
@@ -14,26 +14,26 @@
   <style type="text/tailwindcss">
     @theme {
       /* === 品牌色（电感紫，2026 标志色） === */
-      --color-primary:              #7C5CFF;
-      --color-primary-container:    #2A1B5C;
+      --color-primary:              #6D4DFF;
+      --color-primary-container:    #ECE7FF;
       --color-on-primary:           #ffffff;
-      /* === 背景 / 表面（极暗蓝黑 + 中性灰蓝色阶） === */
-      --color-background:                 #0A0B14;
-      --color-surface-container-lowest:   #0F1119;
-      --color-surface:                    #14171F;
-      --color-surface-container:          #1A1D27;
-      --color-surface-container-high:     #22252F;
-      --color-surface-container-highest:  #2A2D38;
+      /* === 背景 / 表面（极浅冷灰 + 中性灰蓝色阶） === */
+      --color-background:                 #EEF0F6;
+      --color-surface-container-lowest:   #FFFFFF;
+      --color-surface:                    #F8F9FD;
+      --color-surface-container:          #E6E8F0;
+      --color-surface-container-high:     #D9DCE6;
+      --color-surface-container-highest:  #CCD0DC;
       /* === 文字 === */
-      --color-on-surface:           #F5F6FA;
-      --color-on-surface-variant:   #9CA0B0;
-      /* === 功能色（看多绿 / 看空红 / 中性琥珀） === */
-      --color-success:  #22E58D;
-      --color-error:    #FF4D6D;
-      --color-warning:  #FFB547;
+      --color-on-surface:           #161826;
+      --color-on-surface-variant:   #5B5E72;
+      /* === 功能色（看多绿 / 看空红 / 中性琥珀，浅色下加深饱和度以提升对比） === */
+      --color-success:  #0F8C66;
+      --color-error:    #D11A4A;
+      --color-warning:  #B45309;
       /* === 边框 === */
-      --color-outline:          #3A3E4D;
-      --color-outline-variant:  #252835;
+      --color-outline:          #C0C2CF;
+      --color-outline-variant:  #DDDFE9;
       /* === 圆角 === */
       --radius-sm:   0.5rem;
       --radius-md:   0.75rem;
@@ -41,10 +41,10 @@
       --radius-xl:   1.25rem;
       --radius-2xl:  1.5rem;
       --radius-full: 9999px;
-      /* === 阴影（带霓虹辉光） === */
-      --shadow-card:   0 4px 24px rgba(124, 92, 255, 0.10), 0 1px 2px rgba(0,0,0,0.4);
-      --shadow-float:  0 10px 40px rgba(124, 92, 255, 0.18), 0 4px 12px rgba(0,0,0,0.5);
-      --shadow-dialog: 0 25px 60px rgba(0,0,0,0.6), 0 0 60px rgba(124, 92, 255, 0.12);
+      /* === 阴影（柔和实阴影，浅色下替代深色辉光） === */
+      --shadow-card:   0 1px 2px rgba(20, 18, 60, 0.06), 0 6px 20px rgba(20, 18, 60, 0.10);
+      --shadow-float:  0 4px 12px rgba(20, 18, 60, 0.10), 0 12px 40px rgba(20, 18, 60, 0.14);
+      --shadow-dialog: 0 25px 60px rgba(20, 18, 60, 0.20), 0 0 1px rgba(20, 18, 60, 0.08);
       /* === 字体 === */
       --font-sans: "Space Grotesk", "Noto Sans SC", system-ui, sans-serif;
       --font-display: "Space Grotesk", "Noto Sans SC", system-ui, sans-serif;
@@ -56,40 +56,32 @@
       min-height: max(812px, 100dvh);
       font-family: "Space Grotesk", "Noto Sans SC", system-ui, sans-serif;
       background:
-        radial-gradient(ellipse 80% 50% at 50% -20%, rgba(124, 92, 255, 0.18), transparent 60%),
-        radial-gradient(ellipse 60% 40% at 100% 100%, rgba(34, 229, 141, 0.06), transparent 50%),
-        #0A0B14;
+        radial-gradient(ellipse 70% 50% at 50% -10%, rgba(109, 77, 255, 0.12), transparent 60%),
+        radial-gradient(ellipse 60% 40% at 100% 100%, rgba(16, 185, 129, 0.06), transparent 50%),
+        #EEF0F6;
     }
+    /* 玻璃拟态基础类（浅色版：白色半透明 + 强 backdrop-blur） */
     .glass {
-      background: rgba(20, 23, 31, 0.55);
+      background: rgba(255, 255, 255, 0.72);
       backdrop-filter: blur(24px) saturate(180%);
       -webkit-backdrop-filter: blur(24px) saturate(180%);
-      border: 1px solid rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.85);
+      box-shadow: 0 1px 2px rgba(20, 18, 60, 0.04), 0 6px 24px rgba(20, 18, 60, 0.06);
     }
     .glass-strong {
-      background: rgba(15, 17, 25, 0.78);
+      background: rgba(255, 255, 255, 0.88);
       backdrop-filter: blur(32px) saturate(200%);
       -webkit-backdrop-filter: blur(32px) saturate(200%);
-      border: 1px solid rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.95);
+      box-shadow: 0 4px 16px rgba(20, 18, 60, 0.06);
     }
-    .glow-primary { box-shadow: 0 0 24px rgba(124, 92, 255, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.1); }
-    .glow-success { box-shadow: 0 0 18px rgba(34, 229, 141, 0.30); }
-    .glow-error   { box-shadow: 0 0 18px rgba(255, 77, 109, 0.30); }
-    .glow-warning { box-shadow: 0 0 16px rgba(255, 181, 71, 0.25); }
+    /* 浅色辉光（用柔和阴影 + 描边替代发光，保留"主色"识别） */
+    .glow-primary { box-shadow: 0 0 0 1px rgba(109, 77, 255, 0.30), 0 8px 24px rgba(109, 77, 255, 0.18); }
+    .glow-success { box-shadow: 0 0 0 1px rgba(16, 185, 129, 0.30), 0 6px 18px rgba(16, 185, 129, 0.14); }
+    .glow-error   { box-shadow: 0 0 0 1px rgba(225, 29, 72, 0.30), 0 6px 18px rgba(225, 29, 72, 0.14); }
     .scrollbar-hide::-webkit-scrollbar { display: none; }
     .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
     .tabular-nums { font-variant-numeric: tabular-nums; }
-    .ring-focus:focus-within { box-shadow: 0 0 0 2px rgba(124, 92, 255, 0.3); }
-    .gradient-border {
-      position: relative;
-      background: linear-gradient(135deg, rgba(124,92,255,0.55), rgba(34,229,141,0.35) 50%, rgba(124,92,255,0.55));
-      padding: 1px;
-      border-radius: 1rem;
-    }
-    .gradient-border > .gradient-inner {
-      background: rgba(26, 29, 39, 0.85);
-      border-radius: calc(1rem - 1px);
-    }
     @keyframes float-glow {
       0%, 100% { transform: translateY(0); opacity: 0.6; }
       50% { transform: translateY(-4px); opacity: 1; }
@@ -100,11 +92,10 @@
       100% { background-position: 200% 0; }
     }
     .shimmer {
-      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.08), transparent);
+      background: linear-gradient(90deg, transparent, rgba(109, 77, 255, 0.10), transparent);
       background-size: 200% 100%;
       animation: shimmer 2s infinite;
     }
-    .rt-tool.active { background-color: rgba(124, 92, 255, 0.18); color: #7C5CFF; }
   </style>
 
   <script>
@@ -119,7 +110,7 @@
       const icons = { '人物': '👤', '自然风景': '🏞', '动物': '🐾', '建筑城市': '🏙', '运动体育': '⚽', '交通工具': '🚗', '食物': '🍽', '服饰时尚': '👗', '商业科技': '💼', '游戏娱乐': '🎮', '艺术': '🎨', '其他': '🖼' };
       const icon = icons[cat] || '🖼';
       const w = img.width || 400, h = img.height || 300;
-      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}"><rect width="100%" height="100%" fill="%231A1D27"/><text x="50%" y="45%" text-anchor="middle" font-size="${Math.min(w, h) * 0.18}" dominant-baseline="central">${icon}</text><text x="50%" y="68%" text-anchor="middle" font-size="${Math.min(w, h) * 0.07}" fill="%239CA0B0" font-family="system-ui,sans-serif" dominant-baseline="central">${label}</text></svg>`;
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}"><rect width="100%" height="100%" fill="%23F0F0F5"/><text x="50%" y="45%" text-anchor="middle" font-size="${Math.min(w, h) * 0.18}" dominant-baseline="central">${icon}</text><text x="50%" y="68%" text-anchor="middle" font-size="${Math.min(w, h) * 0.07}" fill="%235E6172" font-family="system-ui,sans-serif" dominant-baseline="central">${label}</text></svg>`;
       img.src = 'data:image/svg+xml,' + svg;
     }, true);
   </script>
@@ -127,681 +118,567 @@
 
 <body class="bg-background text-on-surface font-sans">
 
-  <!-- 二级页 Header（替换骨架的 TabBar 段） -->
-  <header class="sticky top-0 z-40 h-14 flex items-center justify-between px-4 bg-background">
-    <button id="btn-close"
-            class="w-10 h-10 flex items-center justify-center text-on-surface-variant rounded-full
-                   hover:bg-surface-container active:bg-surface-container-high transition-colors"
+  <!-- @nav:start 二级页 Header（带关闭按钮 + 保存文本按钮，无 TabBar） -->
+  <header class="sticky top-0 z-40 bg-background h-14 flex items-center justify-between px-4">
+    <button id="btn-close" class="w-10 h-10 flex items-center justify-center text-on-surface rounded-full
+                                   hover:bg-surface-container active:bg-surface-container-high transition-colors"
             aria-label="关闭">
       <i data-lucide="x" class="w-5 h-5"></i>
     </button>
     <h1 class="text-base font-semibold text-on-surface">新建观点</h1>
-    <button id="btn-header-save"
-            class="text-primary font-semibold text-sm px-2 py-2 active:opacity-70 transition-opacity">
+    <button id="btn-header-save" class="px-3 h-10 text-primary text-sm font-semibold rounded-full
+                                        hover:bg-primary/10 active:bg-primary/15 transition-colors">
       保存
     </button>
   </header>
+  <!-- @nav:end -->
 
   <!-- @main-content:start -->
   <main class="flex-1 pb-[calc(5.5rem+env(safe-area-inset-bottom))]">
-    <div class="px-4 pt-4 space-y-5">
 
-      <!-- 1) 股票选择卡（玻璃容器） -->
-      <div id="stock-card"
-           class="glass rounded-2xl p-4 flex items-center gap-3 active:scale-[0.99] transition-transform cursor-pointer">
-        <div class="w-10 h-10 rounded-[10px] glass flex items-center justify-center flex-shrink-0">
-          <span class="text-lg font-bold text-primary">宁</span>
+    <!-- 1) 股票选择卡 -->
+    <section class="px-4 pt-3">
+      <button id="btn-stock-select" type="button"
+              class="glass w-full rounded-2xl border border-outline-variant/40 px-4 py-3.5
+                     flex items-center gap-3 hover:bg-white/85 active:scale-[0.99] transition-all">
+        <div class="w-10 h-10 rounded-[10px] bg-white border border-primary/25 flex items-center justify-center shrink-0">
+          <span class="text-[18px] font-bold text-primary leading-none">宁</span>
         </div>
-        <div class="flex-1 min-w-0">
+        <div class="flex-1 min-w-0 text-left">
           <p class="text-[15px] font-semibold text-on-surface leading-tight">宁德时代</p>
-          <p class="text-xs text-on-surface-variant mt-0.5">300750.SZ · 创业板</p>
+          <p class="text-[12px] text-on-surface-variant mt-0.5 tabular-nums">300750.SZ</p>
         </div>
-        <i data-lucide="chevron-down" class="w-3 h-3 text-on-surface-variant flex-shrink-0"></i>
-      </div>
+        <i data-lucide="chevron-down" class="w-3.5 h-3.5 text-on-surface-variant shrink-0"></i>
+      </button>
+    </section>
 
-      <!-- 2) 方向三选一（Segmented Control） -->
-      <div class="glass rounded-full p-1 flex">
-        <!-- 看多（默认激活） -->
-        <button id="dir-bull" data-dir="bull" aria-pressed="true"
-                class="dir-btn flex-1 flex items-center justify-center gap-2 py-2.5 rounded-full
-                       bg-primary-container/60 transition-all">
-          <span class="w-2 h-2 rounded-full bg-success glow-success"></span>
-          <span class="text-sm font-semibold text-primary">看多</span>
+    <!-- 2) 方向三选一 -->
+    <section class="px-4 pt-5">
+      <div class="glass-strong rounded-full p-1 flex items-center border border-outline-variant/30">
+        <button id="dir-bull" data-dir="bull" type="button"
+                class="dir-option flex-1 flex items-center justify-center gap-1.5 h-10 rounded-full
+                       bg-primary-container text-primary border border-primary/40
+                       text-[14px] font-semibold transition-all">
+          <span class="w-2 h-2 rounded-full bg-success"></span>
+          看多
         </button>
-        <!-- 看空 -->
-        <button id="dir-bear" data-dir="bear" aria-pressed="false"
-                class="dir-btn flex-1 flex items-center justify-center gap-2 py-2.5 rounded-full
-                       transition-all">
+        <button id="dir-bear" data-dir="bear" type="button"
+                class="dir-option flex-1 flex items-center justify-center gap-1.5 h-10 rounded-full
+                       text-on-surface-variant text-[14px] font-semibold transition-all">
           <span class="w-2 h-2 rounded-full bg-error"></span>
-          <span class="text-sm font-semibold text-on-surface-variant">看空</span>
+          看空
         </button>
-        <!-- 中性 -->
-        <button id="dir-neutral" data-dir="neutral" aria-pressed="false"
-                class="dir-btn flex-1 flex items-center justify-center gap-2 py-2.5 rounded-full
-                       transition-all">
+        <button id="dir-neutral" data-dir="neutral" type="button"
+                class="dir-option flex-1 flex items-center justify-center gap-1.5 h-10 rounded-full
+                       text-on-surface-variant text-[14px] font-semibold transition-all">
           <span class="w-2 h-2 rounded-full bg-warning"></span>
-          <span class="text-sm font-semibold text-on-surface-variant">中性</span>
+          中性
         </button>
       </div>
+    </section>
 
-      <!-- 3) 价格三列输入 -->
-      <div class="grid grid-cols-3 gap-3">
-        <!-- 入场价 -->
-        <div class="bg-surface-container rounded-xl px-4 py-3 ring-focus transition-shadow">
-          <div class="flex items-center gap-1.5 mb-1.5">
-            <i data-lucide="log-in" class="w-3 h-3 text-success"></i>
-            <span class="text-xs text-on-surface-variant">入场</span>
+    <!-- 3) 价格三列输入 -->
+    <section class="px-4 pt-5">
+      <div class="grid grid-cols-3 gap-2.5">
+        <div class="bg-surface-container rounded-xl px-4 py-3">
+          <div class="flex items-center gap-1 text-on-surface-variant">
+            <i data-lucide="log-in" class="w-3 h-3"></i>
+            <span class="text-[12px]">入场</span>
           </div>
-          <input id="input-entry" type="text" inputmode="decimal" value="195.20"
-                 class="w-full bg-transparent border-none p-0 text-[17px] font-bold text-on-surface
-                        tabular-nums focus:outline-none placeholder:text-on-surface-variant/30" />
+          <input id="price-entry" type="number" inputmode="decimal" value="195.20" step="0.01"
+                 class="w-full bg-transparent border-none outline-none text-[17px] font-bold text-on-surface
+                        placeholder:text-on-surface-variant/40 mt-1.5 tabular-nums p-0 focus:ring-0" />
         </div>
-        <!-- 目标价 -->
-        <div class="bg-surface-container rounded-xl px-4 py-3 ring-focus transition-shadow">
-          <div class="flex items-center gap-1.5 mb-1.5">
-            <i data-lucide="target" class="w-3 h-3 text-primary"></i>
-            <span class="text-xs text-on-surface-variant">目标</span>
+        <div class="bg-surface-container rounded-xl px-4 py-3">
+          <div class="flex items-center gap-1 text-on-surface-variant">
+            <i data-lucide="target" class="w-3 h-3"></i>
+            <span class="text-[12px]">目标</span>
           </div>
-          <input id="input-target" type="text" inputmode="decimal" value="285.00"
-                 class="w-full bg-transparent border-none p-0 text-[17px] font-bold text-on-surface
-                        tabular-nums focus:outline-none placeholder:text-on-surface-variant/30" />
+          <input id="price-target" type="number" inputmode="decimal" value="285.00" step="0.01"
+                 class="w-full bg-transparent border-none outline-none text-[17px] font-bold text-on-surface
+                        placeholder:text-on-surface-variant/40 mt-1.5 tabular-nums p-0 focus:ring-0" />
         </div>
-        <!-- 止损价 -->
-        <div class="bg-surface-container rounded-xl px-4 py-3 ring-focus transition-shadow">
-          <div class="flex items-center gap-1.5 mb-1.5">
-            <i data-lucide="shield" class="w-3 h-3 text-error"></i>
-            <span class="text-xs text-on-surface-variant">止损</span>
+        <div class="bg-surface-container rounded-xl px-4 py-3">
+          <div class="flex items-center gap-1 text-on-surface-variant">
+            <i data-lucide="shield" class="w-3 h-3"></i>
+            <span class="text-[12px]">止损</span>
           </div>
-          <input id="input-stop" type="text" inputmode="decimal" value="175.00"
-                 class="w-full bg-transparent border-none p-0 text-[17px] font-bold text-on-surface
-                        tabular-nums focus:outline-none placeholder:text-on-surface-variant/30" />
+          <input id="price-stop" type="number" inputmode="decimal" value="175.00" step="0.01"
+                 class="w-full bg-transparent border-none outline-none text-[17px] font-bold text-on-surface
+                        placeholder:text-on-surface-variant/40 mt-1.5 tabular-nums p-0 focus:ring-0" />
         </div>
       </div>
+    </section>
 
-      <!-- 4) 标题输入 -->
-      <div class="relative bg-surface-container rounded-xl px-4 py-3 ring-focus transition-shadow">
+    <!-- 4) 标题输入 -->
+    <section class="px-4 pt-5">
+      <div class="relative">
         <input id="input-title" type="text" maxlength="100"
-               placeholder="取个简洁有力的标题"
-               class="w-full bg-transparent border-none p-0 pr-14 text-base text-on-surface
-                      placeholder:text-on-surface-variant/30 focus:outline-none" />
-        <span id="title-counter"
-              class="absolute right-4 top-3 text-[11px] text-on-surface-variant pointer-events-none tabular-nums">28/100</span>
+               value="Q3 业绩拐点 + 储能放量，看多宁王 50% 空间"
+               class="w-full bg-surface-container border-none rounded-xl px-4 py-3 pr-16 text-base
+                      text-on-surface placeholder:text-on-surface-variant/40
+                      focus:outline-none focus:ring-2 focus:ring-primary/30 transition-colors" />
+        <span id="title-counter" class="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] text-on-surface-variant tabular-nums">
+          28/100
+        </span>
       </div>
+    </section>
 
-      <!-- 5) 富文本正文编辑器 -->
-      <div class="glass rounded-2xl overflow-hidden">
+    <!-- 5) 富文本正文编辑器 -->
+    <section class="px-4 pt-5">
+      <div class="glass bg-white/70 rounded-2xl border border-outline-variant/40 overflow-hidden">
         <!-- 工具栏 -->
-        <div class="flex items-center gap-1 px-2 py-2 border-b border-outline-variant/10 overflow-x-auto scrollbar-hide">
-          <button id="rt-bold" class="rt-tool p-2 rounded-lg hover:bg-surface-container transition-colors" aria-label="加粗">
-            <i data-lucide="bold" class="w-4 h-4 text-on-surface-variant"></i>
+        <div class="flex items-center gap-1 px-2 py-2 border-b border-outline-variant/30 overflow-x-auto scrollbar-hide">
+          <button id="rt-bold" type="button" aria-label="加粗"
+                  class="rt-tool shrink-0 w-9 h-9 flex items-center justify-center text-on-surface-variant
+                          rounded-lg hover:bg-surface-container active:bg-surface-container-high transition-colors">
+            <i data-lucide="bold" class="w-4 h-4"></i>
           </button>
-          <button id="rt-italic" class="rt-tool p-2 rounded-lg hover:bg-surface-container transition-colors" aria-label="斜体">
-            <i data-lucide="italic" class="w-4 h-4 text-on-surface-variant"></i>
+          <button id="rt-italic" type="button" aria-label="斜体"
+                  class="rt-tool shrink-0 w-9 h-9 flex items-center justify-center text-on-surface-variant
+                          rounded-lg hover:bg-surface-container active:bg-surface-container-high transition-colors">
+            <i data-lucide="italic" class="w-4 h-4"></i>
           </button>
-          <button id="rt-underline" class="rt-tool p-2 rounded-lg hover:bg-surface-container transition-colors" aria-label="下划线">
-            <i data-lucide="underline" class="w-4 h-4 text-on-surface-variant"></i>
+          <button id="rt-underline" type="button" aria-label="下划线"
+                  class="rt-tool shrink-0 w-9 h-9 flex items-center justify-center text-on-surface-variant
+                          rounded-lg hover:bg-surface-container active:bg-surface-container-high transition-colors">
+            <i data-lucide="underline" class="w-4 h-4"></i>
           </button>
-          <span class="w-px h-5 bg-outline-variant/20 mx-1"></span>
-          <button id="rt-list" class="rt-tool p-2 rounded-lg hover:bg-surface-container transition-colors" aria-label="无序列表">
-            <i data-lucide="list" class="w-4 h-4 text-on-surface-variant"></i>
+          <span class="shrink-0 w-px h-5 bg-outline-variant/40 mx-1"></span>
+          <button id="rt-list" type="button" aria-label="无序列表"
+                  class="rt-tool shrink-0 w-9 h-9 flex items-center justify-center text-on-surface-variant
+                          rounded-lg hover:bg-surface-container active:bg-surface-container-high transition-colors">
+            <i data-lucide="list" class="w-4 h-4"></i>
           </button>
-          <button id="rt-list-ordered" class="rt-tool p-2 rounded-lg hover:bg-surface-container transition-colors" aria-label="有序列表">
-            <i data-lucide="list-ordered" class="w-4 h-4 text-on-surface-variant"></i>
+          <button id="rt-list-ol" type="button" aria-label="有序列表"
+                  class="rt-tool shrink-0 w-9 h-9 flex items-center justify-center text-on-surface-variant
+                          rounded-lg hover:bg-surface-container active:bg-surface-container-high transition-colors">
+            <i data-lucide="list-ordered" class="w-4 h-4"></i>
           </button>
-          <button id="rt-quote" class="rt-tool p-2 rounded-lg hover:bg-surface-container transition-colors" aria-label="引用">
-            <i data-lucide="quote" class="w-4 h-4 text-on-surface-variant"></i>
+          <button id="rt-quote" type="button" aria-label="引用"
+                  class="rt-tool shrink-0 w-9 h-9 flex items-center justify-center text-on-surface-variant
+                          rounded-lg hover:bg-surface-container active:bg-surface-container-high transition-colors">
+            <i data-lucide="quote" class="w-4 h-4"></i>
           </button>
-          <span class="w-px h-5 bg-outline-variant/20 mx-1"></span>
-          <button id="rt-link" class="rt-tool p-2 rounded-lg hover:bg-surface-container transition-colors" aria-label="插入链接">
-            <i data-lucide="link" class="w-4 h-4 text-on-surface-variant"></i>
+          <span class="shrink-0 w-px h-5 bg-outline-variant/40 mx-1"></span>
+          <button id="rt-link" type="button" aria-label="链接"
+                  class="rt-tool shrink-0 w-9 h-9 flex items-center justify-center text-on-surface-variant
+                          rounded-lg hover:bg-surface-container active:bg-surface-container-high transition-colors">
+            <i data-lucide="link" class="w-4 h-4"></i>
           </button>
-          <button id="rt-image" class="rt-tool p-2 rounded-lg hover:bg-surface-container transition-colors" aria-label="插入图片">
-            <i data-lucide="image" class="w-4 h-4 text-on-surface-variant"></i>
+          <button id="rt-image" type="button" aria-label="插入图片"
+                  class="rt-tool shrink-0 w-9 h-9 flex items-center justify-center text-on-surface-variant
+                          rounded-lg hover:bg-surface-container active:bg-surface-container-high transition-colors">
+            <i data-lucide="image" class="w-4 h-4"></i>
           </button>
         </div>
         <!-- 正文区 -->
-        <textarea id="input-content" rows="8"
-                  placeholder="详细记录你的投资逻辑……支持粘贴图片，自动调用 AI 解读"
-                  class="w-full bg-transparent border-none p-4 text-sm text-on-surface leading-relaxed
-                         placeholder:text-on-surface-variant/30 focus:outline-none resize-none min-h-48">1. 行业逻辑：新能源车渗透率突破 50%，电池需求年化 25%+
-
-2. 业绩拐点：Q2 装机量同比 +45%，单位毛利回升至 0.18 元/Wh
-
-3. 估值水平：当前 PE 18x 处于历史 30% 分位，海外储能订单超预期</textarea>
+        <textarea id="rt-content" rows="10"
+                  class="w-full bg-transparent border-none outline-none px-4 py-3.5 text-[15px] leading-relaxed
+                         text-on-surface placeholder:text-on-surface-variant/40 resize-none
+                         focus:ring-0 min-h-48"
+                  placeholder="详细记录你的投资逻辑……支持粘贴图片，自动调用 AI 解读">1. 行业逻辑：新能源车渗透率突破 50%，行业从导入期进入成长期主升浪。
+2. 业绩拐点：Q2 装机量同比 +45%，毛利率回升至 28%，单瓦时盈利超预期。
+3. 估值水平：当前 PE 18x 处于历史 30% 分位，海外储能订单贡献第二增长曲线。
+4. 风险提示：上游碳酸锂价格反弹 + 海外贸易政策不确定性。</textarea>
       </div>
+    </section>
 
-      <!-- 6) 图片附件区 -->
-      <div>
-        <div class="flex items-center justify-between mb-3">
-          <h3 class="text-sm font-semibold text-on-surface">附件</h3>
-          <span class="text-xs text-on-surface-variant tabular-nums">3/9</span>
-        </div>
-        <div class="flex gap-3 overflow-x-auto scrollbar-hide pb-1 -mx-4 px-4">
-          <!-- 附件-图1：宁德 K 线图 -->
-          <div class="attachment-item relative w-24 h-24 rounded-xl overflow-hidden flex-shrink-0 active:scale-95 transition-transform"
-               data-id="att-1" data-name="宁德时代周K线图">
-            <img src="https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=400&h=400&fit=crop"
-                 alt="宁德时代 K 线图" data-category="商业科技"
-                 class="w-full h-full object-cover" />
-            <div class="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent"></div>
-            <button class="att-remove absolute top-1 right-1 w-5 h-5 bg-black/60 backdrop-blur-sm rounded-full flex items-center justify-center">
-              <i data-lucide="x" class="w-3 h-3 text-white"></i>
-            </button>
-            <div class="absolute bottom-1 left-1 px-1.5 py-0.5 bg-primary/85 backdrop-blur-sm rounded text-[10px] font-bold text-on-primary tracking-wide">AI</div>
-          </div>
-          <!-- 附件-图2：装机量柱状图 -->
-          <div class="attachment-item relative w-24 h-24 rounded-xl overflow-hidden flex-shrink-0 active:scale-95 transition-transform"
-               data-id="att-2" data-name="Q2 装机量柱状图">
-            <img src="https://images.unsplash.com/photo-1543286386-713bdd548da4?w=400&h=400&fit=crop"
-                 alt="Q2 装机量柱状图" data-category="商业科技"
-                 class="w-full h-full object-cover" />
-            <div class="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent"></div>
-            <button class="att-remove absolute top-1 right-1 w-5 h-5 bg-black/60 backdrop-blur-sm rounded-full flex items-center justify-center">
-              <i data-lucide="x" class="w-3 h-3 text-white"></i>
-            </button>
-            <div class="absolute bottom-1 left-1 px-1.5 py-0.5 bg-primary/85 backdrop-blur-sm rounded text-[10px] font-bold text-on-primary tracking-wide">AI</div>
-          </div>
-          <!-- 附件-图3：海外订单截图 -->
-          <div class="attachment-item relative w-24 h-24 rounded-xl overflow-hidden flex-shrink-0 active:scale-95 transition-transform"
-               data-id="att-3" data-name="海外储能订单截图">
-            <img src="https://images.unsplash.com/photo-1535320903710-d993d3d77d29?w=400&h=400&fit=crop"
-                 alt="海外储能订单截图" data-category="商业科技"
-                 class="w-full h-full object-cover" />
-            <div class="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent"></div>
-            <button class="att-remove absolute top-1 right-1 w-5 h-5 bg-black/60 backdrop-blur-sm rounded-full flex items-center justify-center">
-              <i data-lucide="x" class="w-3 h-3 text-white"></i>
-            </button>
-            <div class="absolute bottom-1 left-1 px-1.5 py-0.5 bg-primary/85 backdrop-blur-sm rounded text-[10px] font-bold text-on-primary tracking-wide">AI</div>
-          </div>
-          <!-- 上传占位卡 -->
-          <button id="btn-add-image"
-                  class="w-24 h-24 rounded-xl border border-dashed border-surface-container-high
-                         flex flex-col items-center justify-center gap-1 flex-shrink-0
-                         active:scale-95 transition-transform hover:border-primary/40">
-            <i data-lucide="plus" class="w-6 h-6 text-on-surface-variant"></i>
-            <span class="text-[10px] text-on-surface-variant">上传截图</span>
+    <!-- 6) 图片附件区 -->
+    <section class="px-4 pt-5">
+      <div class="flex items-center justify-between mb-2.5">
+        <h2 class="text-sm font-semibold text-on-surface">附件</h2>
+        <span class="text-xs text-on-surface-variant tabular-nums">3/9</span>
+      </div>
+      <div class="flex gap-2.5 overflow-x-auto scrollbar-hide pb-1">
+        <!-- 缩略图-1：已上传 + AI 解读 -->
+        <div class="relative shrink-0 group" data-img-id="img-1">
+          <img id="thumb-1" src="https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=200&h=200&fit=crop"
+               alt="宁德时代K线图" data-category="商业科技"
+               class="w-24 h-24 rounded-xl object-cover border border-outline-variant/30 bg-surface-container" />
+          <span class="absolute top-1 left-1 px-1.5 py-0.5 rounded-md bg-primary/95 text-on-primary text-[9px] font-bold tracking-wide">AI</span>
+          <button id="btn-del-1" type="button" aria-label="删除附件"
+                  class="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/60 backdrop-blur text-white
+                          flex items-center justify-center hover:bg-error active:scale-90 transition-all">
+            <i data-lucide="x" class="w-3 h-3"></i>
           </button>
         </div>
-      </div>
-
-      <!-- 7) AI 解读提示条（渐变描边玻璃卡） -->
-      <div class="gradient-border">
-        <div class="gradient-inner p-3.5 flex items-center gap-3">
-          <div class="w-9 h-9 rounded-full bg-primary/15 flex items-center justify-center flex-shrink-0">
-            <i data-lucide="sparkles" class="w-[18px] h-[18px] text-primary"></i>
-          </div>
-          <p class="flex-1 text-[13px] text-on-surface leading-snug">
-            已为 <span class="font-semibold text-primary">3</span> 张图生成 AI 解读，合并到正文末尾？
-          </p>
-          <button id="btn-ai-insert"
-                  class="text-primary text-xs font-semibold px-3 py-1.5 rounded-full
-                         bg-primary/15 hover:bg-primary/25 active:scale-95 transition-all">
-            插入
+        <!-- 缩略图-2：已上传 + AI 解读 -->
+        <div class="relative shrink-0 group" data-img-id="img-2">
+          <img id="thumb-2" src="https://images.unsplash.com/photo-1640340434855-6084b1f4901c?w=200&h=200&fit=crop"
+               alt="装机量数据图表" data-category="商业科技"
+               class="w-24 h-24 rounded-xl object-cover border border-outline-variant/30 bg-surface-container" />
+          <span class="absolute top-1 left-1 px-1.5 py-0.5 rounded-md bg-primary/95 text-on-primary text-[9px] font-bold tracking-wide">AI</span>
+          <button id="btn-del-2" type="button" aria-label="删除附件"
+                  class="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/60 backdrop-blur text-white
+                          flex items-center justify-center hover:bg-error active:scale-90 transition-all">
+            <i data-lucide="x" class="w-3 h-3"></i>
           </button>
         </div>
-      </div>
-
-      <!-- 8) 标签 + 关联事件 -->
-      <div class="space-y-4">
-        <div>
-          <div class="flex items-center justify-between mb-2.5">
-            <p class="text-xs text-on-surface-variant">标签</p>
-            <span class="text-[11px] text-on-surface-variant tabular-nums">3/5</span>
-          </div>
-          <div class="flex flex-wrap gap-2">
-            <span class="tag-selected px-3 py-1.5 rounded-full border border-primary/60 bg-primary/10 text-primary text-xs font-medium inline-flex items-center gap-1">
-              新能源
-              <i data-lucide="x" class="w-3 h-3 opacity-60"></i>
-            </span>
-            <span class="tag-selected px-3 py-1.5 rounded-full border border-primary/60 bg-primary/10 text-primary text-xs font-medium inline-flex items-center gap-1">
-              车端需求
-              <i data-lucide="x" class="w-3 h-3 opacity-60"></i>
-            </span>
-            <span class="tag-selected px-3 py-1.5 rounded-full border border-primary/60 bg-primary/10 text-primary text-xs font-medium inline-flex items-center gap-1">
-              Q3 业绩
-              <i data-lucide="x" class="w-3 h-3 opacity-60"></i>
-            </span>
-            <button id="btn-add-tag"
-                    class="px-3 py-1.5 rounded-full border border-dashed border-on-surface-variant/30
-                           text-on-surface-variant text-xs inline-flex items-center gap-1
-                           active:scale-95 transition-transform">
-              <i data-lucide="plus" class="w-3 h-3"></i>
-              添加标签
-            </button>
-          </div>
+        <!-- 缩略图-3：已上传 + AI 解读 -->
+        <div class="relative shrink-0 group" data-img-id="img-3">
+          <img id="thumb-3" src="https://images.unsplash.com/photo-1559526324-4b87b5e36e44?w=200&h=200&fit=crop"
+               alt="行业研报截图" data-category="商业科技"
+               class="w-24 h-24 rounded-xl object-cover border border-outline-variant/30 bg-surface-container" />
+          <span class="absolute top-1 left-1 px-1.5 py-0.5 rounded-md bg-primary/95 text-on-primary text-[9px] font-bold tracking-wide">AI</span>
+          <button id="btn-del-3" type="button" aria-label="删除附件"
+                  class="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/60 backdrop-blur text-white
+                          flex items-center justify-center hover:bg-error active:scale-90 transition-all">
+            <i data-lucide="x" class="w-3 h-3"></i>
+          </button>
         </div>
-        <div>
-          <p class="text-xs text-on-surface-variant mb-1.5">关联事件</p>
-          <input id="input-event" type="text"
-                 placeholder="如：2024 Q2 财报发布"
-                 class="w-full bg-surface-container border-none rounded-xl px-4 py-3 text-sm
-                        text-on-surface placeholder:text-on-surface-variant/30
-                        focus:outline-none focus:ring-2 focus:ring-primary/30 transition-shadow" />
-        </div>
+        <!-- 上传占位卡 -->
+        <button id="btn-upload" type="button"
+                class="shrink-0 w-24 h-24 rounded-xl border-2 border-dashed border-surface-container-high
+                       flex flex-col items-center justify-center gap-1 text-on-surface-variant
+                       hover:border-primary/40 hover:bg-primary/5 active:scale-95 transition-all">
+          <i data-lucide="plus" class="w-6 h-6"></i>
+          <span class="text-[10px] font-medium">上传截图</span>
+        </button>
       </div>
+    </section>
 
-      <!-- 9) 来源备注 -->
-      <div>
-        <p class="text-xs text-on-surface-variant mb-1.5">来源备注</p>
-        <input id="input-source" type="text"
-               placeholder="信息来源，如：招股书 / 行业研报 / 财报电话会"
-               class="w-full bg-surface-container border-none rounded-xl px-4 py-3 text-sm
-                      text-on-surface placeholder:text-on-surface-variant/30
-                      focus:outline-none focus:ring-2 focus:ring-primary/30 transition-shadow" />
-      </div>
-
-      <!-- 底部说明 -->
-      <div class="pt-2 pb-2 text-center">
-        <p class="text-[11px] text-on-surface-variant/50 leading-relaxed">
-          观点将保存至「宁德时代」时间线 · 仅自己可见
+    <!-- 7) AI 解读提示条 -->
+    <section class="px-4 pt-5">
+      <div id="ai-insert-banner"
+           class="glass bg-white/80 rounded-2xl border border-primary/25 px-3.5 py-3 flex items-center gap-3">
+        <i data-lucide="sparkles" class="w-[18px] h-[18px] text-primary shrink-0"></i>
+        <p class="flex-1 text-[13px] text-on-surface leading-snug">
+          已为 3 张图生成 AI 解读，合并到正文末尾？
         </p>
+        <button id="btn-ai-insert" type="button"
+                class="text-primary text-[12px] font-semibold px-2 py-1 rounded-md
+                       hover:bg-primary/10 active:bg-primary/15 transition-colors shrink-0">
+          插入
+        </button>
+      </div>
+    </section>
+
+    <!-- 8) 标签与关联事件 -->
+    <section class="px-4 pt-6">
+      <h2 class="text-sm font-semibold text-on-surface mb-2.5">标签</h2>
+      <div class="flex flex-wrap gap-2">
+        <span id="tag-new-energy" class="tag-chip inline-flex items-center gap-1 px-3 py-1.5 rounded-full
+                                           border border-primary/40 bg-primary/5 text-primary text-[13px] font-medium">
+          新能源
+          <i data-lucide="x" class="w-3 h-3 opacity-60"></i>
+        </span>
+        <span id="tag-ev-demand" class="tag-chip inline-flex items-center gap-1 px-3 py-1.5 rounded-full
+                                          border border-primary/40 bg-primary/5 text-primary text-[13px] font-medium">
+          车端需求
+          <i data-lucide="x" class="w-3 h-3 opacity-60"></i>
+        </span>
+        <span id="tag-q3" class="tag-chip inline-flex items-center gap-1 px-3 py-1.5 rounded-full
+                                  border border-primary/40 bg-primary/5 text-primary text-[13px] font-medium">
+          Q3 业绩
+          <i data-lucide="x" class="w-3 h-3 opacity-60"></i>
+        </span>
+        <button id="btn-add-tag" type="button"
+                class="inline-flex items-center gap-1 px-3 py-1.5 rounded-full
+                       border border-dashed border-on-surface-variant/40 text-on-surface-variant text-[13px] font-medium
+                       hover:border-primary/40 hover:text-primary hover:bg-primary/5 transition-colors">
+          <i data-lucide="plus" class="w-3 h-3"></i>
+          添加标签
+        </button>
       </div>
 
-    </div>
+      <h2 class="text-sm font-semibold text-on-surface mt-5 mb-2.5">关联事件</h2>
+      <input id="input-event" type="text"
+             placeholder="如：2024 Q2 财报发布"
+             class="w-full bg-surface-container border-none rounded-xl px-4 py-3 text-base
+                    text-on-surface placeholder:text-on-surface-variant/50
+                    focus:outline-none focus:ring-2 focus:ring-primary/30 transition-colors" />
+    </section>
+
+    <!-- 9) 来源备注 -->
+    <section class="px-4 pt-5">
+      <h2 class="text-sm font-semibold text-on-surface mb-2.5">来源备注</h2>
+      <input id="input-source" type="text"
+             placeholder="信息来源，如：招股书 / 行业研报 / 财报电话会"
+             class="w-full bg-surface-container border-none rounded-xl px-4 py-3 text-base
+                    text-on-surface placeholder:text-on-surface-variant/50
+                    focus:outline-none focus:ring-2 focus:ring-primary/30 transition-colors" />
+    </section>
+
+    <!-- 底部留白 -->
+    <div class="h-4"></div>
   </main>
   <!-- @main-content:end -->
 
-  <!-- 底部固定操作条（glass-strong） -->
-  <div class="fixed bottom-0 left-0 right-0 z-30 glass-strong border-t border-outline-variant/10
-              px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
-    <div class="flex items-center gap-3">
-      <button id="btn-insert-image"
+  <!-- 10) 底部固定操作条 -->
+  <div class="fixed bottom-0 left-0 right-0 z-30 glass-strong border-t border-outline-variant/40
+              px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
+    <div class="flex items-center gap-2.5">
+      <button id="btn-bottom-image" type="button" aria-label="添加图片"
               class="w-12 h-12 rounded-full bg-surface-container flex items-center justify-center
-                     active:scale-95 transition-transform"
-              aria-label="插入图片">
-        <i data-lucide="image" class="w-5 h-5 text-on-surface"></i>
+                     text-on-surface-variant hover:bg-surface-container-high active:scale-95 transition-all shrink-0">
+        <i data-lucide="image-plus" class="w-5 h-5"></i>
       </button>
-      <button id="btn-voice"
+      <button id="btn-bottom-mic" type="button" aria-label="语音输入"
               class="w-12 h-12 rounded-full bg-surface-container flex items-center justify-center
-                     active:scale-95 transition-transform"
-              aria-label="语音速记">
-        <i data-lucide="mic" class="w-5 h-5 text-on-surface"></i>
+                     text-on-surface-variant hover:bg-surface-container-high active:scale-95 transition-all shrink-0">
+        <i data-lucide="mic" class="w-5 h-5"></i>
       </button>
-      <button id="btn-save"
-              class="flex-1 h-12 rounded-xl bg-primary text-on-primary text-[15px] font-semibold
-                     glow-primary inline-flex items-center justify-center gap-2
-                     active:scale-[0.98] transition-transform">
+      <button id="btn-save" type="button"
+              class="flex-1 h-12 rounded-xl bg-primary text-on-primary glow-primary
+                     flex items-center justify-center gap-1.5 text-[15px] font-semibold
+                     hover:opacity-95 active:scale-[0.98] transition-all">
         <i data-lucide="check" class="w-4 h-4"></i>
         保存观点
       </button>
     </div>
   </div>
 
-  <!-- Sheet：股票选择器 -->
-  <div id="sheet-stock" class="hidden fixed inset-0 z-50">
-    <div id="sheet-stock-backdrop" class="absolute inset-0 bg-black/60 backdrop-blur-sm"></div>
-    <div class="absolute bottom-0 left-0 right-0 bg-surface rounded-t-2xl
-                max-h-[80vh] overflow-y-auto
-                px-6 pt-5 pb-[calc(1.5rem+env(safe-area-inset-bottom))]">
-      <div class="w-10 h-1 bg-on-surface-variant/30 rounded-full mx-auto mb-4"></div>
-      <div class="flex items-center justify-between mb-4">
+  <!-- ============= 浮层：股票选择 Sheet ============= -->
+  <div id="sheet-stock" class="fixed inset-0 z-50 hidden">
+    <div id="sheet-stock-mask" class="absolute inset-0 bg-black/40 backdrop-blur-sm"></div>
+    <div class="absolute bottom-0 left-0 right-0 glass-strong rounded-t-2xl border-t border-outline-variant/40
+                p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] max-h-[80vh] overflow-y-auto">
+      <div class="w-10 h-1 rounded-full bg-on-surface-variant/30 mx-auto mb-4"></div>
+      <div class="flex items-center justify-between mb-3">
         <h3 class="text-base font-semibold text-on-surface">选择股票</h3>
-        <button id="sheet-stock-close" class="w-8 h-8 flex items-center justify-center text-on-surface-variant rounded-full hover:bg-surface-container transition-colors">
+        <button id="btn-sheet-stock-close" type="button" aria-label="关闭"
+                class="w-8 h-8 flex items-center justify-center text-on-surface-variant rounded-full
+                       hover:bg-surface-container active:bg-surface-container-high transition-colors">
           <i data-lucide="x" class="w-4 h-4"></i>
         </button>
       </div>
-
-      <div class="space-y-2">
-        <button class="stock-option w-full flex items-center gap-3 p-3 rounded-xl bg-surface-container active:scale-[0.99] transition-transform" data-name="宁德时代" data-code="300750.SZ" data-initial="宁">
-          <div class="w-10 h-10 rounded-[10px] glass flex items-center justify-center flex-shrink-0">
-            <span class="text-lg font-bold text-primary">宁</span>
+      <div class="relative mb-3">
+        <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-on-surface-variant/60"></i>
+        <input id="stock-search" type="text" placeholder="搜索股票代码或名称"
+               class="w-full bg-surface-container border-none rounded-xl pl-9 pr-4 py-2.5 text-sm
+                      text-on-surface placeholder:text-on-surface-variant/50
+                      focus:outline-none focus:ring-2 focus:ring-primary/30 transition-colors" />
+      </div>
+      <p class="text-[11px] text-on-surface-variant mb-2 px-1">我的自选</p>
+      <div id="stock-list" class="flex flex-col">
+        <!-- 列表-股票1 -->
+        <button class="stock-item flex items-center gap-3 px-2 py-3 rounded-xl hover:bg-surface-container active:bg-surface-container-high transition-colors text-left"
+                data-code="300750" data-name="宁德时代">
+          <div class="w-10 h-10 rounded-[10px] bg-white border border-primary/25 flex items-center justify-center shrink-0">
+            <span class="text-[18px] font-bold text-primary leading-none">宁</span>
           </div>
-          <div class="flex-1 text-left">
-            <p class="text-sm font-semibold text-on-surface">宁德时代</p>
-            <p class="text-xs text-on-surface-variant mt-0.5">300750.SZ · 新能源</p>
+          <div class="flex-1 min-w-0">
+            <p class="text-[15px] font-semibold text-on-surface leading-tight">宁德时代</p>
+            <p class="text-[12px] text-on-surface-variant mt-0.5 tabular-nums">300750.SZ · 新能源</p>
           </div>
           <i data-lucide="check" class="w-4 h-4 text-primary"></i>
         </button>
-        <button class="stock-option w-full flex items-center gap-3 p-3 rounded-xl bg-surface-container active:scale-[0.99] transition-transform" data-name="比亚迪" data-code="002594.SZ" data-initial="比">
-          <div class="w-10 h-10 rounded-[10px] glass flex items-center justify-center flex-shrink-0">
-            <span class="text-lg font-bold text-primary">比</span>
+        <!-- 列表-股票2 -->
+        <button class="stock-item flex items-center gap-3 px-2 py-3 rounded-xl hover:bg-surface-container active:bg-surface-container-high transition-colors text-left"
+                data-code="002594" data-name="比亚迪">
+          <div class="w-10 h-10 rounded-[10px] bg-white border border-outline-variant/40 flex items-center justify-center shrink-0">
+            <span class="text-[18px] font-bold text-on-surface-variant leading-none">比</span>
           </div>
-          <div class="flex-1 text-left">
-            <p class="text-sm font-semibold text-on-surface">比亚迪</p>
-            <p class="text-xs text-on-surface-variant mt-0.5">002594.SZ · 整车</p>
-          </div>
-        </button>
-        <button class="stock-option w-full flex items-center gap-3 p-3 rounded-xl bg-surface-container active:scale-[0.99] transition-transform" data-name="阳光电源" data-code="300274.SZ" data-initial="阳">
-          <div class="w-10 h-10 rounded-[10px] glass flex items-center justify-center flex-shrink-0">
-            <span class="text-lg font-bold text-primary">阳</span>
-          </div>
-          <div class="flex-1 text-left">
-            <p class="text-sm font-semibold text-on-surface">阳光电源</p>
-            <p class="text-xs text-on-surface-variant mt-0.5">300274.SZ · 光伏逆变器</p>
+          <div class="flex-1 min-w-0">
+            <p class="text-[15px] font-semibold text-on-surface leading-tight">比亚迪</p>
+            <p class="text-[12px] text-on-surface-variant mt-0.5 tabular-nums">002594.SZ · 新能源车</p>
           </div>
         </button>
-        <button class="stock-option w-full flex items-center gap-3 p-3 rounded-xl bg-surface-container active:scale-[0.99] transition-transform" data-name="隆基绿能" data-code="601012.SH" data-initial="隆">
-          <div class="w-10 h-10 rounded-[10px] glass flex items-center justify-center flex-shrink-0">
-            <span class="text-lg font-bold text-primary">隆</span>
+        <!-- 列表-股票3 -->
+        <button class="stock-item flex items-center gap-3 px-2 py-3 rounded-xl hover:bg-surface-container active:bg-surface-container-high transition-colors text-left"
+                data-code="300274" data-name="阳光电源">
+          <div class="w-10 h-10 rounded-[10px] bg-white border border-outline-variant/40 flex items-center justify-center shrink-0">
+            <span class="text-[18px] font-bold text-on-surface-variant leading-none">阳</span>
           </div>
-          <div class="flex-1 text-left">
-            <p class="text-sm font-semibold text-on-surface">隆基绿能</p>
-            <p class="text-xs text-on-surface-variant mt-0.5">601012.SH · 光伏</p>
+          <div class="flex-1 min-w-0">
+            <p class="text-[15px] font-semibold text-on-surface leading-tight">阳光电源</p>
+            <p class="text-[12px] text-on-surface-variant mt-0.5 tabular-nums">300274.SZ · 储能</p>
+          </div>
+        </button>
+        <!-- 列表-股票4 -->
+        <button class="stock-item flex items-center gap-3 px-2 py-3 rounded-xl hover:bg-surface-container active:bg-surface-container-high transition-colors text-left"
+                data-code="300124" data-name="汇川技术">
+          <div class="w-10 h-10 rounded-[10px] bg-white border border-outline-variant/40 flex items-center justify-center shrink-0">
+            <span class="text-[18px] font-bold text-on-surface-variant leading-none">汇</span>
+          </div>
+          <div class="flex-1 min-w-0">
+            <p class="text-[15px] font-semibold text-on-surface leading-tight">汇川技术</p>
+            <p class="text-[12px] text-on-surface-variant mt-0.5 tabular-nums">300124.SZ · 工控自动化</p>
           </div>
         </button>
       </div>
     </div>
   </div>
 
-  <!-- Sheet：图片操作 -->
-  <div id="sheet-image" class="hidden fixed inset-0 z-50">
-    <div id="sheet-image-backdrop" class="absolute inset-0 bg-black/60 backdrop-blur-sm"></div>
-    <div class="absolute bottom-0 left-0 right-0 bg-surface rounded-t-2xl
-                px-6 pt-5 pb-[calc(1.5rem+env(safe-area-inset-bottom))]">
-      <div class="w-10 h-1 bg-on-surface-variant/30 rounded-full mx-auto mb-4"></div>
-      <h3 id="sheet-image-title" class="text-sm font-medium text-on-surface-variant text-center mb-4 truncate">附件操作</h3>
-      <div class="space-y-2">
-        <button id="img-action-view" class="w-full flex items-center gap-3 p-4 rounded-xl bg-surface-container active:scale-[0.99] transition-transform">
-          <i data-lucide="image" class="w-5 h-5 text-on-surface-variant"></i>
-          <span class="text-sm font-medium text-on-surface">查看大图</span>
+  <!-- ============= 浮层：图片操作 Sheet ============= -->
+  <div id="sheet-image" class="fixed inset-0 z-50 hidden">
+    <div id="sheet-image-mask" class="absolute inset-0 bg-black/40 backdrop-blur-sm"></div>
+    <div class="absolute bottom-0 left-0 right-0 glass-strong rounded-t-2xl border-t border-outline-variant/40
+                p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
+      <div class="w-10 h-1 rounded-full bg-on-surface-variant/30 mx-auto mb-4"></div>
+      <p id="sheet-image-title" class="text-sm font-semibold text-on-surface text-center mb-3">图片操作</p>
+      <div class="flex flex-col">
+        <button id="img-action-view" type="button"
+                class="flex items-center gap-3 px-3 py-3.5 rounded-xl hover:bg-surface-container active:bg-surface-container-high transition-colors text-left">
+          <i data-lucide="eye" class="w-4 h-4 text-on-surface-variant"></i>
+          <span class="text-[15px] text-on-surface">查看大图</span>
         </button>
-        <button id="img-action-ai" class="w-full flex items-center gap-3 p-4 rounded-xl bg-surface-container active:scale-[0.99] transition-transform">
-          <i data-lucide="sparkles" class="w-5 h-5 text-primary"></i>
-          <span class="text-sm font-medium text-primary">AI 解读图片</span>
+        <button id="img-action-ai" type="button"
+                class="flex items-center gap-3 px-3 py-3.5 rounded-xl hover:bg-surface-container active:bg-surface-container-high transition-colors text-left">
+          <i data-lucide="sparkles" class="w-4 h-4 text-primary"></i>
+          <span class="text-[15px] text-on-surface">AI 重新解读</span>
         </button>
-        <button id="img-action-delete" class="w-full flex items-center gap-3 p-4 rounded-xl bg-error/10 active:scale-[0.99] transition-transform">
-          <i data-lucide="trash-2" class="w-5 h-5 text-error"></i>
-          <span class="text-sm font-medium text-error">删除图片</span>
-        </button>
-        <button id="img-action-cancel" class="w-full p-4 rounded-xl bg-surface-container-high active:scale-[0.99] transition-transform">
-          <span class="text-sm font-medium text-on-surface-variant">取消</span>
+        <button id="img-action-del" type="button"
+                class="flex items-center gap-3 px-3 py-3.5 rounded-xl hover:bg-error/10 active:bg-error/15 transition-colors text-left">
+          <i data-lucide="trash-2" class="w-4 h-4 text-error"></i>
+          <span class="text-[15px] text-error">删除图片</span>
         </button>
       </div>
-    </div>
-  </div>
-
-  <!-- Sheet：AI 解读结果预览（隐藏 demo） -->
-  <div id="sheet-ai-result" class="hidden fixed inset-0 z-[60]">
-    <div class="absolute inset-0 bg-black/70 backdrop-blur-sm"></div>
-    <div class="absolute inset-x-4 top-1/2 -translate-y-1/2 glass-strong rounded-2xl p-5">
-      <div class="flex items-center gap-2 mb-3">
-        <i data-lucide="sparkles" class="w-4 h-4 text-primary"></i>
-        <h3 class="text-sm font-semibold text-on-surface">AI 解读完成</h3>
-      </div>
-      <p id="ai-result-text" class="text-[13px] text-on-surface leading-relaxed">
-        图表显示宁德时代周线级别处于上升通道，MACD 金叉，成交量温和放大；下方支撑 175 元，上方阻力 220 元，止损位建议设置在 175 附近。
-      </p>
-      <div class="flex gap-2 mt-4">
-        <button id="ai-result-cancel" class="flex-1 py-2.5 rounded-xl bg-surface-container text-on-surface text-sm font-medium">取消</button>
-        <button id="ai-result-confirm" class="flex-1 py-2.5 rounded-xl bg-primary text-on-primary text-sm font-semibold glow-primary">插入正文</button>
-      </div>
+      <button id="btn-sheet-image-close" type="button"
+              class="w-full mt-3 py-3 rounded-xl bg-surface-container text-on-surface text-[15px] font-medium
+                     hover:bg-surface-container-high active:scale-[0.99] transition-all">
+        取消
+      </button>
     </div>
   </div>
 
   <script>
-    // ========== 导航辅助函数 ==========
-    function navPush(route) {
-      console.log(`[原型演示] PUSH 到: ${route}`);
-      window.location.href = route;
-    }
-    function navReplace(route) {
-      console.log(`[原型演示] REPLACE 为: ${route}`);
-      window.location.replace(route);
-    }
-    function navReset(route) {
-      console.log(`[原型演示] RESET 到: ${route}`);
-      window.location.href = route;
-    }
-    function navBack() {
-      console.log(`[原型演示] BACK 返回上一页`);
-      if (window.history.length > 1) window.history.back();
-      else window.location.href = 'stock.html';
-    }
-
-    $(function () {
-      // ====== Header ======
-      // 关闭：返回 stock.html
-      $('#btn-close').on('click', function () {
-        window.location.href = 'stock.html';
-      });
-      // 顶部保存
-      $('#btn-header-save').on('click', function () {
-        saveNote();
-      });
-
-      // ====== 1. 股票选择卡 ======
-      $('#stock-card').on('click', function () {
-        $('#sheet-stock').removeClass('hidden');
-        lucide.createIcons();
-      });
-      $('#sheet-stock-backdrop, #sheet-stock-close').on('click', function () {
-        $('#sheet-stock').addClass('hidden');
-      });
-      $('.stock-option').on('click', function () {
-        const name = $(this).data('name');
-        const code = $(this).data('code');
-        const initial = $(this).data('initial');
-        // 更新股票卡显示
-        $('#stock-card').find('p').first().text(name);
-        $('#stock-card').find('p').eq(1).text(code + ' · 已选');
-        $('#stock-card').find('span').first().text(initial);
-        $('#sheet-stock').addClass('hidden');
-      });
-
-      // ====== 2. 方向三选一 ======
-      $('.dir-btn').on('click', function () {
-        const dir = $(this).data('dir');
-        // 重置所有
-        $('.dir-btn').attr('aria-pressed', 'false')
-          .removeClass('bg-primary-container/60')
-          .find('span:last-child').removeClass('text-primary text-error text-warning').addClass('text-on-surface-variant');
-        // 激活当前
-        $(this).attr('aria-pressed', 'true').addClass('bg-primary-container/60');
-        const colorMap = { bull: 'text-primary', bear: 'text-primary', neutral: 'text-primary' };
-        $(this).find('span:last-child').removeClass('text-on-surface-variant').addClass(colorMap[dir]);
-        // 简单交互：切换激活态已完成，复杂场景下应同步表单方向字段到 hidden input
-        console.log(`[方向切换] 当前方向: ${dir}`);
-      });
-
-      // ====== 4. 标题字符计数 ======
-      $('#input-title').on('input', function () {
-        const len = $(this).val().length;
-        $('#title-counter').text(`${len}/100`);
-      });
-
-      // ====== 5. 富文本工具栏（复杂交互，仅占位） ======
-      // 加粗按钮 - 复杂交互：富文本编辑
-      // 1. 获取 textarea 当前选区起始/结束位置
-      // 2. 用 ** 包裹选区文本（markdown 语法）
-      // 3. 替换原选区并重新聚焦
-      // 4. 高亮当前按钮（toggle active 状态）
-      $('#rt-bold').on('click', function () {
-        $(this).toggleClass('active');
-        console.log('[富文本] 加粗 - 需实现选区 markdown 包裹');
-      });
-      // 斜体 - 复杂交互：用 * 包裹选区
-      $('#rt-italic').on('click', function () {
-        $(this).toggleClass('active');
-        console.log('[富文本] 斜体 - 需实现选区 * 包裹');
-      });
-      // 下划线 - 复杂交互：插入 <u> 标签或 markdown 扩展语法
-      $('#rt-underline').on('click', function () {
-        $(this).toggleClass('active');
-        console.log('[富文本] 下划线 - 需实现选区标记');
-      });
-      // 无序列表 - 复杂交互：在光标行首插入 - 标记
-      $('#rt-list').on('click', function () {
-        console.log('[富文本] 无序列表 - 需实现在行首插入 - ');
-      });
-      // 有序列表 - 复杂交互：根据行号自动编号 1. 2. 3.
-      $('#rt-list-ordered').on('click', function () {
-        console.log('[富文本] 有序列表 - 需实现自动编号');
-      });
-      // 引用 - 复杂交互：在行首插入 > 标记
-      $('#rt-quote').on('click', function () {
-        console.log('[富文本] 引用 - 需实现在行首插入 > ');
-      });
-      // 插入链接 - 复杂交互：弹出输入框收集 URL，包裹选区为 [text](url)
-      $('#rt-link').on('click', function () {
-        console.log('[富文本] 链接 - 需弹窗收集 URL 并包裹选区');
-      });
-      // 插入图片 - 复杂交互：调起系统相册选择图片，上传 TOS 后插入 ![](url)
-      $('#rt-image').on('click', function () {
-        console.log('[富文本] 插入图片 - 需调起系统相册并上传');
-      });
-
-      // ====== 6. 图片附件交互 ======
-      // 点击图片 → 弹出操作 sheet
-      $('.attachment-item').on('click', function (e) {
-        // 阻止删除按钮冒泡
-        if ($(e.target).closest('.att-remove').length) return;
-        const name = $(this).data('name') || '附件';
-        $('#sheet-image-title').text(name);
-        $('#sheet-image').removeClass('hidden');
-        lucide.createIcons();
-      });
-      // 关闭图片 sheet
-      $('#sheet-image-backdrop, #img-action-cancel').on('click', function () {
-        $('#sheet-image').addClass('hidden');
-      });
-      // 查看大图 - 复杂交互：弹出全屏预览，支持双指缩放、左右滑动切换
-      $('#img-action-view').on('click', function () {
-        $('#sheet-image').addClass('hidden');
-        console.log('[图片] 查看大图 - 需实现全屏预览组件');
-      });
-      // AI 解读 - 复杂交互：调用豆包多模态 ai/image-understand，弹窗显示解读结果
-      $('#img-action-ai').on('click', function () {
-        $('#sheet-image').addClass('hidden');
-        $('#sheet-ai-result').removeClass('hidden');
-        lucide.createIcons();
-      });
-      // 确认插入 AI 解读
-      $('#ai-result-confirm').on('click', function () {
-        const result = $('#ai-result-text').text();
-        const content = $('#input-content');
-        content.val((content.val() || '') + '\n\n[AI 解读] ' + result);
-        $('#sheet-ai-result').addClass('hidden');
-        console.log('[AI 解读] 已合并到正文');
-      });
-      $('#ai-result-cancel, #sheet-ai-result > div').first().on('click', function () {
-        $('#sheet-ai-result').addClass('hidden');
-      });
-      // 删除图片
-      $('#img-action-delete').on('click', function () {
-        $('#sheet-image').addClass('hidden');
-        // 简单交互：从 DOM 移除最后一张附件（demo）
-        const items = $('.attachment-item');
-        if (items.length > 0) {
-          items.last().remove();
-          // 更新计数
-          const left = $('.attachment-item').length;
-          $('h3:contains("附件")').siblings('span').text(`${left}/9`);
+    $(function() {
+        // === 导航辅助函数 ===
+        function navPush(route) { window.location.href = route; }
+        function navReplace(route) { window.location.replace(route); }
+        function navReset(route) { window.location.href = route; }
+        function navBack() {
+            if (window.history.length > 1) window.history.back();
+            else window.location.href = 'stock.html';
         }
-      });
-      // 删除按钮（缩略图右上角 ×）
-      $('.att-remove').on('click', function (e) {
-        e.stopPropagation();
-        const item = $(this).closest('.attachment-item');
-        item.css('transform', 'scale(0.8)').css('opacity', '0');
-        setTimeout(function () {
-          item.remove();
-          const left = $('.attachment-item').length;
-          $('.text-sm.font-semibold:contains("附件")').siblings('span').text(`${left}/9`);
-        }, 200);
-      });
-      // 新增图片
-      $('#btn-add-image').on('click', function () {
-        // 复杂交互：调起系统相册/相机 → 上传 TOS → 写入 attachments 数组
-        // 1. 调用 wx.chooseMedia / Taro.chooseMedia 唤起选择
-        // 2. 上传至 TOS（先调 upload/sign 拿签名 URL）
-        // 3. 上传完成后回填 URL 到附件列表 + 触发单图 AI 解读
-        console.log('[附件] 唤起系统相册选择图片');
-      });
 
-      // ====== 7. AI 解读提示条"插入"按钮 ======
-      $('#btn-ai-insert').on('click', function () {
-        const aiText = '\n\n[AI 解读摘要]\n· K 线处于上升通道，MACD 金叉，量能温和放大\n· 关键支撑 175 元，阻力 220 元\n· 装机量柱状图显示 Q2 同比 +45%，拐点确认\n· 海外储能订单超预期，业绩弹性可期';
-        const content = $('#input-content');
-        content.val((content.val() || '') + aiText);
-        // 隐藏提示条
-        $(this).closest('.gradient-border').fadeOut(300, function () { $(this).remove(); });
-        console.log('[AI 解读] 已批量插入到正文末尾');
-      });
+        // === 关闭按钮：返回 stock.html ===
+        $('#btn-close').on('click', function() {
+            navBack();
+        });
 
-      // ====== 8. 标签与事件 ======
-      // 移除已选标签
-      $('.tag-selected').on('click', function (e) {
-        e.stopPropagation();
-        if ($(e.target).closest('svg').length || $(e.target).is('span.tag-selected')) {
-          $(this).fadeOut(200, function () { $(this).remove(); });
+        // === 标题输入：字符计数 ===
+        $('#input-title').on('input', function() {
+            const len = $(this).val().length;
+            $('#title-counter').text(len + '/100');
+        });
+
+        // === 方向三选一：切换激活态 ===
+        $('.dir-option').on('click', function() {
+            const $self = $(this);
+            // 移除所有激活态
+            $('.dir-option').removeClass('bg-primary-container text-primary border border-primary/40')
+                              .addClass('text-on-surface-variant')
+                              .removeAttr('aria-current');
+            // 设置当前激活
+            $self.addClass('bg-primary-container text-primary border border-primary/40')
+                 .removeClass('text-on-surface-variant')
+                 .attr('aria-current', 'true');
+        });
+
+        // === 富文本工具栏（原型只绑定事件入口） ===
+        // 后续应实现：
+        // 1. bold/italic/underline：在选区包裹对应 markdown 标记（** / * / __）
+        // 2. list/list-ordered：在行首插入 - / 1. 标记
+        // 3. quote：在行首插入 > 标记
+        // 4. link：弹出 URL 输入框，选中文本包裹 [text](url)
+        // 5. image：弹出图片选择/上传，插入 ![alt](url)
+        $('.rt-tool').on('click', function() {
+            const tool = this.id.replace('rt-', '');
+            console.log('[富文本] 工具栏操作:', tool, '- 实际实现需在选区插入对应 markdown 标记');
+        });
+
+        // === 股票选择：打开 sheet ===
+        $('#btn-stock-select').on('click', function() {
+            $('#sheet-stock').removeClass('hidden');
+        });
+        // 关闭 stock sheet
+        function closeStockSheet() { $('#sheet-stock').addClass('hidden'); }
+        $('#btn-sheet-stock-close, #sheet-stock-mask').on('click', closeStockSheet);
+
+        // 选择股票
+        $('.stock-item').on('click', function() {
+            const code = $(this).data('code');
+            const name = $(this).data('name');
+            const first = name.substring(0, 1);
+            // 更新顶部卡（视觉态）
+            $('#btn-stock-select .text-\\[15px\\]').text(name);
+            $('#btn-stock-select .text-\\[12px\\]').text(code + '.SZ · 我的自选');
+            $('#btn-stock-select .text-\\[18px\\]').text(first);
+            closeStockSheet();
+        });
+
+        // === 图片缩略图：点击弹出操作 sheet ===
+        $('[data-img-id]').on('click', function(e) {
+            // 阻止 × 删除按钮冒泡
+            if ($(e.target).closest('button').length) return;
+            const id = $(this).data('img-id');
+            console.log('[图片] 点击缩略图:', id);
+            $('#sheet-image-title').text('图片操作');
+            $('#sheet-image').removeClass('hidden');
+        });
+        // 单张 × 删除按钮
+        $('[id^="btn-del-"]').on('click', function(e) {
+            e.stopPropagation();
+            const id = $(this).attr('id').replace('btn-del-', '');
+            console.log('[图片] 删除图片:', id);
+            // 原型仅日志；后续应：确认 → 调 upload/delete → 从 DOM 移除
+            $(this).closest('[data-img-id]').fadeOut(200, function() { $(this).remove(); });
+        });
+        // 关闭 image sheet
+        function closeImageSheet() { $('#sheet-image').addClass('hidden'); }
+        $('#btn-sheet-image-close, #sheet-image-mask').on('click', closeImageSheet);
+        $('#img-action-view').on('click', function() { console.log('[图片] 查看大图'); closeImageSheet(); });
+        $('#img-action-ai').on('click', function() { console.log('[图片] AI 重新解读'); closeImageSheet(); });
+        $('#img-action-del').on('click', function() { console.log('[图片] 删除图片'); closeImageSheet(); });
+
+        // === 上传占位卡 ===
+        $('#btn-upload, #btn-bottom-image').on('click', function() {
+            console.log('[上传] 弹出系统选择图片：相册/拍照/粘贴');
+            // 后续应：调起 Network.chooseImage → 上传 TOS → 调 ai/image-understand
+        });
+
+        // === 语音输入 ===
+        $('#btn-bottom-mic').on('click', function() {
+            console.log('[语音] 开始录音：长按说话，识别为文字追加到正文');
+            // 后续应：按住录音 → 实时识别 → 追加到 #rt-content 末尾
+        });
+
+        // === AI 解读插入 ===
+        $('#btn-ai-insert').on('click', function() {
+            const $rt = $('#rt-content');
+            const insertText = '\n\n【AI 解读】\n• 图1（K线图）：5日均线金叉10日，MACD 红柱放大，短期动能向上。\n• 图2（装机量）：6月装机 32.5 GWh 创历史新高，YoY +45%。\n• 图3（研报截图）：中信证券 7/15 给予「买入」评级，目标价 285 元。';
+            $rt.val(($rt.val() || '') + insertText);
+            // 隐藏提示条
+            $('#ai-insert-banner').fadeOut(200, function() { $(this).remove(); });
+            console.log('[AI] 已将 3 张图解读插入正文末尾');
+        });
+
+        // === 标签管理 ===
+        $('.tag-chip').on('click', function() {
+            const tag = $(this).text().trim();
+            console.log('[标签] 移除标签:', tag);
+            // 后续应：调 notes/remove-tag → 动画移除
+            $(this).fadeOut(150, function() { $(this).remove(); });
+        });
+        $('#btn-add-tag').on('click', function() {
+            console.log('[标签] 弹出标签选择器：搜索已有标签 / 新建标签');
+            // 后续应：弹出 tag-picker sheet
+        });
+
+        // === 保存按钮 ===
+        function saveNote() {
+            const payload = {
+                code: '300750.SZ',
+                name: '宁德时代',
+                direction: $('.dir-option[aria-current="true"]').data('dir') || 'bull',
+                price_entry: $('#price-entry').val(),
+                price_target: $('#price-target').val(),
+                price_stop: $('#price-stop').val(),
+                title: $('#input-title').val(),
+                content: $('#rt-content').val(),
+                event: $('#input-event').val(),
+                source: $('#input-source').val(),
+                tags: ['新能源', '车端需求', 'Q3 业绩']
+            };
+            console.log('[保存] 提交观点:', payload);
+            // 后续应：调 notes/create 或 notes/update，成功后 navBack
+            alert('已保存观点（演示）');
         }
-      });
-      // 添加标签 - 复杂交互：弹出标签输入弹层
-      // 1. 弹层包含输入框 + 已有标签推荐
-      // 2. 输入回车提交，自动去重
-      // 3. 最多 5 个标签
-      $('#btn-add-tag').on('click', function () {
-        console.log('[标签] 弹层输入新标签 - 需实现标签选择/创建弹层');
-      });
-
-      // ====== 9. 底部操作条 ======
-      // 插入图片（底部条）
-      $('#btn-insert-image').on('click', function () {
-        // 复杂交互：调起系统相册，多选图片批量上传
-        console.log('[底部] 插入图片 - 需实现系统相册多选 + 批量上传');
-      });
-      // 语音速记
-      $('#btn-voice').on('click', function () {
-        // 复杂交互：
-        // 1. 调起 Taro.getRecorderManager 开始录音
-        // 2. 录音中显示波形动画
-        // 3. 松开发送 → 上传音频 → 调豆包 ASR 转写
-        // 4. 转写结果追加到正文
-        console.log('[底部] 语音速记 - 需实现录音 + ASR 转写');
-      });
-      // 保存观点
-      $('#btn-save').on('click', function () {
-        saveNote();
-      });
-
-      // ====== 价格输入校验（简单） ======
-      $('input[id^="input-"]').on('input', function () {
-        if ($(this).attr('inputmode') === 'decimal') {
-          // 仅允许数字 + 一个小数点
-          let v = $(this).val().replace(/[^\d.]/g, '');
-          const parts = v.split('.');
-          if (parts.length > 2) v = parts[0] + '.' + parts.slice(1).join('');
-          $(this).val(v);
-        }
-      });
+        $('#btn-header-save, #btn-save').on('click', saveNote);
     });
-
-    // ========== 保存观点（复杂交互） ==========
-    // 复杂交互 - 完整实现步骤：
-    // 1. 收集表单数据：stock_code / direction / entry_price / target_price / stop_price / title / content / tags / event / source / attachments
-    // 2. 前端校验：
-    //    - title 必填且 ≤100 字
-    //    - 三个价格必须为正数，且止损 < 入场 < 目标（看多）/ 入场 < 止损 < 目标（看空）
-    //    - 至少 1 个标签
-    // 3. 调用 notes/create 或 notes/update（根据 URL ?note_id 判定）
-    // 4. 成功 → Toast「观点已保存」→ navBack()
-    // 5. 失败 → Toast 错误信息，停留当前页
-    function saveNote() {
-      const data = {
-        stock: $('#stock-card p').first().text(),
-        direction: $('.dir-btn[aria-pressed="true"]').data('dir'),
-        entry: $('#input-entry').val(),
-        target: $('#input-target').val(),
-        stop: $('#input-stop').val(),
-        title: $('#input-title').val(),
-        content: $('#input-content').val(),
-        tags: $('.tag-selected').map(function () { return $(this).text().trim(); }).get(),
-        event: $('#input-event').val(),
-        source: $('#input-source').val(),
-        attachments: $('.attachment-item').length
-      };
-      console.log('[保存观点] 表单数据:', data);
-      // 演示：直接返回
-      if (!data.title) {
-        alert('请输入观点标题');
-        return;
-      }
-      // 实际实现应调 API，成功后跳回详情页
-      // navBack();
-      // 这里仅演示导航
-      console.log('[保存观点] 成功，跳转回 stock.html');
-      window.location.href = 'stock.html';
-    }
   </script>
 
   <script>lucide.createIcons();</script>

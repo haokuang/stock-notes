@@ -14,26 +14,26 @@
   <style type="text/tailwindcss">
     @theme {
       /* === 品牌色（电感紫，2026 标志色） === */
-      --color-primary:              #7C5CFF;
-      --color-primary-container:    #2A1B5C;
+      --color-primary:              #6D4DFF;
+      --color-primary-container:    #ECE7FF;
       --color-on-primary:           #ffffff;
-      /* === 背景 / 表面（极暗蓝黑 + 中性灰蓝色阶） === */
-      --color-background:                 #0A0B14;
-      --color-surface-container-lowest:   #0F1119;
-      --color-surface:                    #14171F;
-      --color-surface-container:          #1A1D27;
-      --color-surface-container-high:     #22252F;
-      --color-surface-container-highest:  #2A2D38;
+      /* === 背景 / 表面（极浅冷灰 + 中性灰蓝色阶） === */
+      --color-background:                 #EEF0F6;
+      --color-surface-container-lowest:   #FFFFFF;
+      --color-surface:                    #F8F9FD;
+      --color-surface-container:          #E6E8F0;
+      --color-surface-container-high:     #D9DCE6;
+      --color-surface-container-highest:  #CCD0DC;
       /* === 文字 === */
-      --color-on-surface:           #F5F6FA;
-      --color-on-surface-variant:   #9CA0B0;
-      /* === 功能色（看多绿 / 看空红 / 中性琥珀） === */
-      --color-success:  #22E58D;
-      --color-error:    #FF4D6D;
-      --color-warning:  #FFB547;
+      --color-on-surface:           #161826;
+      --color-on-surface-variant:   #5B5E72;
+      /* === 功能色（看多绿 / 看空红 / 中性琥珀，浅色下加深饱和度以提升对比） === */
+      --color-success:  #0F8C66;
+      --color-error:    #D11A4A;
+      --color-warning:  #B45309;
       /* === 边框 === */
-      --color-outline:          #3A3E4D;
-      --color-outline-variant:  #252835;
+      --color-outline:          #C0C2CF;
+      --color-outline-variant:  #DDDFE9;
       /* === 圆角 === */
       --radius-sm:   0.5rem;
       --radius-md:   0.75rem;
@@ -41,10 +41,10 @@
       --radius-xl:   1.25rem;
       --radius-2xl:  1.5rem;
       --radius-full: 9999px;
-      /* === 阴影（带霓虹辉光） === */
-      --shadow-card:   0 4px 24px rgba(124, 92, 255, 0.10), 0 1px 2px rgba(0,0,0,0.4);
-      --shadow-float:  0 10px 40px rgba(124, 92, 255, 0.18), 0 4px 12px rgba(0,0,0,0.5);
-      --shadow-dialog: 0 25px 60px rgba(0,0,0,0.6), 0 0 60px rgba(124, 92, 255, 0.12);
+      /* === 阴影（柔和实阴影，浅色下替代深色辉光） === */
+      --shadow-card:   0 1px 2px rgba(20, 18, 60, 0.06), 0 6px 20px rgba(20, 18, 60, 0.10);
+      --shadow-float:  0 4px 12px rgba(20, 18, 60, 0.10), 0 12px 40px rgba(20, 18, 60, 0.14);
+      --shadow-dialog: 0 25px 60px rgba(20, 18, 60, 0.20), 0 0 1px rgba(20, 18, 60, 0.08);
       /* === 字体 === */
       --font-sans: "Space Grotesk", "Noto Sans SC", system-ui, sans-serif;
       --font-display: "Space Grotesk", "Noto Sans SC", system-ui, sans-serif;
@@ -56,25 +56,29 @@
       min-height: max(812px, 100dvh);
       font-family: "Space Grotesk", "Noto Sans SC", system-ui, sans-serif;
       background:
-        radial-gradient(ellipse 80% 50% at 50% -20%, rgba(124, 92, 255, 0.18), transparent 60%),
-        radial-gradient(ellipse 60% 40% at 100% 100%, rgba(34, 229, 141, 0.06), transparent 50%),
-        #0A0B14;
+        radial-gradient(ellipse 70% 50% at 50% -10%, rgba(109, 77, 255, 0.12), transparent 60%),
+        radial-gradient(ellipse 60% 40% at 100% 100%, rgba(16, 185, 129, 0.06), transparent 50%),
+        #EEF0F6;
     }
+    /* 玻璃拟态基础类（浅色版：白色半透明 + 强 backdrop-blur） */
     .glass {
-      background: rgba(20, 23, 31, 0.55);
+      background: rgba(255, 255, 255, 0.72);
       backdrop-filter: blur(24px) saturate(180%);
       -webkit-backdrop-filter: blur(24px) saturate(180%);
-      border: 1px solid rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.85);
+      box-shadow: 0 1px 2px rgba(20, 18, 60, 0.04), 0 6px 24px rgba(20, 18, 60, 0.06);
     }
     .glass-strong {
-      background: rgba(15, 17, 25, 0.78);
+      background: rgba(255, 255, 255, 0.88);
       backdrop-filter: blur(32px) saturate(200%);
       -webkit-backdrop-filter: blur(32px) saturate(200%);
-      border: 1px solid rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.95);
+      box-shadow: 0 4px 16px rgba(20, 18, 60, 0.06);
     }
-    .glow-primary { box-shadow: 0 0 24px rgba(124, 92, 255, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.1); }
-    .glow-success { box-shadow: 0 0 18px rgba(34, 229, 141, 0.30); }
-    .glow-error   { box-shadow: 0 0 18px rgba(255, 77, 109, 0.30); }
+    /* 浅色辉光（用柔和阴影 + 描边替代发光，保留"主色"识别） */
+    .glow-primary { box-shadow: 0 0 0 1px rgba(109, 77, 255, 0.30), 0 8px 24px rgba(109, 77, 255, 0.18); }
+    .glow-success { box-shadow: 0 0 0 1px rgba(16, 185, 129, 0.30), 0 6px 18px rgba(16, 185, 129, 0.14); }
+    .glow-error   { box-shadow: 0 0 0 1px rgba(225, 29, 72, 0.30), 0 6px 18px rgba(225, 29, 72, 0.14); }
     .scrollbar-hide::-webkit-scrollbar { display: none; }
     .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
     .tabular-nums { font-variant-numeric: tabular-nums; }
@@ -88,7 +92,7 @@
       100% { background-position: 200% 0; }
     }
     .shimmer {
-      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.08), transparent);
+      background: linear-gradient(90deg, transparent, rgba(109, 77, 255, 0.10), transparent);
       background-size: 200% 100%;
       animation: shimmer 2s infinite;
     }
@@ -106,7 +110,7 @@
       const icons = { '人物': '👤', '自然风景': '🏞', '动物': '🐾', '建筑城市': '🏙', '运动体育': '⚽', '交通工具': '🚗', '食物': '🍽', '服饰时尚': '👗', '商业科技': '💼', '游戏娱乐': '🎮', '艺术': '🎨', '其他': '🖼' };
       const icon = icons[cat] || '🖼';
       const w = img.width || 400, h = img.height || 300;
-      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}"><rect width="100%" height="100%" fill="%231A1D27"/><text x="50%" y="45%" text-anchor="middle" font-size="${Math.min(w, h) * 0.18}" dominant-baseline="central">${icon}</text><text x="50%" y="68%" text-anchor="middle" font-size="${Math.min(w, h) * 0.07}" fill="%239CA0B0" font-family="system-ui,sans-serif" dominant-baseline="central">${label}</text></svg>`;
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}"><rect width="100%" height="100%" fill="%23F0F0F5"/><text x="50%" y="45%" text-anchor="middle" font-size="${Math.min(w, h) * 0.18}" dominant-baseline="central">${icon}</text><text x="50%" y="68%" text-anchor="middle" font-size="${Math.min(w, h) * 0.07}" fill="%235E6172" font-family="system-ui,sans-serif" dominant-baseline="central">${label}</text></svg>`;
       img.src = 'data:image/svg+xml,' + svg;
     }, true);
   </script>
