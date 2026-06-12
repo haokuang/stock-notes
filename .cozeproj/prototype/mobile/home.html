@@ -249,7 +249,55 @@
       </div>
     </section>
 
-    <!-- 5. 自选股横向滑动 -->
+    <!-- 5. 观点活跃度热力图（GitHub / Flomo 风格贡献度图） -->
+    <section id="contribution-heatmap" class="px-4 mt-6">
+      <div class="glass rounded-2xl p-4">
+        <!-- 标题行 + 图例 -->
+        <div class="flex items-start justify-between gap-3 mb-3">
+          <div class="min-w-0">
+            <h3 class="text-sm font-semibold text-on-surface">观点活跃度</h3>
+            <p id="heatmap-summary" class="text-[11px] text-on-surface-variant mt-0.5">过去 365 天 · 共记录 23 条观点</p>
+          </div>
+          <div class="flex items-center gap-1.5 text-[10px] text-on-surface-variant shrink-0 pt-0.5">
+            <span>少</span>
+            <div class="flex gap-[2px]" id="heatmap-legend">
+              <div class="w-2.5 h-2.5 rounded-[2px] bg-surface-container"></div>
+              <div class="w-2.5 h-2.5 rounded-[2px]" style="background:rgba(109,77,255,0.18)"></div>
+              <div class="w-2.5 h-2.5 rounded-[2px]" style="background:rgba(109,77,255,0.40)"></div>
+              <div class="w-2.5 h-2.5 rounded-[2px]" style="background:rgba(109,77,255,0.65)"></div>
+              <div class="w-2.5 h-2.5 rounded-[2px] bg-primary"></div>
+            </div>
+            <span>多</span>
+          </div>
+        </div>
+
+        <!-- 热力图主体（横向滚动，53 周 × 7 天 年视图） -->
+        <div class="overflow-x-auto scrollbar-hide -mx-4 px-4 pb-1">
+          <div class="inline-block">
+            <!-- 月份标签行：宽度 = 18px(星期) + 3px(gap) + 53 × 13px(列) ≈ 710px -->
+            <div id="heatmap-months" class="flex gap-[3px] ml-[18px] mb-1 text-[9px] text-on-surface-variant/70 h-3"></div>
+            <!-- 主网格：左星期标签 + 53 列方格 -->
+            <div class="flex gap-[3px]">
+              <div class="flex flex-col gap-[3px] shrink-0 text-[9px] text-on-surface-variant/70 leading-[10px]">
+                <span class="h-[10px]">一</span>
+                <span class="h-[10px]"></span>
+                <span class="h-[10px]">三</span>
+                <span class="h-[10px]"></span>
+                <span class="h-[10px]">五</span>
+                <span class="h-[10px]"></span>
+                <span class="h-[10px]">日</span>
+              </div>
+              <div id="heatmap-grid" class="flex gap-[3px] shrink-0"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 底部 hover tooltip：默认隐藏，hover 单格时填充 -->
+        <div id="heatmap-tooltip" class="hidden fixed pointer-events-none z-20 px-2.5 py-1.5 rounded-md bg-on-surface/95 text-background text-[11px] font-medium whitespace-nowrap shadow-float"></div>
+      </div>
+    </section>
+
+    <!-- 6. 自选股横向滑动 -->
     <section id="watchlist" class="mt-6">
       <div class="flex items-center justify-between px-4 mb-3">
         <h2 class="text-base font-semibold text-on-surface">我的自选</h2>
@@ -522,6 +570,105 @@
             e.preventDefault();
             navReset('library.html');
         });
+
+        // === 观点活跃度热力图（GitHub / Flomo 风格） ===
+        (function renderHeatmap() {
+          const WEEKS = 53, DAYS = 7, COL_W = 10, ROW_H = 10, GAP = 3, COL_TOTAL = COL_W + GAP;
+
+          // 1) 模拟 23 条观点在过去 ~280 天内的分布
+          const data = {};
+          const seeds = [
+            { d: 2, n: 1 }, { d: 5, n: 2 }, { d: 8, n: 1 }, { d: 12, n: 3 },
+            { d: 18, n: 1 }, { d: 22, n: 2 }, { d: 26, n: 1 }, { d: 31, n: 4 },
+            { d: 36, n: 1 }, { d: 41, n: 2 }, { d: 48, n: 1 }, { d: 53, n: 2 },
+            { d: 60, n: 3 }, { d: 68, n: 1 }, { d: 75, n: 2 }, { d: 82, n: 1 },
+            { d: 90, n: 3 }, { d: 100, n: 2 }, { d: 110, n: 1 }, { d: 125, n: 2 },
+            { d: 142, n: 1 }, { d: 160, n: 3 }, { d: 180, n: 2 }
+          ];
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          seeds.forEach(({ d, n }) => {
+            const dt = new Date(today);
+            dt.setDate(today.getDate() - d);
+            const key = dt.toISOString().slice(0, 10);
+            data[key] = (data[key] || 0) + n;
+          });
+
+          // 2) 起点 = 过去 (53*7-1) 天前那个周一
+          const start = new Date(today);
+          start.setDate(today.getDate() - (WEEKS * 7 - 1));
+          const startDow = (start.getDay() + 6) % 7;
+          start.setDate(start.getDate() - startDow);
+
+          // 3) 月份标签
+          const $months = $('#heatmap-months');
+          let lastMonth = -1;
+          for (let w = 0; w < WEEKS; w++) {
+            const colDate = new Date(start);
+            colDate.setDate(start.getDate() + w * 7);
+            const el = document.createElement('span');
+            el.className = 'shrink-0 leading-3';
+            el.style.width = COL_TOTAL + 'px';
+            if (colDate.getMonth() !== lastMonth && colDate.getDate() <= 7 && w > 0) {
+              el.textContent = (colDate.getMonth() + 1) + '月';
+              lastMonth = colDate.getMonth();
+            }
+            $months.append($(el));
+          }
+
+          // 4) 53×7 方格
+          const $grid = $('#heatmap-grid');
+          for (let w = 0; w < WEEKS; w++) {
+            const col = document.createElement('div');
+            col.className = 'flex flex-col gap-[3px] shrink-0';
+            for (let d = 0; d < DAYS; d++) {
+              const cellDate = new Date(start);
+              cellDate.setDate(start.getDate() + w * 7 + d);
+              const cell = document.createElement('div');
+              cell.style.width = COL_W + 'px';
+              cell.style.height = ROW_H + 'px';
+              cell.className = 'rounded-[2px] transition-transform hover:scale-150 hover:z-10';
+              if (cellDate > today) {
+                cell.style.visibility = 'hidden';
+              } else {
+                const key = cellDate.toISOString().slice(0, 10);
+                const count = data[key] || 0;
+                if (count === 0)        cell.style.background = '#E6E8F0';
+                else if (count <= 2)    cell.style.background = 'rgba(109,77,255,0.18)';
+                else if (count <= 5)    cell.style.background = 'rgba(109,77,255,0.40)';
+                else if (count <= 10)   cell.style.background = 'rgba(109,77,255,0.65)';
+                else                    cell.style.background = '#6D4DFF';
+                cell.dataset.date = key;
+                cell.dataset.count = count;
+              }
+              col.appendChild(cell);
+            }
+            $grid[0].appendChild(col);
+          }
+
+          // 5) Tooltip 跟随
+          const $tooltip = $('#heatmap-tooltip');
+          $grid.find('[data-date]').each(function () {
+            const $cell = $(this);
+            $cell.on('mouseenter', function (e) {
+              const c = $cell.attr('data-count');
+              const date = $cell.attr('data-date');
+              const label = date + (c === '0' ? ' · 无观点' : ' · ' + c + ' 条观点');
+              $tooltip.text(label).removeClass('hidden');
+            });
+            $cell.on('mousemove', function (e) {
+              $tooltip.css('left', (e.clientX + 12) + 'px').css('top', (e.clientY - 32) + 'px');
+            });
+            $cell.on('mouseleave', function () { $tooltip.addClass('hidden'); });
+          });
+
+          // 6) 更新顶部摘要
+          const totalNotes = Object.values(data).reduce((a, b) => a + b, 0);
+          const activeDays = Object.keys(data).length;
+          $('#heatmap-summary').text(
+            `过去 365 天 · 共 ${totalNotes} 条观点 · 活跃 ${activeDays} 天`
+          );
+        })();
 
         // 悬浮 + 按钮
         $('#fab-create').on('click', function () {
