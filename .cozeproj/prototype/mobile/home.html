@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1, user-scalable=no" />
+
+  <link href="https://lf-code-agent.coze.cn/obj/x-ai-cn/fonts/google/google-all-fonts.css" rel="stylesheet" />
+
+  <script src="https://lf-code-agent.coze.cn/obj/x-ai-cn/cdn/jquery/jquery-3.7.1.min.js"></script>
+  <script src="https://lf-code-agent.coze.cn/obj/x-ai-cn/cdn/lucide/lucide-1.11.0.min.js"></script>
+  <script src="https://lf-code-agent.coze.cn/obj/x-ai-cn/cdn/tailwindcss/tailwindcss-browser-4.2.4.min.js"></script>
+
+  <style type="text/tailwindcss">
+    @theme {
+      /* === 品牌色（电感紫，2026 标志色） === */
+      --color-primary:              #7C5CFF;
+      --color-primary-container:    #2A1B5C;
+      --color-on-primary:           #ffffff;
+      /* === 背景 / 表面（极暗蓝黑 + 中性灰蓝色阶） === */
+      --color-background:                 #0A0B14;
+      --color-surface-container-lowest:   #0F1119;
+      --color-surface:                    #14171F;
+      --color-surface-container:          #1A1D27;
+      --color-surface-container-high:     #22252F;
+      --color-surface-container-highest:  #2A2D38;
+      /* === 文字 === */
+      --color-on-surface:           #F5F6FA;
+      --color-on-surface-variant:   #9CA0B0;
+      /* === 功能色（看多绿 / 看空红 / 中性琥珀） === */
+      --color-success:  #22E58D;
+      --color-error:    #FF4D6D;
+      --color-warning:  #FFB547;
+      /* === 边框 === */
+      --color-outline:          #3A3E4D;
+      --color-outline-variant:  #252835;
+      /* === 圆角 === */
+      --radius-sm:   0.5rem;
+      --radius-md:   0.75rem;
+      --radius-lg:   1rem;
+      --radius-xl:   1.25rem;
+      --radius-2xl:  1.5rem;
+      --radius-full: 9999px;
+      /* === 阴影（带霓虹辉光） === */
+      --shadow-card:   0 4px 24px rgba(124, 92, 255, 0.10), 0 1px 2px rgba(0,0,0,0.4);
+      --shadow-float:  0 10px 40px rgba(124, 92, 255, 0.18), 0 4px 12px rgba(0,0,0,0.5);
+      --shadow-dialog: 0 25px 60px rgba(0,0,0,0.6), 0 0 60px rgba(124, 92, 255, 0.12);
+      /* === 字体 === */
+      --font-sans: "Space Grotesk", "Noto Sans SC", system-ui, sans-serif;
+      --font-display: "Space Grotesk", "Noto Sans SC", system-ui, sans-serif;
+    }
+  </style>
+
+  <style>
+    body {
+      min-height: max(812px, 100dvh);
+      font-family: "Space Grotesk", "Noto Sans SC", system-ui, sans-serif;
+      background:
+        radial-gradient(ellipse 80% 50% at 50% -20%, rgba(124, 92, 255, 0.18), transparent 60%),
+        radial-gradient(ellipse 60% 40% at 100% 100%, rgba(34, 229, 141, 0.06), transparent 50%),
+        #0A0B14;
+    }
+    .glass {
+      background: rgba(20, 23, 31, 0.55);
+      backdrop-filter: blur(24px) saturate(180%);
+      -webkit-backdrop-filter: blur(24px) saturate(180%);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+    }
+    .glass-strong {
+      background: rgba(15, 17, 25, 0.78);
+      backdrop-filter: blur(32px) saturate(200%);
+      -webkit-backdrop-filter: blur(32px) saturate(200%);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .glow-primary { box-shadow: 0 0 24px rgba(124, 92, 255, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.1); }
+    .glow-success { box-shadow: 0 0 18px rgba(34, 229, 141, 0.30); }
+    .glow-error   { box-shadow: 0 0 18px rgba(255, 77, 109, 0.30); }
+    .scrollbar-hide::-webkit-scrollbar { display: none; }
+    .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+    .tabular-nums { font-variant-numeric: tabular-nums; }
+    @keyframes float-glow {
+      0%, 100% { transform: translateY(0); opacity: 0.6; }
+      50% { transform: translateY(-4px); opacity: 1; }
+    }
+    .animate-float-glow { animation: float-glow 3s ease-in-out infinite; }
+    @keyframes shimmer {
+      0% { background-position: -200% 0; }
+      100% { background-position: 200% 0; }
+    }
+    .shimmer {
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.08), transparent);
+      background-size: 200% 100%;
+      animation: shimmer 2s infinite;
+    }
+  </style>
+
+  <script>
+    document.addEventListener('error', function (e) {
+      const img = e.target;
+      if (img.tagName !== 'IMG' || img.dataset.fallback) return;
+      img.dataset.fallback = '1';
+      const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      const cat = img.getAttribute('data-category') || '其他';
+      const alt = img.getAttribute('alt') || '';
+      const label = esc(alt.length > 8 ? alt.slice(0, 8) + '…' : alt);
+      const icons = { '人物': '👤', '自然风景': '🏞', '动物': '🐾', '建筑城市': '🏙', '运动体育': '⚽', '交通工具': '🚗', '食物': '🍽', '服饰时尚': '👗', '商业科技': '💼', '游戏娱乐': '🎮', '艺术': '🎨', '其他': '🖼' };
+      const icon = icons[cat] || '🖼';
+      const w = img.width || 400, h = img.height || 300;
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}"><rect width="100%" height="100%" fill="%231A1D27"/><text x="50%" y="45%" text-anchor="middle" font-size="${Math.min(w, h) * 0.18}" dominant-baseline="central">${icon}</text><text x="50%" y="68%" text-anchor="middle" font-size="${Math.min(w, h) * 0.07}" fill="%239CA0B0" font-family="system-ui,sans-serif" dominant-baseline="central">${label}</text></svg>`;
+      img.src = 'data:image/svg+xml,' + svg;
+    }, true);
+  </script>
+</head>
+
+<body class="bg-background text-on-surface font-sans">
+
+  <!-- @nav:start 一级页 TabBar（TabBar 直达的页面用此段；二级页请整体替换为带返回按钮的 header） -->
+  <nav class="fixed bottom-0 left-0 right-0 z-40 glass-strong
+              flex justify-around items-center h-16 pb-[env(safe-area-inset-bottom)]">
+    <a href="home.html" class="flex flex-col items-center gap-0.5 px-4 py-1.5 text-primary" aria-current="page">
+      <i data-lucide="home" class="w-5 h-5"></i>
+      <span class="text-[10px] font-bold tracking-wide">首页</span>
+    </a>
+    <a href="library.html" class="flex flex-col items-center gap-0.5 px-4 py-1.5 text-on-surface-variant hover:text-on-surface transition-colors">
+      <i data-lucide="book-open" class="w-5 h-5"></i>
+      <span class="text-[10px] font-bold tracking-wide">观点库</span>
+    </a>
+    <a href="analysis.html" class="flex flex-col items-center gap-0.5 px-4 py-1.5 text-on-surface-variant hover:text-on-surface transition-colors">
+      <i data-lucide="sparkles" class="w-5 h-5"></i>
+      <span class="text-[10px] font-bold tracking-wide">AI 分析</span>
+    </a>
+    <a href="profile.html" class="flex flex-col items-center gap-0.5 px-4 py-1.5 text-on-surface-variant hover:text-on-surface transition-colors">
+      <i data-lucide="user" class="w-5 h-5"></i>
+      <span class="text-[10px] font-bold tracking-wide">我的</span>
+    </a>
+  </nav>
+  <!-- @nav:end -->
+
+  <main class="flex-1 pb-[calc(4rem+env(safe-area-inset-bottom))]">
+    <!-- @main-content:start -->
+
+    <!-- 1) 顶部 Header（sticky，与 body 一体化，无 border） -->
+    <header class="sticky top-0 z-30 h-14 px-4 flex items-center justify-between bg-background">
+      <div class="flex items-center gap-3">
+        <div class="flex items-center gap-1.5">
+          <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-[#4A2FCC] flex items-center justify-center glow-primary">
+            <i data-lucide="trending-up" class="w-4 h-4 text-on-primary"></i>
+          </div>
+          <span class="text-base font-bold text-on-surface tracking-wide">投研</span>
+          <span class="w-1.5 h-1.5 rounded-full bg-primary shadow-[0_0_8px_#7C5CFF] animate-float-glow"></span>
+        </div>
+        <div class="w-9 h-9 rounded-full bg-primary/20 border border-primary/30 flex items-center justify-center text-primary font-bold text-sm">初</div>
+      </div>
+      <div class="flex items-center gap-1">
+        <button id="btn-search" class="w-10 h-10 flex items-center justify-center text-on-surface-variant rounded-full hover:bg-surface-container active:bg-surface-container-high transition-colors">
+          <i data-lucide="search" class="w-5 h-5"></i>
+        </button>
+        <button id="btn-notify" class="relative w-10 h-10 flex items-center justify-center text-on-surface-variant rounded-full hover:bg-surface-container active:bg-surface-container-high transition-colors">
+          <i data-lucide="bell" class="w-5 h-5"></i>
+          <span class="absolute top-2 right-2 w-2 h-2 rounded-full bg-error glow-error"></span>
+        </button>
+      </div>
+    </header>
+
+    <!-- 2) Hero 问候区 -->
+    <section class="px-4 pt-5 pb-2">
+      <div class="flex items-start justify-between gap-3">
+        <div class="flex-1 min-w-0">
+          <h1 class="text-2xl font-bold text-on-surface leading-tight">晚上好，小初</h1>
+          <p class="text-sm text-on-surface-variant mt-1.5">今天关注 6 只股票 · 已记录 23 条观点</p>
+        </div>
+        <button id="btn-hero-add" class="flex-shrink-0 w-12 h-12 rounded-full glass flex items-center justify-center text-primary glow-primary active:scale-95 transition-transform">
+          <i data-lucide="plus" class="w-6 h-6"></i>
+        </button>
+      </div>
+    </section>
+
+    <!-- 3) 概览统计卡（玻璃 + 渐变描边） -->
+    <section class="px-4 mt-1">
+      <div class="relative glass rounded-2xl p-4 overflow-hidden border border-primary/20" style="background-image: linear-gradient(135deg, rgba(124,92,255,0.18), rgba(124,92,255,0) 60%);">
+        <div class="grid grid-cols-3 gap-3 relative z-10">
+          <div class="text-center">
+            <p class="text-2xl font-bold tabular-nums bg-gradient-to-br from-primary to-[#A78BFA] bg-clip-text text-transparent leading-none">6</p>
+            <p class="text-[11px] text-on-surface-variant mt-2">关注股票</p>
+          </div>
+          <div class="text-center border-x border-outline-variant/20">
+            <p class="text-2xl font-bold tabular-nums bg-gradient-to-br from-primary to-[#A78BFA] bg-clip-text text-transparent leading-none">23</p>
+            <p class="text-[11px] text-on-surface-variant mt-2">观点总数</p>
+          </div>
+          <div class="text-center">
+            <p class="text-2xl font-bold tabular-nums bg-gradient-to-br from-primary to-[#A78BFA] bg-clip-text text-transparent leading-none">8</p>
+            <p class="text-[11px] text-on-surface-variant mt-2">AI 报告</p>
+          </div>
+        </div>
+        <div class="mt-4 pt-3 border-t border-outline-variant/15 relative z-10">
+          <div class="flex items-center justify-between mb-1">
+            <span class="text-[11px] text-on-surface-variant">7 日观点活跃度</span>
+            <span class="text-[11px] text-success flex items-center gap-0.5 tabular-nums font-semibold">
+              <i data-lucide="trending-up" class="w-3 h-3"></i>
+              +18%
+            </span>
+          </div>
+          <svg viewBox="0 0 200 36" class="w-full h-9" preserveAspectRatio="none">
+            <defs>
+              <linearGradient id="spark-grad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#7C5CFF" stop-opacity="0.5"/>
+                <stop offset="100%" stop-color="#7C5CFF" stop-opacity="0"/>
+              </linearGradient>
+            </defs>
+            <path d="M0,26 L28,22 L57,28 L85,16 L114,20 L142,10 L171,14 L200,6 L200,36 L0,36 Z" fill="url(#spark-grad)"/>
+            <path d="M0,26 L28,22 L57,28 L85,16 L114,20 L142,10 L171,14 L200,6" fill="none" stroke="#7C5CFF" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+      </div>
+    </section>
+
+    <!-- 4) 快捷操作 4 宫格 -->
+    <section class="px-4 mt-5">
+      <div class="grid grid-cols-4 gap-2.5">
+        <button id="qa-add-stock" class="glass rounded-2xl py-3.5 flex flex-col items-center gap-1.5 active:scale-95 transition-transform">
+          <i data-lucide="plus-circle" class="w-6 h-6 text-primary"></i>
+          <span class="text-[11px] text-on-surface">添加股票</span>
+        </button>
+        <button id="qa-new-note" class="glass rounded-2xl py-3.5 flex flex-col items-center gap-1.5 active:scale-95 transition-transform">
+          <i data-lucide="pen-square" class="w-6 h-6 text-primary"></i>
+          <span class="text-[11px] text-on-surface">新建观点</span>
+        </button>
+        <button id="qa-image-ai" class="glass rounded-2xl py-3.5 flex flex-col items-center gap-1.5 active:scale-95 transition-transform">
+          <i data-lucide="image-plus" class="w-6 h-6 text-primary"></i>
+          <span class="text-[11px] text-on-surface">截图解读</span>
+        </button>
+        <button id="qa-ai-report" class="glass rounded-2xl py-3.5 flex flex-col items-center gap-1.5 active:scale-95 transition-transform">
+          <i data-lucide="sparkles" class="w-6 h-6 text-primary"></i>
+          <span class="text-[11px] text-on-surface">AI 报告</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- 5) 自选股横向滑动 -->
+    <section class="mt-6">
+      <div class="px-4 flex items-center justify-between mb-3">
+        <h2 class="text-base font-semibold text-on-surface">我的自选</h2>
+        <a href="profile.html" id="link-manage-stocks" class="text-xs text-on-surface-variant flex items-center gap-0.5">
+          管理
+          <i data-lucide="chevron-right" class="w-3.5 h-3.5"></i>
+        </a>
+      </div>
+      <div id="stock-list" class="flex gap-3 overflow-x-auto scrollbar-hide px-4 pb-1">
+        <!-- 列表-股票1：宁德时代 -->
+        <button data-code="300750" class="stock-card glass rounded-xl p-3.5 w-40 flex-shrink-0 text-left active:scale-[0.98] transition-transform">
+          <div class="flex items-center justify-between gap-1">
+            <p class="text-base font-semibold text-on-surface truncate">宁德时代</p>
+            <span class="px-1.5 py-0.5 rounded text-[10px] bg-surface-container-high text-on-surface-variant flex-shrink-0">锂电池</span>
+          </div>
+          <p class="text-xs text-on-surface-variant mt-0.5 tabular-nums">300750</p>
+          <p class="text-[22px] font-bold tabular-nums text-success mt-3 leading-none">189.36</p>
+          <div class="flex items-center gap-1 mt-1.5 text-success">
+            <svg class="w-3 h-3" viewBox="0 0 12 12" fill="currentColor" aria-hidden="true">
+              <path d="M6 2L11 10H1L6 2Z"/>
+            </svg>
+            <span class="text-xs font-semibold tabular-nums">+2.84%</span>
+          </div>
+        </button>
+        <!-- 列表-股票2：贵州茅台 -->
+        <button data-code="600519" class="stock-card glass rounded-xl p-3.5 w-40 flex-shrink-0 text-left active:scale-[0.98] transition-transform">
+          <div class="flex items-center justify-between gap-1">
+            <p class="text-base font-semibold text-on-surface truncate">贵州茅台</p>
+            <span class="px-1.5 py-0.5 rounded text-[10px] bg-surface-container-high text-on-surface-variant flex-shrink-0">白酒</span>
+          </div>
+          <p class="text-xs text-on-surface-variant mt-0.5 tabular-nums">600519</p>
+          <p class="text-[22px] font-bold tabular-nums text-error mt-3 leading-none">1672.50</p>
+          <div class="flex items-center gap-1 mt-1.5 text-error">
+            <svg class="w-3 h-3" viewBox="0 0 12 12" fill="currentColor" aria-hidden="true">
+              <path d="M6 10L1 2H11L6 10Z"/>
+            </svg>
+            <span class="text-xs font-semibold tabular-nums">-1.12%</span>
+          </div>
+        </button>
+        <!-- 列表-股票3：比亚迪 -->
+        <button data-code="002594" class="stock-card glass rounded-xl p-3.5 w-40 flex-shrink-0 text-left active:scale-[0.98] transition-transform">
+          <div class="flex items-center justify-between gap-1">
+            <p class="text-base font-semibold text-on-surface truncate">比亚迪</p>
+            <span class="px-1.5 py-0.5 rounded text-[10px] bg-surface-container-high text-on-surface-variant flex-shrink-0">新能源车</span>
+          </div>
+          <p class="text-xs text-on-surface-variant mt-0.5 tabular-nums">002594</p>
+          <p class="text-[22px] font-bold tabular-nums text-success mt-3 leading-none">252.80</p>
+          <div class="flex items-center gap-1 mt-1.5 text-success">
+            <svg class="w-3 h-3" viewBox="0 0 12 12" fill="currentColor" aria-hidden="true">
+              <path d="M6 2L11 10H1L6 2Z"/>
+            </svg>
+            <span class="text-xs font-semibold tabular-nums">+3.45%</span>
+          </div>
+        </button>
+        <!-- 列表-股票4：中际旭创 -->
+        <button data-code="300308" class="stock-card glass rounded-xl p-3.5 w-40 flex-shrink-0 text-left active:scale-[0.98] transition-transform">
+          <div class="flex items-center justify-between gap-1">
+            <p class="text-base font-semibold text-on-surface truncate">中际旭创</p>
+            <span class="px-1.5 py-0.5 rounded text-[10px] bg-surface-container-high text-on-surface-variant flex-shrink-0">光通信</span>
+          </div>
+          <p class="text-xs text-on-surface-variant mt-0.5 tabular-nums">300308</p>
+          <p class="text-[22px] font-bold tabular-nums text-success mt-3 leading-none">143.20</p>
+          <div class="flex items-center gap-1 mt-1.5 text-success">
+            <svg class="w-3 h-3" viewBox="0 0 12 12" fill="currentColor" aria-hidden="true">
+              <path d="M6 2L11 10H1L6 2Z"/>
+            </svg>
+            <span class="text-xs font-semibold tabular-nums">+5.62%</span>
+          </div>
+        </button>
+      </div>
+    </section>
+
+    <!-- 6) 最近观点 -->
+    <section class="px-4 mt-7">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="text-base font-semibold text-on-surface">最近观点</h2>
+        <a href="library.html" id="link-all-notes" class="text-xs text-on-surface-variant flex items-center gap-0.5">
+          全部
+          <i data-lucide="chevron-right" class="w-3.5 h-3.5"></i>
+        </a>
+      </div>
+      <div id="notes-list" class="flex flex-col gap-3">
+        <!-- 列表-观点1：宁德时代 / 看多 -->
+        <article class="note-card glass rounded-2xl p-3.5 flex gap-3" data-id="note-001">
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2 mb-1.5">
+              <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-bold bg-success/15 text-success glow-success">看多</span>
+              <span class="text-xs text-on-surface-variant">宁德时代</span>
+            </div>
+            <h3 class="text-base font-semibold text-on-surface">装机量超预期，看 Q3 出货</h3>
+            <p class="text-sm text-on-surface-variant mt-1 leading-snug line-clamp-2">7 月动力电池装机量同比增长 38%，海外储能订单加速兑现，Q3 出货量有望环比再提升 12% 以上。</p>
+            <div class="flex items-center gap-3 mt-2.5 text-on-surface-variant">
+              <span class="text-xs">2 小时前</span>
+              <span class="flex items-center gap-1 text-xs">
+                <i data-lucide="message-circle" class="w-3 h-3"></i>12
+              </span>
+              <span class="flex items-center gap-1 text-xs">
+                <i data-lucide="eye" class="w-3 h-3"></i>248
+              </span>
+            </div>
+          </div>
+          <img src="https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=160&h=160&fit=crop" alt="金融数据与电池装机" data-category="商业科技" class="w-14 h-14 rounded-xl object-cover flex-shrink-0"/>
+        </article>
+        <!-- 列表-观点2：比亚迪 / 看多 -->
+        <article class="note-card glass rounded-2xl p-3.5 flex gap-3" data-id="note-002">
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2 mb-1.5">
+              <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-bold bg-success/15 text-success glow-success">看多</span>
+              <span class="text-xs text-on-surface-variant">比亚迪</span>
+            </div>
+            <h3 class="text-base font-semibold text-on-surface">高端化路径明确，估值修复在即</h3>
+            <p class="text-sm text-on-surface-variant mt-1 leading-snug line-clamp-2">仰望 U8 单月交付破千，腾势品牌毛利率持续抬升，对标新势力 PE 仍有 30% 修复空间。</p>
+            <div class="flex items-center gap-3 mt-2.5 text-on-surface-variant">
+              <span class="text-xs">5 小时前</span>
+              <span class="flex items-center gap-1 text-xs">
+                <i data-lucide="message-circle" class="w-3 h-3"></i>8
+              </span>
+              <span class="flex items-center gap-1 text-xs">
+                <i data-lucide="eye" class="w-3 h-3"></i>176
+              </span>
+            </div>
+          </div>
+          <img src="https://images.unsplash.com/photo-1593941707882-a5bba14938c7?w=160&h=160&fit=crop" alt="新能源汽车生产线" data-category="商业科技" class="w-14 h-14 rounded-xl object-cover flex-shrink-0"/>
+        </article>
+        <!-- 列表-观点3：中际旭创 / 中性 -->
+        <article class="note-card glass rounded-2xl p-3.5 flex gap-3" data-id="note-003">
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2 mb-1.5">
+              <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-bold bg-warning/15 text-warning">中性</span>
+              <span class="text-xs text-on-surface-variant">中际旭创</span>
+            </div>
+            <h3 class="text-base font-semibold text-on-surface">800G 光模块需求强劲，调整即机会</h3>
+            <p class="text-sm text-on-surface-variant mt-1 leading-snug line-clamp-2">北美云厂商 capex 上修，800G 出货 Q3 环比 +40%，但当前估值已部分透支，建议等待回调布局。</p>
+            <div class="flex items-center gap-3 mt-2.5 text-on-surface-variant">
+              <span class="text-xs">昨天 21:18</span>
+              <span class="flex items-center gap-1 text-xs">
+                <i data-lucide="message-circle" class="w-3 h-3"></i>21
+              </span>
+              <span class="flex items-center gap-1 text-xs">
+                <i data-lucide="eye" class="w-3 h-3"></i>412
+              </span>
+            </div>
+          </div>
+          <img src="https://images.unsplash.com/photo-1518770660439-4636190af475?w=160&h=160&fit=crop" alt="光通信与高速网络" data-category="商业科技" class="w-14 h-14 rounded-xl object-cover flex-shrink-0"/>
+        </article>
+      </div>
+    </section>
+
+    <!-- 7) 悬浮"+"按钮 -->
+    <button id="fab-add" aria-label="新建" class="fixed right-4 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-30 w-14 h-14 rounded-full glass-strong glow-primary flex items-center justify-center active:scale-95 transition-transform">
+      <i data-lucide="plus" class="w-6 h-6 text-white"></i>
+    </button>
+
+    <!-- @main-content:end -->
+  </main>
+
+  <script>
+    // 移动端导航辅助函数
+    function navPush(route) {
+      console.log('[原型演示] PUSH 到:', route);
+      window.location.href = route;
+    }
+    function navReplace(route) {
+      console.log('[原型演示] REPLACE 为:', route);
+      window.location.replace(route);
+    }
+    function navReset(route) {
+      console.log('[原型演示] RESET 到:', route);
+      window.location.href = route;
+    }
+    function navBack() {
+      console.log('[原型演示] BACK 返回上一页');
+      if (window.history.length > 1) window.history.back();
+    }
+
+    $(function() {
+      // 1) Header 按钮
+      // 后续应实现：点击进入搜索页（自动聚焦搜索框，支持股票代码/名称/观点关键词检索）
+      $('#btn-search').on('click', function() {
+        console.log('搜索按钮 - 后续应实现：跳转搜索页（/search），自动聚焦搜索框，支持股票代码/名称/观点关键词检索');
+      });
+      // 后续应实现：点击进入通知中心，标记已读后清除红点；演示中用样式操作直接去掉红点
+      $('#btn-notify').on('click', function() {
+        $(this).find('span').fadeOut(200);
+        console.log('通知按钮 - 后续应实现：跳转到通知中心（观点被引用 / AI 报告完成 / 关注股票异动 等），标记已读后清除红点');
+      });
+
+      // 2) Hero 顶部"+"按钮
+      $('#btn-hero-add').on('click', function() {
+        // 后续应实现：
+        // 1. 从底部弹出 quick-create Sheet（高度 40vh，背景 bg-surface，圆角 2xl）
+        // 2. Sheet 中提供两个选项：「新建观点」（lucide-pen-square）和「新建股票」（lucide-plus-circle）
+        // 3. 点击选项后分别 navPush('note-edit.html') / navPush('stock.html?action=add') 后关闭 Sheet
+        console.log('Hero + 按钮 - 后续应实现：弹出 quick-create Sheet，含「新建观点」「新建股票」两个入口');
+      });
+
+      // 3) 快捷操作 4 宫格
+      $('#qa-add-stock').on('click', function() { navPush('stock.html?action=add'); });
+      $('#qa-new-note').on('click', function() { navPush('note-edit.html'); });
+      $('#qa-image-ai').on('click', function() { navPush('analysis.html?action=image'); });
+      $('#qa-ai-report').on('click', function() { navPush('analysis.html?action=report'); });
+
+      // 4) 自选股卡
+      $('#stock-list').on('click', '.stock-card', function() {
+        const code = $(this).data('code');
+        navPush('stock.html?code=' + code);
+      });
+
+      // 5) 观点卡
+      $('#notes-list').on('click', '.note-card', function() {
+        const id = $(this).data('id');
+        navPush('stock.html?note_id=' + id);
+      });
+
+      // 6) TabBar 切换（按规范：TabBar 一级页之间用 navReset）
+      // 禁止修改骨架的 nav 结构与 class，使用 href 属性选择器
+      $('nav a[href="home.html"]').on('click', function(e) { e.preventDefault(); navReset('home.html'); });
+      $('nav a[href="library.html"]').on('click', function(e) { e.preventDefault(); navReset('library.html'); });
+      $('nav a[href="analysis.html"]').on('click', function(e) { e.preventDefault(); navReset('analysis.html'); });
+      $('nav a[href="profile.html"]').on('click', function(e) { e.preventDefault(); navReset('profile.html'); });
+
+      // 7) 悬浮"+"
+      $('#fab-add').on('click', function() {
+        // 后续应实现：长按弹出 quick-create 菜单，点击直接展开底部 Sheet
+        console.log('悬浮 + 按钮 - 后续应实现：弹出 quick-create Sheet，含「新建观点」「新建股票」两个入口');
+      });
+    });
+  </script>
+  <script>lucide.createIcons();</script>
+</body>
+</html>

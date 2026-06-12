@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>宁德时代 · 股票详情</title>
+
+  <link href="https://lf-code-agent.coze.cn/obj/x-ai-cn/fonts/google/google-all-fonts.css" rel="stylesheet" />
+
+  <script src="https://lf-code-agent.coze.cn/obj/x-ai-cn/cdn/jquery/jquery-3.7.1.min.js"></script>
+  <script src="https://lf-code-agent.coze.cn/obj/x-ai-cn/cdn/lucide/lucide-1.11.0.min.js"></script>
+  <script src="https://lf-code-agent.coze.cn/obj/x-ai-cn/cdn/tailwindcss/tailwindcss-browser-4.2.4.min.js"></script>
+
+  <style type="text/tailwindcss">
+    @theme {
+      /* === 品牌色（电感紫，2026 标志色） === */
+      --color-primary:              #7C5CFF;
+      --color-primary-container:    #2A1B5C;
+      --color-on-primary:           #ffffff;
+      /* === 背景 / 表面（极暗蓝黑 + 中性灰蓝色阶） === */
+      --color-background:                 #0A0B14;
+      --color-surface-container-lowest:   #0F1119;
+      --color-surface:                    #14171F;
+      --color-surface-container:          #1A1D27;
+      --color-surface-container-high:     #22252F;
+      --color-surface-container-highest:  #2A2D38;
+      /* === 文字 === */
+      --color-on-surface:           #F5F6FA;
+      --color-on-surface-variant:   #9CA0B0;
+      /* === 功能色（看多绿 / 看空红 / 中性琥珀） === */
+      --color-success:  #22E58D;
+      --color-error:    #FF4D6D;
+      --color-warning:  #FFB547;
+      /* === 边框 === */
+      --color-outline:          #3A3E4D;
+      --color-outline-variant:  #252835;
+      /* === 圆角 === */
+      --radius-sm:   0.5rem;
+      --radius-md:   0.75rem;
+      --radius-lg:   1rem;
+      --radius-xl:   1.25rem;
+      --radius-2xl:  1.5rem;
+      --radius-full: 9999px;
+      /* === 阴影（带霓虹辉光） === */
+      --shadow-card:   0 4px 24px rgba(124, 92, 255, 0.10), 0 1px 2px rgba(0,0,0,0.4);
+      --shadow-float:  0 10px 40px rgba(124, 92, 255, 0.18), 0 4px 12px rgba(0,0,0,0.5);
+      --shadow-dialog: 0 25px 60px rgba(0,0,0,0.6), 0 0 60px rgba(124, 92, 255, 0.12);
+      /* === 字体 === */
+      --font-sans: "Space Grotesk", "Noto Sans SC", system-ui, sans-serif;
+      --font-display: "Space Grotesk", "Noto Sans SC", system-ui, sans-serif;
+    }
+  </style>
+
+  <style>
+    body {
+      min-height: max(812px, 100dvh);
+      font-family: "Space Grotesk", "Noto Sans SC", system-ui, sans-serif;
+      background:
+        radial-gradient(ellipse 80% 50% at 50% -20%, rgba(124, 92, 255, 0.18), transparent 60%),
+        radial-gradient(ellipse 60% 40% at 100% 100%, rgba(34, 229, 141, 0.06), transparent 50%),
+        #0A0B14;
+    }
+    .glass {
+      background: rgba(20, 23, 31, 0.55);
+      backdrop-filter: blur(24px) saturate(180%);
+      -webkit-backdrop-filter: blur(24px) saturate(180%);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+    }
+    .glass-strong {
+      background: rgba(15, 17, 25, 0.78);
+      backdrop-filter: blur(32px) saturate(200%);
+      -webkit-backdrop-filter: blur(32px) saturate(200%);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .glow-primary { box-shadow: 0 0 24px rgba(124, 92, 255, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.1); }
+    .glow-success { box-shadow: 0 0 18px rgba(34, 229, 141, 0.30); }
+    .glow-error   { box-shadow: 0 0 18px rgba(255, 77, 109, 0.30); }
+    .scrollbar-hide::-webkit-scrollbar { display: none; }
+    .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+    .tabular-nums { font-variant-numeric: tabular-nums; }
+    .line-clamp-2 {
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    /* 渐变描边：紫色 → 绿色 */
+    .gradient-border {
+      position: relative;
+      background: linear-gradient(135deg, rgba(124, 92, 255, 0.55), rgba(34, 229, 141, 0.35) 50%, rgba(124, 92, 255, 0.55));
+      padding: 1px;
+      border-radius: 1rem;
+    }
+    .gradient-border > .gradient-inner {
+      background: rgba(26, 29, 39, 0.85);
+      border-radius: calc(1rem - 1px);
+    }
+    /* 胶囊条：active 态高亮（仅视觉反馈） */
+    .pill-active-bull    { background: rgba(34, 229, 141, 0.12); border-color: rgba(34, 229, 141, 0.30); }
+    .pill-active-bear    { background: rgba(255, 77, 109, 0.12); border-color: rgba(255, 77, 109, 0.30); }
+    .pill-active-neutral { background: rgba(255, 181, 71, 0.12); border-color: rgba(255, 181, 71, 0.30); }
+  </style>
+
+  <script>
+    document.addEventListener('error', function (e) {
+      const img = e.target;
+      if (img.tagName !== 'IMG' || img.dataset.fallback) return;
+      img.dataset.fallback = '1';
+      const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      const cat = img.getAttribute('data-category') || '其他';
+      const alt = img.getAttribute('alt') || '';
+      const label = esc(alt.length > 8 ? alt.slice(0, 8) + '…' : alt);
+      const icons = { '人物': '👤', '自然风景': '🏞', '动物': '🐾', '建筑城市': '🏙', '运动体育': '⚽', '交通工具': '🚗', '食物': '🍽', '服饰时尚': '👗', '商业科技': '💼', '游戏娱乐': '🎮', '艺术': '🎨', '其他': '🖼' };
+      const icon = icons[cat] || '🖼';
+      const w = img.width || 400, h = img.height || 300;
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}"><rect width="100%" height="100%" fill="%231A1D27"/><text x="50%" y="45%" text-anchor="middle" font-size="${Math.min(w, h) * 0.18}" dominant-baseline="central">${icon}</text><text x="50%" y="68%" text-anchor="middle" font-size="${Math.min(w, h) * 0.07}" fill="%239CA0B0" font-family="system-ui,sans-serif" dominant-baseline="central">${label}</text></svg>`;
+      img.src = 'data:image/svg+xml,' + svg;
+    }, true);
+  </script>
+</head>
+
+<body class="bg-background text-on-surface font-sans">
+
+  <!-- ============ 二级页 Header（替换骨架 TabBar 段） ============ -->
+  <header class="sticky top-0 z-40 h-14 flex items-center justify-between px-4 bg-background">
+    <button id="btn-back" aria-label="返回"
+            class="w-10 h-10 flex items-center justify-center text-on-surface-variant rounded-full
+                   hover:bg-surface-container active:bg-surface-container-high transition-colors">
+      <i data-lucide="arrow-left" class="w-5 h-5"></i>
+    </button>
+    <h1 class="text-base font-semibold text-on-surface">宁德时代</h1>
+    <button id="btn-more" aria-label="更多"
+            class="w-10 h-10 flex items-center justify-center text-on-surface-variant rounded-full
+                   hover:bg-surface-container transition-colors">
+      <i data-lucide="more-vertical" class="w-5 h-5"></i>
+    </button>
+  </header>
+
+  <main class="flex-1 pb-[calc(3.5rem+env(safe-area-inset-bottom))]">
+
+    <!-- ================== 1) 顶部 Hero 区 ================== -->
+    <section class="relative px-4 pt-2 pb-4 overflow-hidden">
+      <!-- 中心发散紫色 radial 装饰光晕 -->
+      <div class="absolute inset-x-0 -top-10 h-64 bg-[radial-gradient(ellipse_70%_100%_at_50%_0%,rgba(124,92,255,0.32),transparent_60%)] pointer-events-none"></div>
+      <div class="absolute -top-32 left-1/2 -translate-x-1/2 w-[420px] h-[260px] bg-[radial-gradient(circle_at_50%_50%,rgba(124,92,255,0.22),transparent_70%)] pointer-events-none"></div>
+
+      <!-- 渐变描边容器 -->
+      <div class="relative p-px rounded-2xl bg-gradient-to-br from-primary/55 via-primary/15 to-success/40 shadow-card">
+        <div class="glass rounded-[15px] p-4 relative overflow-hidden">
+          <!-- 内部辉光 -->
+          <div class="absolute -top-16 -right-16 w-40 h-40 rounded-full bg-primary/20 blur-3xl pointer-events-none"></div>
+          <div class="absolute -bottom-20 -left-10 w-32 h-32 rounded-full bg-success/15 blur-3xl pointer-events-none"></div>
+
+          <div class="relative flex items-start gap-3">
+            <!-- 股票首字玻璃方块 -->
+            <div class="w-16 h-16 rounded-2xl glass flex items-center justify-center shrink-0 border border-primary/30">
+              <span class="text-2xl font-bold bg-gradient-to-br from-primary via-primary to-success bg-clip-text text-transparent">宁</span>
+            </div>
+            <div class="flex-1 min-w-0 pt-0.5">
+              <h2 class="text-2xl font-bold text-on-surface leading-tight">宁德时代</h2>
+              <p class="text-xs text-on-surface-variant mt-1 tabular-nums">300750.SZ</p>
+              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-primary/15 text-primary mt-1.5">动力电池 · 新能源</span>
+            </div>
+          </div>
+
+          <!-- 价格主行 -->
+          <div class="relative mt-4 flex items-baseline gap-2 flex-wrap">
+            <span class="text-3xl font-bold tabular-nums text-on-surface">218.50</span>
+            <span class="text-base font-semibold text-success glow-success rounded-md px-1.5 py-0.5 tabular-nums">+4.86</span>
+            <span class="bg-success/15 text-success px-2.5 py-0.5 rounded-full text-xs font-semibold tabular-nums">+2.28%</span>
+          </div>
+
+          <!-- 当日行情小字 -->
+          <p class="text-[12px] text-on-surface-variant mt-3 leading-relaxed tabular-nums">今日开 215.30 / 最高 220.10 / 最低 213.80 / 成交量 28.6万手</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================== 2) 价格快照玻璃卡 ================== -->
+    <section class="px-4">
+      <div class="glass rounded-2xl p-4 grid grid-cols-[1fr_1px_1fr_1px_1fr] gap-3 items-center">
+        <!-- 入场价均值 -->
+        <div class="flex flex-col items-center gap-1.5">
+          <i data-lucide="trending-up" class="w-4 h-4 text-primary"></i>
+          <p class="text-xs text-on-surface-variant">持仓成本</p>
+          <p class="text-lg font-bold tabular-nums text-primary">195.20</p>
+        </div>
+        <div class="w-px self-stretch bg-outline-variant/15"></div>
+        <!-- 目标价均值 -->
+        <div class="flex flex-col items-center gap-1.5">
+          <i data-lucide="target" class="w-4 h-4 text-success"></i>
+          <p class="text-xs text-on-surface-variant">目标价</p>
+          <p class="text-lg font-bold tabular-nums text-success">285.00</p>
+        </div>
+        <div class="w-px self-stretch bg-outline-variant/15"></div>
+        <!-- 止损价均值 -->
+        <div class="flex flex-col items-center gap-1.5">
+          <i data-lucide="shield" class="w-4 h-4 text-error"></i>
+          <p class="text-xs text-on-surface-variant">止损价</p>
+          <p class="text-lg font-bold tabular-nums text-error">175.00</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================== 3) 观点分布胶囊条 ================== -->
+    <section class="px-4 mt-5">
+      <div class="flex gap-2" id="filter-bar" role="tablist" aria-label="观点方向筛选">
+        <!-- 胶囊-看多 8 -->
+        <button id="filter-bull" data-direction="bull" aria-pressed="false"
+                class="flex-1 glass rounded-full py-2.5 px-3 flex items-center justify-center gap-2 transition-colors border border-transparent">
+          <span class="text-xs font-semibold text-success">看多 8</span>
+          <!-- 胶囊内迷你柱状条（inline SVG） -->
+          <svg width="22" height="14" viewBox="0 0 22 14" aria-hidden="true" class="opacity-90">
+            <rect x="0"  y="7"  width="3" height="7"  rx="1" fill="#22E58D" opacity="0.45"/>
+            <rect x="5"  y="4"  width="3" height="10" rx="1" fill="#22E58D" opacity="0.70"/>
+            <rect x="10" y="1"  width="3" height="13" rx="1" fill="#22E58D" opacity="0.95"/>
+            <rect x="15" y="3"  width="3" height="11" rx="1" fill="#22E58D" opacity="0.65"/>
+            <rect x="20" y="5"  width="2" height="9"  rx="1" fill="#22E58D" opacity="0.50"/>
+          </svg>
+        </button>
+        <!-- 胶囊-看空 1 -->
+        <button id="filter-bear" data-direction="bear" aria-pressed="false"
+                class="flex-1 glass rounded-full py-2.5 px-3 flex items-center justify-center gap-2 transition-colors border border-transparent">
+          <span class="text-xs font-semibold text-error">看空 1</span>
+          <svg width="22" height="14" viewBox="0 0 22 14" aria-hidden="true" class="opacity-90">
+            <rect x="0"  y="11" width="3" height="3"  rx="1" fill="#FF4D6D" opacity="0.45"/>
+            <rect x="5"  y="8"  width="3" height="6"  rx="1" fill="#FF4D6D" opacity="0.70"/>
+            <rect x="10" y="10" width="3" height="4"  rx="1" fill="#FF4D6D" opacity="0.40"/>
+            <rect x="15" y="12" width="3" height="2"  rx="1" fill="#FF4D6D" opacity="0.30"/>
+            <rect x="20" y="13" width="2" height="1"  rx="0.5" fill="#FF4D6D" opacity="0.25"/>
+          </svg>
+        </button>
+        <!-- 胶囊-中性 1 -->
+        <button id="filter-neutral" data-direction="neutral" aria-pressed="false"
+                class="flex-1 glass rounded-full py-2.5 px-3 flex items-center justify-center gap-2 transition-colors border border-transparent">
+          <span class="text-xs font-semibold text-warning">中性 1</span>
+          <svg width="22" height="14" viewBox="0 0 22 14" aria-hidden="true" class="opacity-90">
+            <rect x="0"  y="6"  width="3" height="2" rx="1" fill="#FFB547" opacity="0.60"/>
+            <rect x="5"  y="5"  width="3" height="4" rx="1" fill="#FFB547" opacity="0.75"/>
+            <rect x="10" y="6"  width="3" height="2" rx="1" fill="#FFB547" opacity="0.60"/>
+            <rect x="15" y="5"  width="3" height="4" rx="1" fill="#FFB547" opacity="0.55"/>
+            <rect x="20" y="6"  width="2" height="2" rx="1" fill="#FFB547" opacity="0.45"/>
+          </svg>
+        </button>
+      </div>
+    </section>
+
+    <!-- ================== 4) 行为操作按钮组 ================== -->
+    <section class="px-4 mt-4 grid grid-cols-2 gap-3">
+      <!-- 新建观点（主按钮） -->
+      <button id="btn-new-note"
+              class="bg-primary text-on-primary rounded-xl py-3.5 text-[15px] font-semibold glow-primary
+                     hover:opacity-90 active:scale-[0.98] transition-all inline-flex items-center justify-center gap-2">
+        <i data-lucide="plus" class="w-5 h-5"></i>
+        新建观点
+      </button>
+      <!-- AI 报告（玻璃副按钮 + 渐变描边） -->
+      <div class="gradient-border rounded-xl">
+        <button id="btn-ai-report"
+                class="gradient-inner w-full h-full py-3.5 text-[15px] font-semibold text-on-surface
+                       hover:from-primary/20 hover:to-success/10 active:scale-[0.98] transition-all inline-flex items-center justify-center gap-2">
+          <i data-lucide="sparkles" class="w-5 h-5 text-primary"></i>
+          AI 报告
+        </button>
+      </div>
+    </section>
+
+    <!-- ================== 5) Tab 二级切换 ================== -->
+    <section class="px-4 mt-6">
+      <div class="glass rounded-full p-1 grid grid-cols-3 gap-1" id="sub-tabs" role="tablist" aria-label="详情页 Tab 切换">
+        <button id="tab-timeline" class="rounded-full bg-primary text-on-primary py-1.5 text-sm font-semibold transition-colors" aria-current="page" role="tab">观点时间线</button>
+        <button id="tab-ai"        class="rounded-full text-on-surface-variant py-1.5 text-sm font-medium hover:text-on-surface transition-colors" role="tab">AI 报告</button>
+        <button id="tab-info"      class="rounded-full text-on-surface-variant py-1.5 text-sm font-medium hover:text-on-surface transition-colors" role="tab">基本信息</button>
+      </div>
+    </section>
+
+    <!-- ================== 6) 观点时间线列表 ================== -->
+    <section class="px-4 mt-4 space-y-3" id="note-list" aria-label="观点时间线">
+
+      <!-- 观点-1 · 看多 · 装机量超预期，看 Q3 出货 -->
+      <article class="note-card relative glass rounded-2xl p-3.5 border-l-4 border-l-success active:scale-[0.99] transition-transform cursor-pointer"
+               data-id="note-1" data-direction="bull">
+        <div class="flex items-center gap-2 mb-1.5">
+          <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-success/15 text-success">看多</span>
+          <span class="text-xs text-on-surface-variant">宁德时代</span>
+        </div>
+        <h3 class="text-base font-semibold text-on-surface leading-snug">装机量超预期，看 Q3 出货</h3>
+        <p class="text-xs text-on-surface-variant mt-1.5 leading-relaxed line-clamp-2">7月动力电池装机量同比增长 38%，海外市场特斯拉、宝马订单兑现节奏快于预期。Q3 出货有望环比 +15%，全年装机量目标上调至 550GWh。</p>
+        <div class="flex items-center justify-between gap-2 mt-2.5">
+          <div class="flex items-center gap-3 text-xs text-on-surface-variant">
+            <span>2小时前</span>
+            <span class="inline-flex items-center gap-1">
+              <i data-lucide="message-circle" class="w-3 h-3"></i>5
+            </span>
+            <span class="inline-flex items-center gap-1">
+              <i data-lucide="eye" class="w-3 h-3"></i>128
+            </span>
+          </div>
+          <img src="https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=120&h=120&fit=crop"
+               alt="K线图附件缩略图" data-category="商业科技"
+               class="w-8 h-8 rounded-lg object-cover shrink-0" />
+        </div>
+        <div class="flex items-center gap-1.5 mt-2 flex-wrap">
+          <span class="text-[10px] px-1.5 py-0.5 rounded bg-primary/15 text-primary">新能源</span>
+          <span class="text-[10px] px-1.5 py-0.5 rounded bg-primary/15 text-primary">车端需求</span>
+        </div>
+      </article>
+
+      <!-- 观点-2 · 看空 · 储能业务利润率受压 -->
+      <article class="note-card relative glass rounded-2xl p-3.5 border-l-4 border-l-error active:scale-[0.99] transition-transform cursor-pointer"
+               data-id="note-2" data-direction="bear">
+        <div class="flex items-center gap-2 mb-1.5">
+          <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-error/15 text-error">看空</span>
+          <span class="text-xs text-on-surface-variant">宁德时代</span>
+        </div>
+        <h3 class="text-base font-semibold text-on-surface leading-snug">储能业务利润率受压</h3>
+        <p class="text-xs text-on-surface-variant mt-1.5 leading-relaxed line-clamp-2">储能系统集采价格 Q2 环比下降 12%，原材料碳酸锂反弹空间有限。海外储能订单受 IRA 补贴政策调整影响，毛利率较预期低 3-4pct。</p>
+        <div class="flex items-center justify-between gap-2 mt-2.5">
+          <div class="flex items-center gap-3 text-xs text-on-surface-variant">
+            <span>2天前</span>
+            <span class="inline-flex items-center gap-1">
+              <i data-lucide="message-circle" class="w-3 h-3"></i>3
+            </span>
+            <span class="inline-flex items-center gap-1">
+              <i data-lucide="eye" class="w-3 h-3"></i>86
+            </span>
+          </div>
+          <img src="https://images.unsplash.com/photo-1473341304170-971dccb5ac1e?w=120&h=120&fit=crop"
+               alt="储能业务分析图" data-category="商业科技"
+               class="w-8 h-8 rounded-lg object-cover shrink-0" />
+        </div>
+        <div class="flex items-center gap-1.5 mt-2 flex-wrap">
+          <span class="text-[10px] px-1.5 py-0.5 rounded bg-primary/15 text-primary">储能</span>
+          <span class="text-[10px] px-1.5 py-0.5 rounded bg-primary/15 text-primary">锂电池</span>
+        </div>
+      </article>
+
+      <!-- 观点-3 · 看多 · 海外产能落地，全球份额提升 -->
+      <article class="note-card relative glass rounded-2xl p-3.5 border-l-4 border-l-success active:scale-[0.99] transition-transform cursor-pointer"
+               data-id="note-3" data-direction="bull">
+        <div class="flex items-center gap-2 mb-1.5">
+          <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-success/15 text-success">看多</span>
+          <span class="text-xs text-on-surface-variant">宁德时代</span>
+        </div>
+        <h3 class="text-base font-semibold text-on-surface leading-snug">海外产能落地，全球份额提升</h3>
+        <p class="text-xs text-on-surface-variant mt-1.5 leading-relaxed line-clamp-2">匈牙利、德国工厂 2026 Q1 投产，规避 IRA 限制并覆盖欧洲本土车企。北美与福特、Stellantis 合资项目落地，全球动力电池市占率有望突破 38%。</p>
+        <div class="flex items-center justify-between gap-2 mt-2.5">
+          <div class="flex items-center gap-3 text-xs text-on-surface-variant">
+            <span>1周前</span>
+            <span class="inline-flex items-center gap-1">
+              <i data-lucide="message-circle" class="w-3 h-3"></i>12
+            </span>
+            <span class="inline-flex items-center gap-1">
+              <i data-lucide="eye" class="w-3 h-3"></i>256
+            </span>
+          </div>
+          <img src="https://images.unsplash.com/photo-1494412519320-aa613dfb7738?w=120&h=120&fit=crop"
+               alt="海外工厂建筑" data-category="建筑城市"
+               class="w-8 h-8 rounded-lg object-cover shrink-0" />
+        </div>
+        <div class="flex items-center gap-1.5 mt-2 flex-wrap">
+          <span class="text-[10px] px-1.5 py-0.5 rounded bg-primary/15 text-primary">出海</span>
+        </div>
+      </article>
+
+      <!-- 观点-4 · 中性 · 当前估值合理，等待催化剂 -->
+      <article class="note-card relative glass rounded-2xl p-3.5 border-l-4 border-l-warning active:scale-[0.99] transition-transform cursor-pointer"
+               data-id="note-4" data-direction="neutral">
+        <div class="flex items-center gap-2 mb-1.5">
+          <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-warning/15 text-warning">中性</span>
+          <span class="text-xs text-on-surface-variant">宁德时代</span>
+        </div>
+        <h3 class="text-base font-semibold text-on-surface leading-snug">当前估值合理，等待催化剂</h3>
+        <p class="text-xs text-on-surface-variant mt-1.5 leading-relaxed line-clamp-2">当前 PE-TTM 22x，处于近三年中位数附近。Q3 排产 + 储能拐点 + 海外产能兑现，三大催化剂需要再观察 1-2 个季度数据再行加仓。</p>
+        <div class="flex items-center justify-between gap-2 mt-2.5">
+          <div class="flex items-center gap-3 text-xs text-on-surface-variant">
+            <span>2周前</span>
+            <span class="inline-flex items-center gap-1">
+              <i data-lucide="message-circle" class="w-3 h-3"></i>7
+            </span>
+            <span class="inline-flex items-center gap-1">
+              <i data-lucide="eye" class="w-3 h-3"></i>203
+            </span>
+          </div>
+          <img src="https://images.unsplash.com/photo-1559526324-4b87b5e36e44?w=120&h=120&fit=crop"
+               alt="估值走势图" data-category="商业科技"
+               class="w-8 h-8 rounded-lg object-cover shrink-0" />
+        </div>
+        <div class="flex items-center gap-1.5 mt-2 flex-wrap">
+          <span class="text-[10px] px-1.5 py-0.5 rounded bg-primary/15 text-primary">估值</span>
+        </div>
+      </article>
+
+    </section>
+
+    <!-- 列表底部安全留白 -->
+    <div class="h-4"></div>
+
+  </main>
+
+  <!-- ================== 7) 底部固定操作条 ================== -->
+  <div class="fixed bottom-0 left-0 right-0 z-40 glass-strong border-t border-outline-variant/20
+              flex h-14 pb-[env(safe-area-inset-bottom)]">
+    <!-- 编辑自选股 -->
+    <button id="btn-edit-stock" aria-label="编辑自选股"
+            class="flex-1 flex flex-col items-center justify-center gap-0.5 text-on-surface-variant
+                   hover:text-on-surface active:text-primary transition-colors min-w-0">
+      <i data-lucide="edit" class="w-4 h-4"></i>
+      <span class="text-[11px] font-medium">编辑自选股</span>
+    </button>
+    <div class="w-px bg-outline-variant/20 my-3"></div>
+    <!-- 删除 -->
+    <button id="btn-delete-stock" aria-label="删除"
+            class="flex-1 flex flex-col items-center justify-center gap-0.5 text-on-surface-variant
+                   hover:text-error active:text-error transition-colors min-w-0">
+      <i data-lucide="trash-2" class="w-4 h-4"></i>
+      <span class="text-[11px] font-medium">删除</span>
+    </button>
+    <div class="w-px bg-outline-variant/20 my-3"></div>
+    <!-- 分享 -->
+    <button id="btn-share-stock" aria-label="分享"
+            class="flex-1 flex flex-col items-center justify-center gap-0.5 text-on-surface-variant
+                   hover:text-on-surface active:text-primary transition-colors min-w-0">
+      <i data-lucide="share-2" class="w-4 h-4"></i>
+      <span class="text-[11px] font-medium">分享</span>
+    </button>
+  </div>
+
+  <script>
+    // ========== 导航辅助函数 ==========
+    function navPush(route) {
+      console.log(`[原型演示] PUSH 到: ${route}`);
+      window.location.href = route;
+    }
+    function navReplace(route) {
+      console.log(`[原型演示] REPLACE 为: ${route}`);
+      window.location.replace(route);
+    }
+    function navReset(route) {
+      console.log(`[原型演示] RESET 到: ${route}`);
+      window.location.href = route;
+    }
+    function navBack() {
+      console.log(`[原型演示] BACK 返回上一页`);
+      if (window.history.length > 1) {
+        window.history.back();
+      } else {
+        window.location.href = 'home.html';
+      }
+    }
+
+    $(function () {
+      // 1) 返回按钮
+      $('#btn-back').on('click', function () {
+        navBack();
+      });
+
+      // 2) 右上角更多菜单
+      // 更多菜单 - 应实现底部弹出操作菜单：
+      // 1. 弹出操作列表（加入对比 / 设置价格提醒 / 分享股票 / 取消关注）
+      // 2. 点击外部或菜单项关闭弹层
+      // 3. 选择菜单项后执行对应操作（如调起 toast 提示「已加入对比」）
+      $('#btn-more').on('click', function () {
+        console.log('更多菜单: 应弹出底部操作菜单（加入对比 / 价格提醒 / 分享 / 取消关注）');
+      });
+
+      // 3) 新建观点
+      $('#btn-new-note').on('click', function () {
+        navPush('note-edit.html?stock_code=300750.SZ');
+      });
+
+      // 4) AI 报告
+      $('#btn-ai-report').on('click', function () {
+        navPush('analysis.html?stock_code=300750.SZ');
+      });
+
+      // 5) Tab 二级切换（仅切换激活态样式，Tab 内容简化）
+      $('#sub-tabs button').on('click', function () {
+        const $btn = $(this);
+        if ($btn.attr('aria-current') === 'page') return;
+        // 重置
+        $('#sub-tabs button')
+          .removeClass('bg-primary text-on-primary font-semibold')
+          .addClass('text-on-surface-variant font-medium')
+          .removeAttr('aria-current');
+        // 激活当前
+        $btn
+          .removeClass('text-on-surface-variant font-medium')
+          .addClass('bg-primary text-on-primary font-semibold')
+          .attr('aria-current', 'page');
+
+        const tabName = ({
+          'tab-timeline': '观点时间线',
+          'tab-ai':       'AI 报告',
+          'tab-info':     '基本信息'
+        })[$btn.attr('id')];
+        console.log('切换 Tab:', tabName);
+      });
+
+      // 6) 观点分布胶囊筛选 - 按方向过滤下方列表
+      $('#filter-bar button').on('click', function () {
+        const $btn = $(this);
+        const dir = $btn.data('direction');
+        const wasActive = $btn.attr('aria-pressed') === 'true';
+
+        // 先清除所有胶囊的 active 视觉态
+        $('#filter-bar button')
+          .removeClass('pill-active-bull pill-active-bear pill-active-neutral')
+          .attr('aria-pressed', 'false');
+
+        if (wasActive) {
+          // 再次点击同一胶囊 → 取消筛选，显示全部
+          $('#note-list .note-card').show();
+          console.log('清除筛选: 显示全部观点');
+          return;
+        }
+
+        // 激活当前胶囊 + 应用筛选
+        $btn
+          .addClass('pill-' + dir)
+          .attr('aria-pressed', 'true');
+
+        $('#note-list .note-card').each(function () {
+          if ($(this).data('direction') === dir) {
+            $(this).show();
+          } else {
+            $(this).hide();
+          }
+        });
+        console.log('筛选观点方向:', dir);
+      });
+
+      // 7) 观点卡点击 - 跳转至观点详情
+      // 观点卡 - 点击后应跳转到观点详情（note.html?note_id=xxx）：
+      // 1. 携带 note_id 跳转到 note 详情页
+      // 2. 详情页加载完整的富文本正文 / 图片轮播 / 关联事件 / 来源备注
+      // 当前 URL 列表暂无 note.html，临时跳转至 library.html
+      $('#note-list').on('click', '.note-card', function () {
+        const id = $(this).data('id');
+        console.log('点击观点:', id, '应跳转至 note.html?note_id=' + id);
+        navPush('library.html?note_id=' + id);
+      });
+
+      // 8) 底部操作条 - 编辑自选股
+      // 编辑自选股 - 应实现底部弹出编辑表单：
+      // 1. 弹出编辑股票表单（代码 / 名称 / 行业 / 备注）
+      // 2. 用户修改后点击保存，调用 stocks/update 接口
+      // 3. 保存成功后 toast 提示「已更新」并刷新当前页面的基础信息
+      $('#btn-edit-stock').on('click', function () {
+        console.log('编辑自选股: 应弹出底部编辑表单，修改后保存并刷新');
+      });
+
+      // 9) 删除股票 - 应实现确认弹窗：
+      // 1. 弹出二次确认弹窗（标题"确认删除自选股" / 内容"删除后该股的所有观点仍保留，可在观点库查看" / 取消 + 确认按钮）
+      // 2. 确认后调用 stocks/delete，成功后 navReset('home.html') 回到首页
+      $('#btn-delete-stock').on('click', function () {
+        console.log('删除股票: 应弹出确认弹窗，确认后调用删除接口并返回首页');
+      });
+
+      // 10) 分享股票 - 应调用系统分享：
+      // 1. 调起系统分享面板，分享当前股票卡片（含代码 / 名称 / 价格 / 最新观点）
+      // 2. 移动端调用 navigator.share API；桌面端降级为复制链接 + toast 提示
+      $('#btn-share-stock').on('click', function () {
+        console.log('分享股票: 应调起系统分享面板（navigator.share）');
+      });
+    });
+  </script>
+  <script>lucide.createIcons();</script>
+</body>
+
+</html>

@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+
+  <link href="https://lf-code-agent.coze.cn/obj/x-ai-cn/fonts/google/google-all-fonts.css" rel="stylesheet" />
+
+  <script src="https://lf-code-agent.coze.cn/obj/x-ai-cn/cdn/jquery/jquery-3.7.1.min.js"></script>
+  <script src="https://lf-code-agent.coze.cn/obj/x-ai-cn/cdn/lucide/lucide-1.11.0.min.js"></script>
+  <script src="https://lf-code-agent.coze.cn/obj/x-ai-cn/cdn/tailwindcss/tailwindcss-browser-4.2.4.min.js"></script>
+
+  <style type="text/tailwindcss">
+    @theme {
+      /* === 品牌色（电感紫，2026 标志色） === */
+      --color-primary:              #7C5CFF;
+      --color-primary-container:    #2A1B5C;
+      --color-on-primary:           #ffffff;
+      /* === 背景 / 表面（极暗蓝黑 + 中性灰蓝色阶） === */
+      --color-background:                 #0A0B14;
+      --color-surface-container-lowest:   #0F1119;
+      --color-surface:                    #14171F;
+      --color-surface-container:          #1A1D27;
+      --color-surface-container-high:     #22252F;
+      --color-surface-container-highest:  #2A2D38;
+      /* === 文字 === */
+      --color-on-surface:           #F5F6FA;
+      --color-on-surface-variant:   #9CA0B0;
+      /* === 功能色（看多绿 / 看空红 / 中性琥珀） === */
+      --color-success:  #22E58D;
+      --color-error:    #FF4D6D;
+      --color-warning:  #FFB547;
+      /* === 边框 === */
+      --color-outline:          #3A3E4D;
+      --color-outline-variant:  #252835;
+      /* === 圆角 === */
+      --radius-sm:   0.5rem;
+      --radius-md:   0.75rem;
+      --radius-lg:   1rem;
+      --radius-xl:   1.25rem;
+      --radius-2xl:  1.5rem;
+      --radius-full: 9999px;
+      /* === 阴影（带霓虹辉光） === */
+      --shadow-card:   0 4px 24px rgba(124, 92, 255, 0.10), 0 1px 2px rgba(0,0,0,0.4);
+      --shadow-float:  0 10px 40px rgba(124, 92, 255, 0.18), 0 4px 12px rgba(0,0,0,0.5);
+      --shadow-dialog: 0 25px 60px rgba(0,0,0,0.6), 0 0 60px rgba(124, 92, 255, 0.12);
+      /* === 字体 === */
+      --font-sans: "Space Grotesk", "Noto Sans SC", system-ui, sans-serif;
+      --font-display: "Space Grotesk", "Noto Sans SC", system-ui, sans-serif;
+    }
+  </style>
+
+  <style>
+    body {
+      min-height: max(812px, 100dvh);
+      font-family: "Space Grotesk", "Noto Sans SC", system-ui, sans-serif;
+      background:
+        radial-gradient(ellipse 80% 50% at 50% -20%, rgba(124, 92, 255, 0.18), transparent 60%),
+        radial-gradient(ellipse 60% 40% at 100% 100%, rgba(34, 229, 141, 0.06), transparent 50%),
+        #0A0B14;
+    }
+    .glass {
+      background: rgba(20, 23, 31, 0.55);
+      backdrop-filter: blur(24px) saturate(180%);
+      -webkit-backdrop-filter: blur(24px) saturate(180%);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+    }
+    .glass-strong {
+      background: rgba(15, 17, 25, 0.78);
+      backdrop-filter: blur(32px) saturate(200%);
+      -webkit-backdrop-filter: blur(32px) saturate(200%);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .glow-primary { box-shadow: 0 0 24px rgba(124, 92, 255, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.1); }
+    .glow-success { box-shadow: 0 0 18px rgba(34, 229, 141, 0.30); }
+    .glow-error   { box-shadow: 0 0 18px rgba(255, 77, 109, 0.30); }
+    .scrollbar-hide::-webkit-scrollbar { display: none; }
+    .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+    .tabular-nums { font-variant-numeric: tabular-nums; }
+    @keyframes float-glow {
+      0%, 100% { transform: translateY(0); opacity: 0.6; }
+      50% { transform: translateY(-4px); opacity: 1; }
+    }
+    .animate-float-glow { animation: float-glow 3s ease-in-out infinite; }
+    @keyframes shimmer {
+      0% { background-position: -200% 0; }
+      100% { background-position: 200% 0; }
+    }
+    .shimmer {
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.08), transparent);
+      background-size: 200% 100%;
+      animation: shimmer 2s infinite;
+    }
+  </style>
+
+  <script>
+    document.addEventListener('error', function (e) {
+      const img = e.target;
+      if (img.tagName !== 'IMG' || img.dataset.fallback) return;
+      img.dataset.fallback = '1';
+      const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      const cat = img.getAttribute('data-category') || '其他';
+      const alt = img.getAttribute('alt') || '';
+      const label = esc(alt.length > 8 ? alt.slice(0, 8) + '…' : alt);
+      const icons = { '人物': '👤', '自然风景': '🏞', '动物': '🐾', '建筑城市': '🏙', '运动体育': '⚽', '交通工具': '🚗', '食物': '🍽', '服饰时尚': '👗', '商业科技': '💼', '游戏娱乐': '🎮', '艺术': '🎨', '其他': '🖼' };
+      const icon = icons[cat] || '🖼';
+      const w = img.width || 400, h = img.height || 300;
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}"><rect width="100%" height="100%" fill="%231A1D27"/><text x="50%" y="45%" text-anchor="middle" font-size="${Math.min(w, h) * 0.18}" dominant-baseline="central">${icon}</text><text x="50%" y="68%" text-anchor="middle" font-size="${Math.min(w, h) * 0.07}" fill="%239CA0B0" font-family="system-ui,sans-serif" dominant-baseline="central">${label}</text></svg>`;
+      img.src = 'data:image/svg+xml,' + svg;
+    }, true);
+  </script>
+</head>
+
+<body class="bg-background text-on-surface font-sans">
+
+  <!-- 顶部 Header（一级页，无返回按钮） -->
+  <header class="bg-background sticky top-0 z-40 h-14 flex items-center justify-between px-4">
+    <h1 class="text-lg font-semibold text-on-surface">我的</h1>
+    <button id="btn-settings" class="w-10 h-10 flex items-center justify-center text-on-surface-variant rounded-full hover:bg-surface-container active:bg-surface-container-high transition-colors">
+      <i data-lucide="settings" class="w-5 h-5"></i>
+    </button>
+  </header>
+
+  <!-- @nav:start 一级页 TabBar（TabBar 直达的页面用此段；二级页请整体替换为带返回按钮的 header） -->
+  <nav class="fixed bottom-0 left-0 right-0 z-40 glass-strong
+              flex justify-around items-center h-16 pb-[env(safe-area-inset-bottom)]">
+    <a href="home.html" id="nav-home" class="flex flex-col items-center gap-0.5 px-4 py-1.5 text-on-surface-variant hover:text-on-surface transition-colors">
+      <i data-lucide="home" class="w-5 h-5"></i>
+      <span class="text-[10px] font-bold tracking-wide">首页</span>
+    </a>
+    <a href="library.html" id="nav-library" class="flex flex-col items-center gap-0.5 px-4 py-1.5 text-on-surface-variant hover:text-on-surface transition-colors">
+      <i data-lucide="book-open" class="w-5 h-5"></i>
+      <span class="text-[10px] font-bold tracking-wide">观点库</span>
+    </a>
+    <a href="analysis.html" id="nav-analysis" class="flex flex-col items-center gap-0.5 px-4 py-1.5 text-on-surface-variant hover:text-on-surface transition-colors">
+      <i data-lucide="sparkles" class="w-5 h-5"></i>
+      <span class="text-[10px] font-bold tracking-wide">AI 分析</span>
+    </a>
+    <a href="profile.html" id="nav-profile" class="flex flex-col items-center gap-0.5 px-4 py-1.5 text-primary" aria-current="page">
+      <i data-lucide="user" class="w-5 h-5"></i>
+      <span class="text-[10px] font-bold tracking-wide">我的</span>
+    </a>
+  </nav>
+  <!-- @nav:end -->
+
+  <!-- @main-content:start -->
+  <main class="flex-1 pb-[calc(4rem+env(safe-area-inset-bottom))]">
+
+    <!-- 用户资料卡（大玻璃卡 + 渐变描边 + 紫色光晕） -->
+    <div id="user-card" class="mx-4 mt-4 p-px rounded-2xl bg-gradient-to-br from-primary/55 via-primary/15 to-success/35 cursor-pointer active:opacity-90 transition-opacity">
+      <div class="relative overflow-hidden glass-strong rounded-2xl px-5 py-5">
+        <!-- 上半部 radial 紫色光晕 -->
+        <div class="absolute -top-24 left-1/2 -translate-x-1/2 w-72 h-32 rounded-full pointer-events-none"
+             style="background: radial-gradient(ellipse at center, rgba(124, 92, 255, 0.55), rgba(124, 92, 255, 0) 70%);"></div>
+        <div class="relative flex items-center gap-4">
+          <!-- 头像：64x64 圆角 20px 渐变方块 -->
+          <div class="w-16 h-16 rounded-xl flex items-center justify-center shadow-card shrink-0"
+               style="background: linear-gradient(135deg, #7C5CFF 0%, #22E58D 100%);">
+            <span class="text-white font-bold text-[26px] leading-none">初</span>
+          </div>
+          <!-- 中间：昵称 + 副标题 + 等级 chip -->
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2 flex-wrap">
+              <h2 class="text-xl font-bold text-on-surface truncate">小初</h2>
+              <!-- 等级 chip：surface-container 圆角 6px 11px -->
+              <span class="inline-flex items-center px-2 py-0.5 rounded-[6px] bg-surface-container text-[11px] font-semibold text-on-surface-variant leading-none">投研 Lv.3</span>
+            </div>
+            <p class="text-xs text-on-surface-variant mt-1.5">个人投研者 · 加入 142 天</p>
+          </div>
+          <!-- 右侧 chevron -->
+          <i data-lucide="chevron-right" class="w-[18px] h-[18px] text-on-surface-variant/50 shrink-0"></i>
+        </div>
+      </div>
+    </div>
+
+    <!-- 数据统计卡（横向 4 列玻璃卡） -->
+    <div class="glass rounded-2xl mx-4 mt-3 grid grid-cols-4 overflow-hidden">
+      <!-- 统计-关注股票 -->
+      <button id="stat-watchlist" class="px-2 py-4 flex flex-col items-center gap-1.5 border-r border-outline-variant/40 active:bg-surface-container-high transition-colors min-w-0">
+        <i data-lucide="bookmark" class="w-[18px] h-[18px] text-primary"></i>
+        <span class="text-[22px] font-bold text-on-surface leading-none tabular-nums">6</span>
+        <span class="text-xs text-on-surface-variant">关注股票</span>
+      </button>
+      <!-- 统计-观点总数 -->
+      <button id="stat-notes" class="px-2 py-4 flex flex-col items-center gap-1.5 border-r border-outline-variant/40 active:bg-surface-container-high transition-colors min-w-0">
+        <i data-lucide="message-square-text" class="w-[18px] h-[18px] text-success"></i>
+        <span class="text-[22px] font-bold text-on-surface leading-none tabular-nums">23</span>
+        <span class="text-xs text-on-surface-variant">观点总数</span>
+      </button>
+      <!-- 统计-AI 报告 -->
+      <button id="stat-reports" class="px-2 py-4 flex flex-col items-center gap-1.5 border-r border-outline-variant/40 active:bg-surface-container-high transition-colors min-w-0">
+        <i data-lucide="sparkles" class="w-[18px] h-[18px] text-warning"></i>
+        <span class="text-[22px] font-bold text-on-surface leading-none tabular-nums">8</span>
+        <span class="text-xs text-on-surface-variant">AI 报告</span>
+      </button>
+      <!-- 统计-存储用量 -->
+      <button id="stat-storage" class="px-2 py-4 flex flex-col items-center gap-1.5 active:bg-surface-container-high transition-colors min-w-0">
+        <i data-lucide="hard-drive" class="w-[18px] h-[18px] text-on-surface-variant"></i>
+        <span class="text-[22px] font-bold text-on-surface leading-none tabular-nums">142<span class="text-sm font-semibold text-on-surface-variant">MB</span></span>
+        <span class="text-xs text-on-surface-variant">存储用量</span>
+      </button>
+    </div>
+
+    <!-- 分区标题 -->
+    <h3 class="text-sm font-semibold text-on-surface-variant tracking-widest px-4 mt-7 mb-3">我的工具</h3>
+
+    <!-- 设置列表（玻璃容器） -->
+    <div class="glass rounded-2xl mx-4 overflow-hidden">
+
+      <!-- 列表行-我的自选股 -->
+      <button id="row-watchlist" class="w-full h-14 px-4 flex items-center gap-3 active:bg-surface-container-high transition-colors border-b border-outline-variant/40">
+        <div class="w-9 h-9 rounded-[10px] bg-primary/15 flex items-center justify-center shrink-0">
+          <i data-lucide="bookmark" class="w-[18px] h-[18px] text-primary"></i>
+        </div>
+        <span class="flex-1 text-left text-sm text-on-surface truncate">我的自选股</span>
+        <span class="text-xs text-on-surface-variant mr-1 shrink-0">6 只</span>
+        <i data-lucide="chevron-right" class="w-4 h-4 text-on-surface-variant/50 shrink-0"></i>
+      </button>
+
+      <!-- 列表行-我的观点 -->
+      <button id="row-notes" class="w-full h-14 px-4 flex items-center gap-3 active:bg-surface-container-high transition-colors border-b border-outline-variant/40">
+        <div class="w-9 h-9 rounded-[10px] bg-success/15 flex items-center justify-center shrink-0">
+          <i data-lucide="book-open" class="w-[18px] h-[18px] text-success"></i>
+        </div>
+        <span class="flex-1 text-left text-sm text-on-surface truncate">我的观点</span>
+        <span class="text-xs text-on-surface-variant mr-1 shrink-0">23 条</span>
+        <i data-lucide="chevron-right" class="w-4 h-4 text-on-surface-variant/50 shrink-0"></i>
+      </button>
+
+      <!-- 列表行-AI 报告 -->
+      <button id="row-reports" class="w-full h-14 px-4 flex items-center gap-3 active:bg-surface-container-high transition-colors border-b border-outline-variant/40">
+        <div class="w-9 h-9 rounded-[10px] bg-warning/15 flex items-center justify-center shrink-0">
+          <i data-lucide="sparkles" class="w-[18px] h-[18px] text-warning"></i>
+        </div>
+        <span class="flex-1 text-left text-sm text-on-surface truncate">AI 报告</span>
+        <span class="text-xs text-on-surface-variant mr-1 shrink-0">8 份</span>
+        <i data-lucide="chevron-right" class="w-4 h-4 text-on-surface-variant/50 shrink-0"></i>
+      </button>
+
+      <!-- 列表行-深色模式 Switch -->
+      <div class="w-full h-14 px-4 flex items-center gap-3 border-b border-outline-variant/40">
+        <div class="w-9 h-9 rounded-[10px] bg-surface-container-high flex items-center justify-center shrink-0">
+          <i data-lucide="moon" class="w-[18px] h-[18px] text-on-surface-variant"></i>
+        </div>
+        <span class="flex-1 text-left text-sm text-on-surface truncate">深色模式</span>
+        <label class="relative inline-flex items-center cursor-pointer shrink-0">
+          <input id="switch-dark" type="checkbox" class="sr-only peer" checked>
+          <div class="w-11 h-6 bg-surface-container rounded-full transition-colors relative
+                      peer-checked:bg-primary
+                      after:content-[''] after:absolute after:top-[2px] after:left-[2px]
+                      after:bg-white after:rounded-full after:h-5 after:w-5
+                      after:transition-transform after:duration-200
+                      peer-checked:after:translate-x-5
+                      peer-focus-visible:ring-2 peer-focus-visible:ring-primary/30"></div>
+        </label>
+      </div>
+
+      <!-- 列表行-通知设置 -->
+      <button id="row-notification" class="w-full h-14 px-4 flex items-center gap-3 active:bg-surface-container-high transition-colors border-b border-outline-variant/40">
+        <div class="w-9 h-9 rounded-[10px] bg-surface-container-high flex items-center justify-center shrink-0">
+          <i data-lucide="bell" class="w-[18px] h-[18px] text-on-surface-variant"></i>
+        </div>
+        <span class="flex-1 text-left text-sm text-on-surface truncate">通知设置</span>
+        <i data-lucide="chevron-right" class="w-4 h-4 text-on-surface-variant/50 shrink-0"></i>
+      </button>
+
+      <!-- 列表行-数据导出 -->
+      <button id="row-export" class="w-full h-14 px-4 flex items-center gap-3 active:bg-surface-container-high transition-colors border-b border-outline-variant/40">
+        <div class="w-9 h-9 rounded-[10px] bg-surface-container-high flex items-center justify-center shrink-0">
+          <i data-lucide="download" class="w-[18px] h-[18px] text-on-surface-variant"></i>
+        </div>
+        <span class="flex-1 text-left text-sm text-on-surface truncate">数据导出</span>
+        <i data-lucide="chevron-right" class="w-4 h-4 text-on-surface-variant/50 shrink-0"></i>
+      </button>
+
+      <!-- 列表行-清除缓存 -->
+      <button id="row-clear" class="w-full h-14 px-4 flex items-center gap-3 active:bg-surface-container-high transition-colors border-b border-outline-variant/40">
+        <div class="w-9 h-9 rounded-[10px] bg-surface-container-high flex items-center justify-center shrink-0">
+          <i data-lucide="trash" class="w-[18px] h-[18px] text-on-surface-variant"></i>
+        </div>
+        <span class="flex-1 text-left text-sm text-on-surface truncate">清除缓存</span>
+        <span class="text-xs text-on-surface-variant mr-1 shrink-0">12.3 MB</span>
+        <i data-lucide="chevron-right" class="w-4 h-4 text-on-surface-variant/50 shrink-0"></i>
+      </button>
+
+      <!-- 列表行-关于我们（最后一行无 border） -->
+      <button id="row-about" class="w-full h-14 px-4 flex items-center gap-3 active:bg-surface-container-high transition-colors">
+        <div class="w-9 h-9 rounded-[10px] bg-surface-container-high flex items-center justify-center shrink-0">
+          <i data-lucide="info" class="w-[18px] h-[18px] text-on-surface-variant"></i>
+        </div>
+        <span class="flex-1 text-left text-sm text-on-surface truncate">关于我们</span>
+        <span class="text-xs text-on-surface-variant mr-1 shrink-0">v1.0.0</span>
+        <i data-lucide="chevron-right" class="w-4 h-4 text-on-surface-variant/50 shrink-0"></i>
+      </button>
+    </div>
+
+    <!-- 退出登录按钮（虚线描边 surface-container 圆角 12px） -->
+    <button id="btn-logout" class="mx-4 mt-6 w-[calc(100%-2rem)] h-12 rounded-md border-2 border-dashed border-on-surface-variant/30 text-on-surface-variant text-sm font-medium bg-surface-container/40 hover:bg-surface-container active:bg-surface-container-high transition-colors">
+      退出登录
+    </button>
+
+    <!-- 底部文字 -->
+    <p class="text-center text-[11px] text-on-surface-variant/40 mt-6">投研助手 · v1.0.0</p>
+  </main>
+  <!-- @main-content:end -->
+
+  <script>
+    // 导航辅助函数
+    function navPush(route) {
+      console.log(`[原型演示] PUSH 到: ${route}`);
+      window.location.href = route;
+    }
+    function navReplace(route) {
+      console.log(`[原型演示] REPLACE 为: ${route}`);
+      window.location.replace(route);
+    }
+    function navReset(route) {
+      console.log(`[原型演示] RESET 到: ${route}`);
+      window.location.href = route;
+    }
+    function navBack() {
+      console.log(`[原型演示] BACK 返回上一页`);
+      if (window.history.length > 1) window.history.back();
+    }
+
+    $(function() {
+      // ─── TabBar 切换（TabBar 项之间使用 navReset） ───
+      $('#nav-home').on('click', function(e) {
+        e.preventDefault();
+        navReset('home.html');
+      });
+      $('#nav-library').on('click', function(e) {
+        e.preventDefault();
+        navReset('library.html');
+      });
+      $('#nav-analysis').on('click', function(e) {
+        e.preventDefault();
+        navReset('analysis.html');
+      });
+      $('#nav-profile').on('click', function(e) {
+        e.preventDefault();
+        // 当前已是 profile 页，阻止重复跳转
+      });
+
+      // ─── 头部设置入口 ───
+      // 点击设置按钮应实现：
+      // 1. 跳转到独立设置页 settings.html（含账户/隐私/主题/语言等完整设置项）
+      // 2. 当前原型 URL 列表中未包含 settings.html，故仅打印日志
+      $('#btn-settings').on('click', function() {
+        console.log('设置入口 - 应跳转 settings.html（当前原型未实现该页面）');
+      });
+
+      // ─── 用户资料卡点击 ───
+      // 用户卡点击应实现：
+      // 1. 跳转到个人资料编辑页 profile-edit.html
+      // 2. 支持修改头像（上传/裁剪）、昵称、简介、个性签名
+      // 3. 保存后更新本地缓存与 supabase users 表
+      $('#user-card').on('click', function() {
+        console.log('用户资料卡 - 应跳转 profile-edit.html（修改头像/昵称/简介）');
+      });
+
+      // ─── 数据统计卡点击 ───
+      $('#stat-watchlist').on('click', function() {
+        navPush('home.html');
+      });
+      $('#stat-notes').on('click', function() {
+        navPush('library.html');
+      });
+      $('#stat-reports').on('click', function() {
+        navPush('analysis.html');
+      });
+      // 存储用量点击应实现：
+      // 1. 弹出底部 sheet，展示各类型占用明细（观点图片 / 头像缓存 / AI 报告 / 其他）
+      // 2. 每行右侧提供"清理单项"按钮
+      // 3. 顶部提供"全部清理"主按钮
+      $('#stat-storage').on('click', function() {
+        console.log('存储用量详情 - 应弹出底部 sheet 展示各类占用明细并支持单项清理');
+      });
+
+      // ─── 设置列表行 ───
+      $('#row-watchlist').on('click', function() {
+        navPush('home.html');
+      });
+      $('#row-notes').on('click', function() {
+        navPush('library.html');
+      });
+      $('#row-reports').on('click', function() {
+        navPush('analysis.html');
+      });
+      // 通知设置点击应实现：
+      // 1. 跳转到独立通知偏好页（系统通知 / 邮件订阅 / 声音 / 震动等开关）
+      // 2. 各开关状态实时同步至 supabase user_preferences 表
+      $('#row-notification').on('click', function() {
+        console.log('通知设置 - 应跳转通知偏好页（含系统通知/邮件/声音/震动等开关）');
+      });
+      // 数据导出点击应实现：
+      // 1. 弹出底部 sheet 选择导出范围（自选股 / 观点 / AI 报告 / 全部）
+      // 2. 选择导出格式（JSON / CSV）
+      // 3. 调用后端 export 接口生成下载链接，复制到剪贴板
+      $('#row-export').on('click', function() {
+        console.log('数据导出 - 应弹出范围/格式选择 sheet，调用导出接口生成下载链接');
+      });
+      // 清除缓存点击应实现：
+      // 1. 弹出二次确认 modal "确认清除 12.3 MB 缓存？清除后图片需重新加载"
+      // 2. 确认后调用缓存清理（图片缓存 / 离线数据 / 临时文件）
+      // 3. 成功后 toast "缓存已清理"，将右侧数值更新为 "0 MB"
+      $('#row-clear').on('click', function() {
+        console.log('清除缓存 - 应弹出二次确认 modal，清理后将"12.3 MB"更新为"0 MB"');
+      });
+      // 关于我们点击应实现：
+      // 1. 弹出关于 modal（含 Logo / 版本号 / 隐私政策链接 / 用户协议链接 / 开源许可 / 致谢）
+      // 2. 提供"检查更新"按钮，调用版本检测接口
+      $('#row-about').on('click', function() {
+        console.log('关于我们 - 应弹出关于 modal（版本号 / 隐私政策 / 用户协议 / 开源许可 / 检查更新）');
+      });
+
+      // ─── 深色模式 Switch ───
+      $('#switch-dark').on('change', function() {
+        const isOn = $(this).is(':checked');
+        // 深色模式切换应实现：
+        // 1. 在 <html> 上切换 .dark class 或 data-theme="dark" 属性
+        // 2. 通过 localStorage.setItem('theme', isOn ? 'dark' : 'light') 持久化偏好
+        // 3. 主题色与 surface 色阶由 CSS 变量自动响应
+        // 4. 当前原型仅打印切换状态
+        console.log('深色模式切换 - 当前状态:', isOn ? '开启' : '关闭');
+      });
+
+      // ─── 退出登录 ───
+      $('#btn-logout').on('click', function() {
+        // 退出登录应实现：
+        // 1. 弹出二次确认 modal "确认退出登录？"
+        // 2. 确认后调用 supabase.auth.signOut() 清除会话
+        // 3. 清除本地 token / user state / IndexedDB 缓存
+        // 4. 调用 navReset('login.html') 跳转登录页
+        console.log('退出登录 - 应弹出二次确认 modal，确认后清空登录态并跳转登录页');
+      });
+    });
+  </script>
+  <script>lucide.createIcons();</script>
+</body>
+
+</html>
