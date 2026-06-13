@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input'
 import Taro, { useLoad } from '@tarojs/taro'
 import { useState } from 'react'
 import { Network } from '@/network'
-import { ArrowLeft, X, Image as ImageIcon, Sparkles, FileText, PenLine, Eye } from 'lucide-react-taro'
+import { ArrowLeft, X, Image as ImageIcon, Sparkles, FileText, PenLine, Eye, Upload, File } from 'lucide-react-taro'
 
 const DIRECTIONS: { value: 'bull' | 'bear' | 'neutral'; label: string; color: string; bg: string }[] = [
   { value: 'bull', label: '看多', color: '#0F8C66', bg: 'rgba(15, 140, 102, 0.10)' },
@@ -14,6 +14,12 @@ const DIRECTIONS: { value: 'bull' | 'bear' | 'neutral'; label: string; color: st
 
 type NoteType = 'note' | 'doc'
 
+const formatSize = (bytes: number) => {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / 1024 / 1024).toFixed(2)} MB`
+}
+
 export default function NoteEditPage() {
   const [stockId, setStockId] = useState('')
   const [stockName, setStockName] = useState('')
@@ -21,6 +27,8 @@ export default function NoteEditPage() {
   const [title, setTitle] = useState('')
   const [content, setContent] = useState('')
   const [docMd, setDocMd] = useState('')
+  const [docFileName, setDocFileName] = useState('')
+  const [docFileSize, setDocFileSize] = useState(0)
   const [previewHtml, setPreviewHtml] = useState('')
   const [showPreview, setShowPreview] = useState(false)
   const [direction, setDirection] = useState<'bull' | 'bear' | 'neutral'>('bull')
@@ -34,6 +42,7 @@ export default function NoteEditPage() {
   const [images, setImages] = useState<string[]>([])
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(false)
+  const [docUploading, setDocUploading] = useState(false)
 
   useLoad((opts) => {
     const sid = opts?.stock_id ?? ''
@@ -92,14 +101,73 @@ export default function NoteEditPage() {
 
   const onRemoveImage = (i: number) => setImages(images.filter((_, idx) => idx !== i))
 
-  const insertMd = (snippet: string) => {
-    setDocMd((prev) => prev + (prev.endsWith('\n') || prev.length === 0 ? '' : '\n') + snippet + '\n')
+  const onPickMd = async () => {
+    try {
+      setDocUploading(true)
+      // 微信/抖音小程序使用 chooseMessageFile；H5 走同一 API（Taro 内部映射到 <input type=file>）
+      const res = await Taro.chooseMessageFile({
+        count: 1,
+        type: 'file',
+        extension: ['md', 'markdown', 'txt'],
+      } as any)
+      const files = (res as any).tempFiles ?? []
+      if (!files.length) return
+      const f = files[0]
+      const filePath: string = f.path
+      const fileName: string = f.name ?? 'untitled.md'
+      const fileSize: number = f.size ?? 0
+      // 5MB 限制
+      if (fileSize > 5 * 1024 * 1024) {
+        Taro.showToast({ title: '文件过大（限 5MB）', icon: 'none' })
+        return
+      }
+      // 读取文本内容
+      const fs = Taro.getFileSystemManager()
+      const text: string = await new Promise((resolve, reject) => {
+        fs.readFile({
+          filePath,
+          encoding: 'utf8',
+          success: (r) => resolve((r.data as string) || ''),
+          fail: (e) => reject(e),
+        } as any)
+      })
+      if (!text.trim()) {
+        Taro.showToast({ title: '文件内容为空', icon: 'none' })
+        return
+      }
+      setDocMd(text)
+      setDocFileName(fileName)
+      setDocFileSize(fileSize)
+      // 自动用文件名（去后缀）作为默认标题
+      if (!title.trim()) {
+        const stem = fileName.replace(/\.(md|markdown|txt)$/i, '')
+        setTitle(stem)
+      }
+      // 重置预览
+      setShowPreview(false)
+      setPreviewHtml('')
+    } catch (e: any) {
+      console.error('[note-edit] pick md failed', e)
+      if (e?.errMsg && !/cancel/i.test(e.errMsg)) {
+        Taro.showToast({ title: '读取失败', icon: 'none' })
+      }
+    } finally {
+      setDocUploading(false)
+    }
+  }
+
+  const onRemoveDoc = () => {
+    setDocMd('')
+    setDocFileName('')
+    setDocFileSize(0)
+    setShowPreview(false)
+    setPreviewHtml('')
   }
 
   const togglePreview = async () => {
     if (!showPreview) {
       if (!docMd.trim()) {
-        Taro.showToast({ title: '请先输入文档内容', icon: 'none' })
+        Taro.showToast({ title: '请先上传 MD 文件', icon: 'none' })
         return
       }
       try {
@@ -129,7 +197,7 @@ export default function NoteEditPage() {
       return
     }
     if (type === 'doc' && !docMd.trim()) {
-      Taro.showToast({ title: '请输入文档内容', icon: 'none' })
+      Taro.showToast({ title: '请上传 MD 文件', icon: 'none' })
       return
     }
     setSaving(true)
@@ -241,7 +309,7 @@ export default function NoteEditPage() {
                 className="w-full bg-transparent"
                 style={{ fontSize: '16px', fontWeight: 600, color: '#161826' }}
                 placeholder={type === 'doc' ? '文档名称...' : '一句话总结你的观点...'}
-                
+
                 value={title}
                 onInput={(e) => setTitle(e.detail.value)}
                 maxlength={50}
@@ -297,7 +365,7 @@ export default function NoteEditPage() {
                         <Input
                           style={{ flex: 1, fontSize: '14px', fontWeight: 600, color: '#161826' }}
                           placeholder="—"
-                          
+
                           type="digit"
                           value={p.value}
                           onInput={(e) => p.set(e.detail.value)}
@@ -323,7 +391,7 @@ export default function NoteEditPage() {
                   <Textarea
                     style={{ width: '100%', minHeight: '140px', fontSize: '14px', lineHeight: '1.6', color: '#161826', backgroundColor: 'transparent' }}
                     placeholder="分析逻辑、风险点、关键价位..."
-                    
+
                     value={content}
                     onInput={(e) => setContent(e.detail.value)}
                     maxlength={2000}
@@ -387,7 +455,7 @@ export default function NoteEditPage() {
                       className="w-full bg-transparent"
                       style={{ fontSize: '13px', color: '#161826' }}
                       placeholder="按回车添加标签"
-                      
+
                       value={tagInput}
                       onInput={(e) => setTagInput(e.detail.value)}
                       onConfirm={onAddTag}
@@ -415,7 +483,7 @@ export default function NoteEditPage() {
                       className="w-full bg-transparent"
                       style={{ fontSize: '13px', color: '#161826' }}
                       placeholder="例：央行降准、半年度业绩"
-                      
+
                       value={relatedEvent}
                       onInput={(e) => setRelatedEvent(e.detail.value)}
                       maxlength={50}
@@ -429,7 +497,7 @@ export default function NoteEditPage() {
                       className="w-full bg-transparent"
                       style={{ fontSize: '13px', color: '#161826' }}
                       placeholder="例：东吴证券研报、雪球"
-                      
+
                       value={source}
                       onInput={(e) => setSource(e.detail.value)}
                       maxlength={50}
@@ -441,86 +509,102 @@ export default function NoteEditPage() {
           </>
         )}
 
-        {/* ===== 文档模式 ===== */}
+        {/* ===== 文档模式：上传 .md 文件 ===== */}
         {type === 'doc' && (
           <>
-            {/* Markdown 编辑器 */}
             <View className="px-4 pt-3">
               <View className="rounded-2xl p-4 bg-white bg-opacity-72 border border-white border-opacity-85">
-                <View className="flex items-center justify-between mb-2">
+                <View className="flex items-center justify-between mb-3">
                   <View className="flex items-center gap-2">
                     <FileText size={14} color="#5B5E72" />
-                    <Text className="block text-xs text-on-surface-variant">Markdown 内容</Text>
+                    <Text className="block text-xs text-on-surface-variant">MD 文档</Text>
                   </View>
-                  <View
-                    className="flex items-center gap-1 px-2 py-1 rounded-full"
-                    style={{ background: showPreview ? 'rgba(109, 77, 255, 0.10)' : 'rgba(91, 94, 114, 0.10)' }}
-                    onClick={togglePreview}
-                  >
-                    <Eye size={12} color={showPreview ? '#6D4DFF' : '#5B5E72'} />
-                    <Text className="block text-[10px] font-semibold" style={{ color: showPreview ? '#6D4DFF' : '#5B5E72' }}>
-                      {showPreview ? '返回编辑' : '预览'}
-                    </Text>
-                  </View>
-                </View>
-
-                {/* 工具栏 */}
-                <View className="flex items-center gap-1 mb-2 p-1 rounded-xl bg-surface-container overflow-x-auto scrollbar-hide">
-                  {[
-                    { label: 'H1', snippet: '# 标题' },
-                    { label: 'H2', snippet: '## 副标题' },
-                    { label: 'B', snippet: '**加粗**', wrap: true },
-                    { label: 'I', snippet: '*斜体*', wrap: true },
-                    { label: '—', snippet: '引用' },
-                    { label: '•', snippet: '- 列表项' },
-                    { label: '1.', snippet: '1. 列表项' },
-                    { label: '```', snippet: '```\n代码块\n```' },
-                    { label: '[ ]', snippet: '[链接](https://)' },
-                  ].map((b) => (
+                  {docMd && (
                     <View
-                      key={b.label}
-                      className="shrink-0 px-2 py-1 rounded-md flex items-center justify-center bg-white"
-                      style={{ minWidth: '32px' }}
-                      onClick={() => {
-                        if (b.wrap) {
-                          setDocMd((prev) => prev + b.snippet)
-                        } else {
-                          insertMd(b.snippet)
-                        }
-                      }}
+                      className="flex items-center gap-1 px-2 py-1 rounded-full"
+                      style={{ background: showPreview ? 'rgba(109, 77, 255, 0.10)' : 'rgba(91, 94, 114, 0.10)' }}
+                      onClick={togglePreview}
                     >
-                      <Text className="block text-[11px] font-semibold text-on-surface" style={{ fontStyle: b.label === 'I' ? 'italic' : 'normal', fontWeight: b.label === 'B' ? 700 : 500 }}>
-                        {b.label}
+                      <Eye size={12} color={showPreview ? '#6D4DFF' : '#5B5E72'} />
+                      <Text className="block text-[10px] font-semibold" style={{ color: showPreview ? '#6D4DFF' : '#5B5E72' }}>
+                        {showPreview ? '返回文件' : '预览渲染'}
                       </Text>
                     </View>
-                  ))}
+                  )}
                 </View>
 
-                {!showPreview ? (
-                  <View className="bg-surface-container rounded-xl p-3">
-                    <Textarea
-                      style={{ width: '100%', minHeight: '320px', fontSize: '13px', lineHeight: '1.7', color: '#161826', backgroundColor: 'transparent', fontFamily: 'monospace' }}
-                      placeholder={'# 标题\n\n## 章节\n\n**核心观点**：xxx\n\n- 要点 1\n- 要点 2\n\n> 重要提示'}
-                      
-                      value={docMd}
-                      onInput={(e) => setDocMd(e.detail.value)}
-                      maxlength={20000}
-                    />
+                {!docMd ? (
+                  // 未上传：显示选择按钮
+                  <View
+                    className="rounded-2xl flex flex-col items-center justify-center py-10 px-6"
+                    style={{ background: 'rgba(109, 77, 255, 0.04)', border: '2px dashed rgba(109, 77, 255, 0.30)' }}
+                    hoverClass="opacity-80"
+                    onClick={onPickMd}
+                  >
+                    <View className="w-14 h-14 rounded-full flex items-center justify-center mb-3" style={{ background: 'rgba(109, 77, 255, 0.10)' }}>
+                      <Upload size={26} color="#6D4DFF" />
+                    </View>
+                    <Text className="block text-base font-semibold text-on-surface mb-1">
+                      {docUploading ? '读取中...' : '选择 .md 文件'}
+                    </Text>
+                    <Text className="block text-xs text-on-surface-variant text-center">
+                      支持 .md / .markdown / .txt  ·  最大 5MB
+                    </Text>
+                  </View>
+                ) : !showPreview ? (
+                  // 已上传但未预览：显示文件信息卡
+                  <View className="rounded-2xl p-4 flex items-center gap-3" style={{ background: 'rgba(109, 77, 255, 0.06)', border: '1px solid rgba(109, 77, 255, 0.20)' }}>
+                    <View className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0" style={{ background: 'rgba(109, 77, 255, 0.12)' }}>
+                      <File size={22} color="#6D4DFF" />
+                    </View>
+                    <View className="flex-1 min-w-0">
+                      <Text className="block text-sm font-semibold text-on-surface truncate" numberOfLines={1}>
+                        {docFileName}
+                      </Text>
+                      <View className="flex items-center gap-2 mt-1">
+                        <Text className="block text-[10px] text-on-surface-variant">{formatSize(docFileSize)}</Text>
+                        <View className="w-1 h-1 rounded-full bg-on-surface-variant opacity-40" />
+                        <Text className="block text-[10px] text-on-surface-variant">{docMd.length.toLocaleString()} 字符</Text>
+                      </View>
+                    </View>
+                    <View
+                      className="w-8 h-8 rounded-full flex items-center justify-center shrink-0"
+                      style={{ background: 'rgba(91, 94, 114, 0.10)' }}
+                      hoverClass="opacity-70"
+                      onClick={onRemoveDoc}
+                    >
+                      <X size={16} color="#5B5E72" />
+                    </View>
                   </View>
                 ) : (
-                  <View className="bg-surface-container rounded-xl p-4 min-h-[320px]">
+                  // 预览模式：渲染 HTML
+                  <View className="bg-surface-container rounded-xl p-4 min-h-[280px]">
                     {/* @ts-ignore - rich-text is a Taro component */}
                     {/* @ts-ignore */}
                     <rich-text nodes={previewHtml} className="block text-sm text-on-surface leading-relaxed" />
                   </View>
                 )}
 
-                <View className="mt-2 flex items-center gap-1">
-                  <Sparkles size={10} color="#6D4DFF" />
-                  <Text className="block text-[10px] text-on-surface-variant">
-                    支持 Markdown 语法 · 服务端渲染 · {docMd.length} 字符
-                  </Text>
-                </View>
+                {docMd && !showPreview && (
+                  <View
+                    className="mt-2 flex items-center justify-center gap-1 py-2 rounded-xl"
+                    style={{ background: 'rgba(91, 94, 114, 0.08)' }}
+                    hoverClass="opacity-70"
+                    onClick={onPickMd}
+                  >
+                    <Upload size={12} color="#5B5E72" />
+                    <Text className="block text-xs font-semibold text-on-surface-variant">重新上传</Text>
+                  </View>
+                )}
+
+                {docMd && (
+                  <View className="mt-2 flex items-center gap-1">
+                    <Sparkles size={10} color="#6D4DFF" />
+                    <Text className="block text-[10px] text-on-surface-variant">
+                      服务端渲染为 HTML · 库内可全文阅读
+                    </Text>
+                  </View>
+                )}
               </View>
             </View>
           </>
