@@ -199,14 +199,14 @@ export default function StockDetailPage() {
               </View>
               <View className="relative mt-4 flex items-end gap-2 flex-wrap">
                 <Text className="block text-3xl font-bold text-on-surface tabular-nums leading-none">
-                  {stock.current_price != null ? stock.current_price.toFixed(2) : '—'}
+                  {stock.current_price != null ? Number(stock.current_price).toFixed(2) : '—'}
                 </Text>
                 <View
                   className="px-2 py-1 rounded-full"
                   style={{ background: isUp ? 'rgba(15, 140, 102, 0.10)' : 'rgba(209, 26, 74, 0.10)' }}
                 >
                   <Text className="block text-xs font-bold tabular-nums" style={{ color: isUp ? '#0F8C66' : '#D11A4A' }}>
-                    {stock.change_percent != null ? `${isUp ? '+' : ''}${stock.change_percent.toFixed(2)}%` : '—'}
+                    {stock.change_percent != null ? `${isUp ? '+' : ''}${Number(stock.change_percent).toFixed(2)}%` : '—'}
                   </Text>
                 </View>
               </View>
@@ -215,19 +215,19 @@ export default function StockDetailPage() {
                 <View className="relative mt-4 pt-3 border-t border-outline-variant border-opacity-30 grid grid-cols-4 gap-2">
                   <View>
                     <Text className="block text-[10px] text-on-surface-variant">开盘</Text>
-                    <Text className="block text-xs font-semibold text-on-surface tabular-nums">{stock.open_price.toFixed(2)}</Text>
+                    <Text className="block text-xs font-semibold text-on-surface tabular-nums">{Number(stock.open_price).toFixed(2)}</Text>
                   </View>
                   <View>
                     <Text className="block text-[10px] text-on-surface-variant">最高</Text>
-                    <Text className="block text-xs font-semibold tabular-nums" style={{ color: '#D11A4A' }}>{stock.high_price?.toFixed(2)}</Text>
+                    <Text className="block text-xs font-semibold tabular-nums" style={{ color: '#D11A4A' }}>{Number(stock.high_price)?.toFixed(2)}</Text>
                   </View>
                   <View>
                     <Text className="block text-[10px] text-on-surface-variant">最低</Text>
-                    <Text className="block text-xs font-semibold tabular-nums" style={{ color: '#0F8C66' }}>{stock.low_price?.toFixed(2)}</Text>
+                    <Text className="block text-xs font-semibold tabular-nums" style={{ color: '#0F8C66' }}>{Number(stock.low_price)?.toFixed(2)}</Text>
                   </View>
                   <View>
                     <Text className="block text-[10px] text-on-surface-variant">昨收</Text>
-                    <Text className="block text-xs font-semibold text-on-surface tabular-nums">{stock.pre_close?.toFixed(2)}</Text>
+                    <Text className="block text-xs font-semibold text-on-surface tabular-nums">{Number(stock.pre_close)?.toFixed(2)}</Text>
                   </View>
                 </View>
               )}
@@ -284,7 +284,7 @@ export default function StockDetailPage() {
                     <Text className="block text-[12px] text-on-surface-variant">入场均价</Text>
                   </View>
                   <Text className="block text-lg font-bold text-on-surface tabular-nums mt-2 leading-none">
-                    {summary.avg_entry_price != null ? summary.avg_entry_price.toFixed(2) : '—'}
+                    {summary.avg_entry_price != null ? Number(summary.avg_entry_price).toFixed(2) : '—'}
                   </Text>
                   <Text className="block text-[11px] text-on-surface-variant mt-2">{summary.total} 条</Text>
                 </View>
@@ -294,7 +294,7 @@ export default function StockDetailPage() {
                     <Text className="block text-[12px] text-on-surface-variant">目标均价</Text>
                   </View>
                   <Text className="block text-lg font-bold text-on-surface tabular-nums mt-2 leading-none">
-                    {summary.avg_target_price != null ? summary.avg_target_price.toFixed(2) : '—'}
+                    {summary.avg_target_price != null ? Number(summary.avg_target_price).toFixed(2) : '—'}
                   </Text>
                   <Text className="block text-[11px] text-on-surface-variant mt-2">{summary.total} 条</Text>
                 </View>
@@ -304,7 +304,7 @@ export default function StockDetailPage() {
                     <Text className="block text-[12px] text-on-surface-variant">止损均价</Text>
                   </View>
                   <Text className="block text-lg font-bold text-on-surface tabular-nums mt-2 leading-none">
-                    {summary.avg_stop_loss != null ? summary.avg_stop_loss.toFixed(2) : '—'}
+                    {summary.avg_stop_loss != null ? Number(summary.avg_stop_loss).toFixed(2) : '—'}
                   </Text>
                   <Text className="block text-[11px] text-on-surface-variant mt-2">{summary.total} 条</Text>
                 </View>
