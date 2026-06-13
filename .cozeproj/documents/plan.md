@@ -2,324 +2,136 @@
 
 ## 概述
 
-为投资者打造一个**按股票分类、聚焦深度观点**的小程序，支持富文本+截图+多模态 AI 解析，并基于历史观点做智能投研复盘。目标平台是 **mobile（小程序）**，核心使用 Supabase 做云端持久化、TOS 对象存储管图片、豆包大模型做多模态与文本分析，预留 Tushare 拉股票基础信息。
+在已上线的小程序基础上迭代两个 MVP 能力：(1) 用 Tushare 每日收盘后自动同步自选股的最新行情，并在每只股票上提供「AI 今日简评」按钮（基于价格涨跌 + 联网搜索生成 100 字内的表现与原因总结）；(2) 支持上传 Markdown 文档到观点库，并绑定到自选股。目标平台是 **mobile（小程序）**。
 
 **集成依赖**（必须使用，禁用自造轮子）：
-- Supabase：数据持久化 + 用户系统 + 行级权限
-- TOS 对象存储：截图/K线图等附件
-- 豆包大模型（LLM）：截图理解 + 跨观点分析
-- Tushare（HTTP 自调，非内置）：股票基本信息，token 缺失时优雅降级
+- Supabase：数据持久化
+- TOS 对象存储：截图 / 文档封面图
+- 豆包大模型（LLM）：今日简评 / 跨观点分析 / 单图解读
+- **Tushare HTTP API**：A 股日线行情（用户提供 token，写入 `server/.env` 的 `TUSHARE_TOKEN`）
+- **Web Search 集成**：今日简评时联网拉取相关新闻（用于解释涨跌原因）
 
 ## 技术方案
 
 | 维度 | 选择 | 理由 |
 |---|---|---|
-| 平台 | Taro 跨端小程序（mobile） | 用户明确要求「小程序」 |
-| 存储 | Supabase（PostgreSQL + RLS） | 多设备同步、结构化查询、行级权限 |
-| 文件存储 | TOS 对象存储 | 符合规则；图片不入包 |
-| 大模型 | 豆包（Doubao）多模态 + 文本 | 内置集成，同时支持图片理解与文本生成 |
-| 行情数据 | Tushare HTTP API（预留 token） | 用户持有接口；token 留空时仅做基础校验 |
-| 富文本 | Taro 原生 RichText + markdown 渲染 | 不引入重富文本编辑器，保持轻量 |
-| 设计风格 | 2026 前沿：深色玻璃拟态 + 霓虹强调色 + 微动效 | 原型设计阶段确定 |
+| 平台 | Taro 跨端小程序（mobile） | 既有项目 |
+| 调度 | `@nestjs/schedule` cron | NestJS 原生支持，轻量 |
+| 简评触发 | 手动按钮 | 用户明确要求 |
+| 简评数据源 | Tushare 当日 K 线 + 联网搜索 | 用户确认 |
+| 简评字数 | ≤ 100 字 | 用户要求 |
+| MD 存储 | 复用 `notes` 表 + 新增 `type` 字段 | 简单统一（待用户给示例后确认） |
+| MD 渲染 | Taro `RichText` + 服务端 markdown → HTML 转换 | 不引入重富文本编辑器 |
+| 设计风格 | 2026 浅色玻璃拟态（已落地） | 沿用 |
 
 ## 功能模块
 
-### 1. 股票池（自选股管理）
-- 用户通过代码+名称添加股票；后端可选调 Tushare 拉基础信息（行业、上市状态），token 缺失时回退为纯文本录入
-- 列表以卡片网格呈现：代码、名称、持仓观点数、最近观点方向（多/空/中）
-- 支持搜索、按行业标签筛选、置顶
+### 1. 每日行情同步（新增）
+- **触发时机**：交易日 15:35 自动跑一次（cron `0 35 15 * * 1-5`）；同时为每只股票详情页提供「手动刷新」按钮，立即调 Tushare 拉最新一条
+- **Tushare 接口**：`daily`，字段 `ts_code / trade_date / open / high / low / close / pre_close / change / pct_chg / vol / amount`
+- **数据落库**：`stocks` 表新增字段 `last_price` / `change_pct` / `change_amount` / `price_date` / `volume` / `amount`；同时写入一张新的 `stock_prices` 表（`stock_id / trade_date / open / high / low / close / pre_close / pct_chg / vol / amount`，主键 `(stock_id, trade_date)`），用于历史 K 线查询
+- **错误处理**：Tushare 限流/失败时记 `dev.log`，跳过失败项；非交易日不发请求
 
-### 2. 观点记录（核心）
-- 字段：标题 / 方向（看多·看空·中性）/ 入场价 / 目标价 / 止损价 / 富文本正文 / 关联事件 / 标签 / 来源备注 / 附图（多张）
-- 时间线展示：按股票分组的观点流（最新在上）
-- 支持编辑、删除、复制观点
+### 2. AI 今日简评（新增）
+- **触发**：股票详情页右上新增「AI 简评」按钮 → POST `/api/ai/daily-brief`（body: `{ stockId }`）
+- **后端流程**：
+  1. 读 `stocks.last_price / change_pct / volume / amount` + 当日 K 线
+  2. 加载 `web-search` 技能，搜索「{股票名} {trade_date} 涨/跌/异动」取前 3 条结果摘要
+  3. 用豆包文本模型综合价格数据 + 搜索摘要，生成 ≤100 字简评
+  4. 写入 `ai_reports` 表（`type = 'daily_brief'`），同时返回前端
+- **前端**：点击后 loading 弹窗 → 跳转 AI 报告详情页（同 ai-report 复用）
 
-### 3. 多模态附件
-- 上传图片：调用 `Network.uploadFile` → TOS 存储 → 返回 URL 写入观点
-- 上传时可触发「AI 解读」：调用豆包多模态，生成图片内容描述，自动填入正文草稿
+### 3. Markdown 文档（新增，待用户给示例后确认存储结构）
+- **新建** `/pages/note-edit` 顶部「观点 / 文档」二选一 Tab
+- **文档模式字段**：标题（必填）/ Markdown 正文（必填）/ 关联股票（必填，单选）/ 标签（可选）/ 封面图（可选）
+- **后端**：
+  - 上传：若带图片走 `Network.uploadFile` 到 TOS；正文存 Supabase
+  - 渲染：提供 `POST /api/notes/render-md` 接收 markdown，返回 sanitized HTML（防止 XSS），前端用 `RichText` 渲染
+- **观点库展示**：在 `library` 列表中区分 `note` / `doc` 两种类型（doc 用 📄/文档徽章 + 关联股票名）
 
-### 4. AI 智能分析
-- **单图解读**：上传截图/K线图 → 豆包多模态生成结构化解读（趋势/关键位/风险点）
-- **跨观点复盘**：选定股票 → 拉取该股所有历史观点 → 豆包文本模型生成投研报告（逻辑演变、共识与分歧、风险点）
+### 4. 数据结构扩展
+```sql
+-- stocks 表新增
+ALTER TABLE stocks ADD COLUMN last_price numeric(10,2);
+ALTER TABLE stocks ADD COLUMN change_pct numeric(8,4);
+ALTER TABLE stocks ADD COLUMN change_amount numeric(10,4);
+ALTER TABLE stocks ADD COLUMN price_date date;
+ALTER TABLE stocks ADD COLUMN volume bigint;
+ALTER TABLE stocks ADD COLUMN amount bigint;
 
-### 5. 概览与统计
-- 首页：自选股卡片 + 最近观点流
-- 我的：观点总数、覆盖股票数、AI 报告数、存储用量
+-- 新建 stock_prices 表
+CREATE TABLE stock_prices (
+  stock_id uuid REFERENCES stocks(id) ON DELETE CASCADE,
+  trade_date date NOT NULL,
+  open numeric(10,2), high numeric(10,2), low numeric(10,2),
+  close numeric(10,2), pre_close numeric(10,2),
+  change_amount numeric(10,4), pct_chg numeric(8,4),
+  vol bigint, amount bigint,
+  PRIMARY KEY (stock_id, trade_date)
+);
+
+-- notes 表新增 type 字段
+ALTER TABLE notes ADD COLUMN type varchar(16) DEFAULT 'note' NOT NULL;  -- 'note' | 'doc'
+ALTER TABLE notes ALTER COLUMN direction DROP NOT NULL;
+ALTER TABLE notes ALTER COLUMN entry_price DROP NOT NULL;
+ALTER TABLE notes ALTER COLUMN target_price DROP NOT NULL;
+ALTER TABLE notes ALTER COLUMN stop_loss DROP NOT NULL;
+
+-- ai_reports 表新增 type='daily_brief'
+-- 已有 type 字段，扩展枚举
+```
 
 ## 是否有原型设计
 
-**是**（设计引导工具已开启，必须先做原型）
+**否**（设计引导工具已开启但本轮是已有项目功能迭代，沿用既有视觉规范即可；用户已确认浅色玻璃拟态风格）
 
 ## 实施步骤
 
-### 阶段一：原型设计
-1. **加载 `design-canvas` 技能并产出 5 张 mobile 原型 HTML**（首页、股票详情、观点编辑、AI 分析中心、我的），确定 2026 前沿风格的视觉基线（深色玻璃拟态 + 霓虹强调色 + 渐变光晕）。完成原型后通知用户验收，确认后进入开发。
+1. **扩展数据模型 + Tushare Service**：在 Supabase 中执行 DDL（`stocks` 加字段、新建 `stock_prices`、`notes` 加 `type`）；`server/src/tushare/` 封装 Tushare HTTP 调用（带 5s 超时 + 限流 + token 读取）。`server/.env` 增加 `TUSHARE_TOKEN`。
 
-### 阶段二：代码开发
-2. **项目初始化 + 视觉基线落地**：执行 `coze init` 初始化 Taro 小程序，按原型执行 `theme-migrate-miniapp.js` 将原型 `@theme` 变量迁移到 `src/app.css`，让色值/圆角/阴影在 Taro 端可用。
-3. **Supabase 接入 + 数据表初始化**：加载 `supabase` 技能，建表 `stocks`（自选股）、`notes`（观点，含方向/价格字段/正文 markdown/附图 URL 数组/标签/事件/来源）、`ai_reports`（AI 分析报告快照）。配置 RLS：仅本人读写。
-4. **后端基础能力（NestJS）**：
-   - `stocks` 模块：增删查 + Tushare HTTP 调用（token 缺失降级）
-   - `notes` 模块：增删改查（含附图 URL 数组）
-   - `upload` 模块：调用 TOS 对象存储签发上传 URL
-   - `ai` 模块：豆包多模态（单图解读）+ 豆包文本（跨观点分析）
-   - 每个接口完成后立即 `curl` 验证 + 前后端 URL/方法/参数名/响应结构对齐
-5. **前端页面实现（按原型 1:1 还原）**：
-   - 首页（自选股卡片 + 最近观点流）— 调用 `stocks/list` + `notes/recent`
-   - 股票详情（基本信息 + 该股观点时间线）— 调用 `stocks/detail` + `notes/list-by-stock`
-   - 添加股票（代码 + 名称 + 可选 Tushare 拉取）— 调用 `stocks/create`
-   - 观点编辑（富文本 + 多图上传 + 方向/价格/标签）— 调用 `upload/sign` + `ai/image-understand` + `notes/create|update`
-   - 观点详情（富文本渲染 + 图片轮播 + AI 报告入口）— 调用 `notes/detail` + `ai/analyze-stock`
-   - AI 分析中心（单图解读 / 跨观点报告列表与详情）— 调用 `ai/*`
-   - 我的（统计 + 设置）— 调用聚合统计接口
-   - tabbar 配置：首页 / 观点库 / AI 分析 / 我的（用 `taro-lucide-tabbar` 生成 4 个图标）
-6. **`pnpm validate` + 编译检查**：执行 `pnpm validate` 修复全部 error；首次复杂改动执行 `pnpm build` 验证编译通过。
-7. **端到端联调与回归**：在热更新中走通「添加股票 → 新建带图观点 → 触发单图解读 → 生成跨观点报告 → 列表回显」全链路；检查 `dev.log` 无新 error。
+2. **每日行情同步 + 手动刷新**：`server/src/stocks/daily-sync.service.ts` 用 `@nestjs/schedule` 注册 cron（交易日 15:35）；在 `stocks.controller.ts` 新增 `POST /api/stocks/:id/refresh-price` 手动刷新接口；前端 `stock` 详情页加「刷新」按钮。
 
-## 页面规格
+3. **AI 今日简评**：`server/src/ai/daily-brief.service.ts` 加载 `web-search` 技能 + 调用豆包生成 ≤100 字简评；新增 `POST /api/ai/daily-brief` 端点；前端 `stock` 详情页加「AI 简评」按钮，loading 后跳转 `ai-report` 页。
 
-##### @nav(mobile-tabbar)
-> type: tabbar
-> platform: mobile
+4. **Markdown 文档**：`note-edit` 顶部加 Tab 切换「观点 / 文档」；文档模式下隐藏方向/价格/图片附件，新增 Markdown 编辑器 + 股票选择器；后端 `notes.service.ts` 兼容 `type='doc'`（方向/价格可选）；新增 `POST /api/notes/render-md`（用 `marked` + `dompurify` 转换）；`library` 列表区分两种类型；`note-detail` 根据 type 切换渲染（note 用 Text、doc 用 RichText）。
 
-- @page(/) 首页 | icon: house
-- @page(/library) 观点库 | icon: book-open
-- @page(/analysis) AI 分析 | icon: sparkles
-- @page(/profile) 我的 | icon: user
-
-##### @page(/) 首页
-
-**核心职责**：快速浏览自选股与最近观点，决定是否进入详情。
-**访问路径**：tabbar 直达。
-**布局**：
-- 顶部：渐变背景 + 标题「我的投研」+ 右上角搜索按钮
-- 自选股横向滑动卡：代码 / 名称 / 行业标签 / 观点数 / 最近方向徽章（多=绿、空=红、中=灰）
-- 「最近观点」分区：垂直时间线，呈现方向徽章 + 股票名 + 标题 + 时间 + 缩略图
-- 悬浮按钮：右下「+」快速新建观点
-**列表项字段**：方向徽章 / 股票名 / 标题 / 摘要前 60 字 / 缩略图 / 创建时间
-**状态**：
-- 空态：插画 + 「去添加你的第一只自选股」+ 主按钮「添加股票」
-- 加载态：骨架屏
-- 错误态：Toast + 重试按钮
-
-**交互说明**
-
-| 元素 | 动作 | 响应 | 传参 | 备注 |
-|------|------|------|------|------|
-| 自选股卡 | 点击 | 跳转 @page(/stock)?code | code | — |
-| 添加股票按钮 | 点击 | 跳转 @page(/stock-add) | — | 顶部 + 悬浮按钮均触发 |
-| 观点项 | 点击 | 跳转 @page(/note)?note_id | note_id | — |
-| 搜索按钮 | 点击 | 跳转 @page(/search) | — | — |
-| 悬浮 + 按钮 | 长按 | 弹出 @sheet(quick-create)（新建观点/新建股票） | — | — |
-
-##### @page(/library) 观点库
-
-**核心职责**：全量观点时间线检索与筛选。
-**访问路径**：tabbar 直达。
-**布局**：
-- 顶部：分段 Tabs（全部 / 看多 / 看空 / 中性）
-- 筛选条：股票、行业、时间范围
-- 列表：方向徽章 + 股票名 + 标题 + 摘要 + 缩略图 + 时间
-**列表项字段**：方向 / 股票 / 标题 / 摘要 / 缩略图 / 时间 / 标签
-**状态**：
-- 空态：「还没有记录观点，点击右下 + 开始记录」
-
-**交互说明**
-
-| 元素 | 动作 | 响应 | 传参 | 备注 |
-|------|------|------|------|------|
-| 列表项 | 点击 | 跳转 @page(/note)?note_id | note_id | — |
-| Tabs | 切换 | 刷新列表 | — | — |
-| 筛选条 | 点击 | 弹出 @sheet(filter-panel) | — | — |
-| 悬浮 + 按钮 | 点击 | 跳转 @page(/note-edit) | — | — |
-
-##### @page(/analysis) AI 分析
-
-**核心职责**：单图解读与跨观点报告中心。
-**访问路径**：tabbar 直达。
-**布局**：
-- 顶部：两个大卡片入口「单图解读」「跨观点报告」
-- 单图解读区：上传按钮 + 历史解读列表
-- 跨观点报告区：按股票分组的报告列表（最新一份 + 时间）
-**状态**：
-- 空态：「上传一张 K 线图/财报，让 AI 帮你解读」
-
-**交互说明**
-
-| 元素 | 动作 | 响应 | 传参 | 备注 |
-|------|------|------|------|------|
-| 单图解读卡 | 点击 | 跳转 @page(/image-ai) | — | — |
-| 跨观点报告卡 | 点击 | 跳转 @page(/stock)?code | code | — |
-| 报告项 | 点击 | 跳转 @page(/analysis-report)?stock_code | stock_code | — |
-| 上传按钮 | 点击 | 弹出系统选择图片 | — | — |
-
-##### @page(/profile) 我的
-
-**核心职责**：个人统计与设置入口。
-**访问路径**：tabbar 直达。
-**布局**：
-- 顶部：用户头像 + 昵称 + 简介
-- 统计区：观点总数 / 覆盖股票数 / AI 报告数 / 存储用量
-- 设置区：深色模式、通知、清除缓存、关于
-**列表项字段**：图标 / 标题 / 副标题 / 右侧箭头
-
-**交互说明**
-
-| 元素 | 动作 | 响应 | 传参 | 备注 |
-|------|------|------|------|------|
-| 统计卡 | 点击 | 跳转对应列表页 | — | — |
-| 设置项 | 点击 | 触发对应动作 | — | — |
-
-##### @page(/stock) 股票详情
-
-**核心职责**：单只股票的基本信息 + 全部观点时间线。
-**访问路径**：从首页自选股卡、观点库、搜索结果进入；`code` 必填。
-**布局**：
-- 顶部 Hero 区：股票代码 + 名称 + 行业标签 + 观点统计（多/空/中数量）
-- 价格快照卡：入场价均值 / 目标价均值 / 止损价均值
-- Tabs：观点时间线 / AI 报告
-- 观点时间线：方向徽章 + 标题 + 摘要 + 时间
-**列表项字段**：方向 / 标题 / 摘要 / 时间 / 标签 / 缩略图
-
-**交互说明**
-
-| 元素 | 动作 | 响应 | 传参 | 备注 |
-|------|------|------|------|------|
-| 新建观点按钮 | 点击 | 跳转 @page(/note-edit)?stock_code | stock_code | 自动填入股票 |
-| 观点项 | 点击 | 跳转 @page(/note)?note_id | note_id | — |
-| 编辑股票 | 点击 | 弹出 @sheet(edit-stock) | — | — |
-| 删除股票 | 点击 | 弹出 @modal(confirm-delete) | — | 二次确认 |
-
-##### @page(/stock-add) 添加股票
-
-**核心职责**：录入新自选股，可选触发 Tushare 拉取。
-**访问路径**：从首页、搜索进入。
-**布局**：
-- 股票代码输入 + 自动联想
-- 名称输入（可由 Tushare 自动回填）
-- 行业标签（可由 Tushare 自动回填）
-- 备注
-
-**交互说明**
-
-| 元素 | 动作 | 响应 | 传参 | 备注 |
-|------|------|------|------|------|
-| 代码输入框 | 失焦 | 调用 Tushare 拉取基础信息 | code | token 缺失则降级 |
-| 保存按钮 | 点击 | 调用 stocks/create，成功后返回上一页 | 表单 | — |
-
-##### @page(/note) 观点详情
-
-**核心职责**：完整阅读某条观点，触发 AI 分析。
-**访问路径**：从首页、观点库、股票详情进入；`note_id` 必填。
-**布局**：
-- 顶部：方向徽章 + 股票名 + 创建时间
-- 价格区：入场 / 目标 / 止损（横向三列）
-- 正文区：富文本（markdown 渲染）
-- 图片区：横向轮播，可全屏查看
-- 标签 + 关联事件 + 来源备注
-- 底部操作栏：编辑 / 删除 / 生成 AI 报告
-
-**交互说明**
-
-| 元素 | 动作 | 响应 | 传参 | 备注 |
-|------|------|------|------|------|
-| 图片 | 点击 | 全屏预览 | — | — |
-| 编辑按钮 | 点击 | 跳转 @page(/note-edit)?note_id&stock_code | note_id | — |
-| 删除按钮 | 点击 | 弹出 @modal(confirm-delete) | — | — |
-| 生成 AI 报告 | 点击 | 调用 ai/analyze-stock，跳转 @page(/analysis-report)?stock_code | stock_code | — |
-
-##### @page(/note-edit) 观点编辑/创建
-
-**核心职责**：录入/编辑一条观点，支持多图上传 + 单图 AI 解读。
-**访问路径**：从首页、观点库、股票详情的「+」按钮进入；可选 `stock_code` / `note_id`。
-**布局**：
-- 股票选择（仅新建时显示）
-- 方向三选一（看多·看空·中性）
-- 价格三列：入场 / 目标 / 止损
-- 标题输入
-- 富文本正文（markdown 源 + 工具栏：加粗/列表/引用）
-- 图片上传区：拖拽/选择 + 「AI 解读」按钮（单图）
-- 标签多选 + 关联事件 + 来源备注
-- 底部：取消 / 保存
-
-**交互说明**
-
-| 元素 | 动作 | 响应 | 传参 | 备注 |
-|------|------|------|------|------|
-| 图片项 | 点击 | 弹出 @sheet(image-actions)（查看/AI解读/删除） | — | — |
-| AI 解读按钮 | 点击 | 调用 ai/image-understand，结果回填正文草稿 | image_url | — |
-| 保存按钮 | 点击 | 调用 notes/create 或 notes/update | 表单 | 校验必填 |
-
-##### @page(/analysis-report) AI 报告详情
-
-**核心职责**：展示某只股票的 AI 投研报告。
-**访问路径**：从 AI 分析中心、股票详情、观点详情进入；`stock_code` 必填。
-**布局**：
-- 顶部：股票名 + 报告生成时间 + 「重新生成」按钮
-- 报告正文：分章节（逻辑演变 / 共识与分歧 / 风险点 / 行动建议）
-- 引用区：被引用的观点列表（标题 + 时间 + 方向）
-
-**交互说明**
-
-| 元素 | 动作 | 响应 | 传参 | 备注 |
-|------|------|------|------|------|
-| 重新生成按钮 | 点击 | 调用 ai/analyze-stock，刷新报告 | stock_code | — |
-| 引用观点项 | 点击 | 跳转 @page(/note)?note_id | note_id | — |
-
-##### @page(/image-ai) 单图 AI 解读
-
-**核心职责**：上传一张图片并获得 AI 解读结果。
-**访问路径**：从 AI 分析中心进入。
-**布局**：
-- 图片上传区
-- 解读结果区：图片缩略图 + 解读正文 + 「保存到某观点」按钮
-- 历史解读列表
-
-**交互说明**
-
-| 元素 | 动作 | 响应 | 传参 | 备注 |
-|------|------|------|------|------|
-| 上传按钮 | 点击 | 选择图片，自动调用 ai/image-understand | — | — |
-| 保存到观点 | 点击 | 跳转 @page(/note-edit)?image_url | image_url | 自动填入图片 |
-
-##### @page(/search) 全局搜索
-
-**核心职责**：跨股票/观点快速检索。
-**访问路径**：从首页搜索图标进入。
-**布局**：
-- 顶部搜索框（自动聚焦）
-- Tabs：股票 / 观点
-- 列表区
-
-**交互说明**
-
-| 元素 | 动作 | 响应 | 传参 | 备注 |
-|------|------|------|------|------|
-| 股票结果项 | 点击 | 跳转 @page(/stock)?code | code | — |
-| 观点结果项 | 点击 | 跳转 @page(/note)?note_id | note_id | — |
+5. **样式对齐 + 联调**：股票详情页加「刷新 / AI 简评」按钮组；观点库列表项加类型徽章；`pnpm validate` 修复所有 error；端到端走通「添加自选股 → 等 cron 同步价格 → 触发 AI 简评 → 上传 MD 文档 → 观点库查看」全链路。
 
 ## 关键文件目录树
 
 ```
-.cozeproj/prototype/mobile/        # 原型 HTML
+server/
+├── .env                            # 新增 TUSHARE_TOKEN
+├── src/
+│   ├── stocks/
+│   │   ├── daily-sync.service.ts   # cron + 拉取 Tushare
+│   │   ├── stocks.controller.ts    # +POST /:id/refresh-price
+│   │   ├── stocks.service.ts       # +price 字段处理
+│   │   └── stocks.module.ts        # +ScheduleModule.forRoot()
+│   ├── ai/
+│   │   ├── daily-brief.service.ts  # 价格 + 联网搜索 + 豆包
+│   │   ├── ai.controller.ts        # +POST /daily-brief
+│   │   └── ai.module.ts
+│   ├── notes/
+│   │   ├── notes.service.ts        # 兼容 type='doc'
+│   │   ├── notes.controller.ts     # +POST /render-md
+│   │   └── notes.module.ts
+│   └── tushare/                    # 新建模块
+│       ├── tushare.service.ts
+│       └── tushare.module.ts
+
 src/
 ├── pages/
-│   ├── index/index.tsx            # 首页
-│   ├── library/index.tsx          # 观点库
-│   ├── analysis/index.tsx         # AI 分析
-│   ├── profile/index.tsx          # 我的
-│   ├── stock/index.tsx            # 股票详情
-│   ├── stock-add/index.tsx        # 添加股票
-│   ├── note/index.tsx             # 观点详情
-│   ├── note-edit/index.tsx        # 观点编辑
-│   ├── analysis-report/index.tsx  # AI 报告
-│   ├── image-ai/index.tsx         # 单图解读
-│   └── search/index.tsx           # 搜索
-├── components/                    # 复用业务组件
-├── network/                       # 已有封装
-server/src/
-├── stocks/                        # 自选股模块
-├── notes/                         # 观点模块
-├── upload/                        # TOS 签名
-└── ai/                            # 豆包多模态 + 文本
+│   ├── stock/index.tsx             # +刷新/AI 简评按钮
+│   ├── note-edit/index.tsx         # +观点/文档 Tab
+│   ├── note-detail/index.tsx       # +按 type 渲染
+│   └── library/index.tsx           # +类型徽章
+├── components/
+│   ├── md-editor.tsx               # 新建：Markdown 编辑器
+│   └── type-badge.tsx              # 新建：note/doc 徽章
 ```
+
+## 待用户确认
+
+- [x] Tushare API token 已提供：`7fdb3...41d97`（已脱敏），完整值由用户写入 `server/.env` 的 `TUSHARE_TOKEN`，**不要提交到 git**
+- [ ] MD 文档存储方案默认采用「复用 `notes` 表 + `type='doc'`」（基于典型财报研报 MD 格式推断）；若用户提供的样例包含特殊元素（Mermaid/嵌入 HTML/超大表格/图片附件等），再评估是否升级到独立 `documents` 表

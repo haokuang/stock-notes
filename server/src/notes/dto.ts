@@ -1,10 +1,15 @@
-import { IsArray, IsEnum, IsInt, IsNotEmpty, IsNumber, IsOptional, IsString, Min } from 'class-validator';
+import { IsArray, IsEnum, IsIn, IsInt, IsNotEmpty, IsNumber, IsOptional, IsString, Min } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export enum NoteDirection {
   BULL = 'bull',
   BEAR = 'bear',
   NEUTRAL = 'neutral',
+}
+
+export enum NoteType {
+  NOTE = 'note',
+  DOC = 'doc',
 }
 
 export class CreateNoteDto {
@@ -17,11 +22,21 @@ export class CreateNoteDto {
   title: string;
 
   @IsOptional()
+  @IsIn([NoteType.NOTE, NoteType.DOC])
+  type?: NoteType;
+
+  @IsOptional()
   @IsString()
   content?: string;
 
+  /** 文档类：原始 markdown 源 */
+  @IsOptional()
+  @IsString()
+  doc_md?: string;
+
+  @IsOptional()
   @IsEnum(NoteDirection)
-  direction: NoteDirection;
+  direction?: NoteDirection;
 
   @IsOptional()
   @IsNumber()
@@ -51,9 +66,11 @@ export class CreateNoteDto {
   @IsOptional()
   @IsString()
   ai_summary?: string;
+
   @IsOptional()
   @IsString()
   related_event?: string;
+
   @IsOptional()
   @IsString()
   source?: string;
@@ -69,6 +86,10 @@ export class UpdateNoteDto {
   content?: string;
 
   @IsOptional()
+  @IsString()
+  doc_md?: string;
+
+  @IsOptional()
   @IsEnum(NoteDirection)
   direction?: NoteDirection;
 
@@ -100,9 +121,11 @@ export class UpdateNoteDto {
   @IsOptional()
   @IsString()
   ai_summary?: string;
+
   @IsOptional()
   @IsString()
   related_event?: string;
+
   @IsOptional()
   @IsString()
   source?: string;
@@ -116,6 +139,11 @@ export class QueryNoteDto {
   @IsOptional()
   @IsEnum(NoteDirection)
   direction?: NoteDirection;
+
+  /** 按类型筛选：note / doc / 不传=全部 */
+  @IsOptional()
+  @IsIn([NoteType.NOTE, NoteType.DOC])
+  type?: NoteType;
 
   @IsOptional()
   @IsString()
@@ -140,4 +168,10 @@ export class QueryNoteDto {
   @IsInt()
   @Min(0)
   offset?: number;
+}
+
+export class RenderMdDto {
+  @IsString()
+  @IsNotEmpty()
+  md: string;
 }

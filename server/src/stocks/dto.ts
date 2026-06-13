@@ -23,6 +23,10 @@ export class CreateStockDto {
 
   @IsOptional()
   @IsNumber()
+  changeAmount?: number;
+
+  @IsOptional()
+  @IsNumber()
   changePct?: number;
 
   @IsOptional()
@@ -51,6 +55,10 @@ export class UpdateStockDto {
   @IsOptional()
   @IsNumber()
   currentPrice?: number;
+
+  @IsOptional()
+  @IsNumber()
+  changeAmount?: number;
 
   @IsOptional()
   @IsNumber()

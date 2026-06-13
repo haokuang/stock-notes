@@ -1,19 +1,28 @@
 import { Inject, Injectable, NotFoundException, ConflictException, Logger } from '@nestjs/common';
 import { DRIZZLE_DB } from '../storage/database/database.module';
 import * as schema from '../storage/database/shared/schema';
-import { desc, eq, asc, sql, gte, and } from 'drizzle-orm';
+import { desc, eq, asc, sql, like, or, and } from 'drizzle-orm';
 import { CreateStockDto, UpdateStockDto } from './dto';
-// import type
-
-const TUSHARE_API = 'https://api.tushare.pro';
+import { TushareService } from '../tushare/tushare.service';
 
 @Injectable()
 export class StocksService {
   private readonly logger = new Logger(StocksService.name);
 
-  constructor(@Inject(DRIZZLE_DB) private readonly db: any) {}
+  constructor(
+    @Inject(DRIZZLE_DB) private readonly db: any,
+    private readonly tushare: TushareService,
+  ) {}
 
-  async list(keyword?: string) { const kw = keyword;
+  async list(keyword?: string) {
+    const kw = keyword?.trim();
+    if (kw) {
+      return this.db
+        .select()
+        .from(schema.stocks)
+        .where(or(like(schema.stocks.code, `%${kw}%`), like(schema.stocks.name, `%${kw}%`)))
+        .orderBy(asc(schema.stocks.sort_order), desc(schema.stocks.created_at));
+    }
     return this.db
       .select()
       .from(schema.stocks)
@@ -33,20 +42,25 @@ export class StocksService {
   }
 
   async create(dto: CreateStockDto) {
-    const existing = await this.db.select({ id: schema.stocks.id }).from(schema.stocks).where(eq(schema.stocks.code, dto.code)).limit(1);
+    const existing = await this.db
+      .select({ id: schema.stocks.id })
+      .from(schema.stocks)
+      .where(eq(schema.stocks.code, dto.code))
+      .limit(1);
     if (existing.length) throw new ConflictException(`股票 ${dto.code} 已在自选股中`);
 
-    const tushareData = await this.fetchTushareInfo(dto.code);
+    const tsCode = this.toTushareCode(dto.code);
+    const basic = await this.tushare.getStockBasic(tsCode);
 
     const [row] = await this.db
       .insert(schema.stocks)
       .values({
         code: dto.code,
-        name: dto.name,
-        market: tushareData?.market ?? dto.market ?? 'CN',
-        industry: tushareData?.industry ?? dto.industry ?? null,
-        current_price: dto.currentPrice != null ? String(dto.currentPrice) : tushareData?.price ?? null,
-        change_pct: dto.changePct != null ? String(dto.changePct) : tushareData?.changePct ?? null,
+        name: basic?.name ?? dto.name,
+        industry: basic?.industry ?? dto.industry ?? null,
+        current_price: dto.currentPrice != null ? String(dto.currentPrice) : null,
+        change_amount: dto.changeAmount != null ? String(dto.changeAmount) : null,
+        change_percent: dto.changePct != null ? String(dto.changePct) : null,
         sort_order: dto.sortOrder ?? 0,
       })
       .returning();
@@ -61,7 +75,8 @@ export class StocksService {
         name: dto.name ?? existing.name,
         industry: dto.industry ?? existing.industry,
         current_price: dto.currentPrice != null ? String(dto.currentPrice) : existing.current_price,
-        change_pct: dto.changePct != null ? String(dto.changePct) : existing.change_pct,
+        change_amount: dto.changeAmount != null ? String(dto.changeAmount) : existing.change_amount,
+        change_percent: dto.changePct != null ? String(dto.changePct) : existing.change_percent,
         sort_order: dto.sortOrder ?? existing.sort_order,
         updated_at: new Date(),
       })
@@ -77,57 +92,33 @@ export class StocksService {
   }
 
   async summary() {
-    const [stockCount] = await this.db.select({ count: sql<number>`count(*)::int` }).from(schema.stocks);
-    const [noteCount] = await this.db.select({ count: sql<number>`count(*)::int` }).from(schema.notes);
+    const [stockCount] = await this.db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(schema.stocks);
+    const [noteCount] = await this.db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(schema.notes);
+    const [reportCount] = await this.db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(schema.aiReports);
     const bullCount = await this.db
       .select({ count: sql<number>`count(*)::int` })
       .from(schema.notes)
-      .where(eq(schema.notes.direction, 'bull'));
+      .where(and(eq(schema.notes.direction, 'bull'), eq(schema.notes.type, 'note')));
     return {
       stocks: stockCount?.count ?? 0,
       notes: noteCount?.count ?? 0,
+      reports: reportCount?.count ?? 0,
       bull: bullCount[0]?.count ?? 0,
     };
   }
 
-  private async fetchTushareInfo(code: string): Promise<{ market: string; industry: string; price: string | null; changePct: string | null } | null> {
-    const token = process.env.TUSHARE_TOKEN;
-    if (!token) {
-      this.logger.warn('TUSHARE_TOKEN 未配置，跳过行情拉取');
-      return null;
-    }
-    try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 3000);
-      const res = await fetch(TUSHARE_API, {
-        method: 'POST',
-        signal: controller.signal,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          api_name: 'stock_basic',
-          token,
-          params: { ts_code: code },
-          fields: 'industry,market,list_date',
-        }),
-      });
-      clearTimeout(timeout);
-      if (!res.ok) return null;
-      const data: any = await res.json();
-      if (data.code !== 0 || !data.data?.fields) return null;
-      const fields: string[] = data.data.fields;
-      const row: any[] = data.data.items?.[0] ?? [];
-      if (!row.length) return null;
-      const obj: Record<string, unknown> = {};
-      fields.forEach((f, i) => (obj[f] = row[i]));
-      return {
-        market: String(obj.market ?? 'CN'),
-        industry: String(obj.industry ?? ''),
-        price: null,
-        changePct: null,
-      };
-    } catch (err) {
-      this.logger.warn(`Tushare 拉取失败: ${(err as Error).message}`);
-      return null;
-    }
+  private toTushareCode(code: string): string {
+    const c = code.trim().toUpperCase();
+    if (c.includes('.')) return c;
+    if (/^(6|9|5|1)/.test(c)) return `${c}.SH`;
+    if (/^(0|3|2)/.test(c)) return `${c}.SZ`;
+    if (/^(4|8)/.test(c)) return `${c}.BJ`;
+    return `${c}.SZ`;
   }
 }

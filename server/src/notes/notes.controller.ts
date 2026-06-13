@@ -1,5 +1,5 @@
 import { Body, Controller, Delete, Get, HttpCode, Param, Post, Put, Query } from '@nestjs/common';
-import { CreateNoteDto, NoteDirection, UpdateNoteDto } from './dto';
+import { CreateNoteDto, NoteDirection, NoteType, QueryNoteDto, RenderMdDto, UpdateNoteDto } from './dto';
 import { NotesService } from './notes.service';
 
 @Controller('notes')
@@ -10,6 +10,8 @@ export class NotesController {
   async list(
     @Query('stock_id') stock_id?: string,
     @Query('direction') direction?: NoteDirection,
+    @Query('type') type?: NoteType,
+    @Query('keyword') keyword?: string,
     @Query('from') from?: string,
     @Query('to') to?: string,
     @Query('limit') limit?: string,
@@ -18,6 +20,8 @@ export class NotesController {
     const data = await this.notesService.list({
       stock_id,
       direction,
+      type,
+      keyword,
       from,
       to,
       limit: limit ? Number(limit) : undefined,
@@ -66,5 +70,11 @@ export class NotesController {
   async remove(@Param('id') id: string) {
     const data = await this.notesService.remove(id);
     return { data };
+  }
+
+  @Post('render-md')
+  @HttpCode(200)
+  async renderMd(@Body() dto: RenderMdDto) {
+    return this.notesService.renderMd(dto);
   }
 }

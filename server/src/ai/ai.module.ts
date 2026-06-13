@@ -5,15 +5,19 @@ import {
   Body,
   HttpCode,
   BadRequestException,
+  Get,
+  Param,
 } from '@nestjs/common'
 import { IsString, IsOptional, IsNotEmpty, IsArray, IsUrl, MaxLength } from 'class-validator'
 import { LLMClient } from 'coze-coding-dev-sdk'
+import { DailyBriefService } from './daily-brief.service'
 
 /**
  * AI 分析模块
  * 提供：
  * - POST /ai/image-understand  单图解读（多模态）
  * - POST /ai/analyze-stock     跨观点分析（文本生成）
+ * - POST /ai/daily-brief       今日简评（Tushare + 联网搜索 + 豆包）
  * - POST /ai/chat              通用对话
  *
  * 注：实际项目中应使用豆包/DeepSeek/Kimi 等大模型。
@@ -67,6 +71,8 @@ class ChatDto {
 
 @Controller('ai')
 export class AiController {
+  constructor(private readonly dailyBriefService: DailyBriefService) {}
+
   /** 单图解读：把图片 URL + 上下文传给多模态模型 */
   @Post('image-understand')
   @HttpCode(200)
@@ -115,6 +121,15 @@ export class AiController {
     }
   }
 
+  /** 今日简评：Tushare 价格 + 联网搜索 + 豆包，≤100 字 */
+  @Get('daily-brief/:stockId')
+  @HttpCode(200)
+  async dailyBrief(@Param('stockId') stockId: string) {
+    if (!stockId) throw new BadRequestException('stockId 必填')
+    const result = await this.dailyBriefService.generate(stockId)
+    return { data: result }
+  }
+
   /** 通用对话 */
   @Post('chat')
   @HttpCode(200)
@@ -146,5 +161,7 @@ void LLMClient
 
 @Module({
   controllers: [AiController],
+  providers: [DailyBriefService],
+  exports: [DailyBriefService],
 })
 export class AiModule {}

@@ -2,8 +2,9 @@ import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { DRIZZLE_DB } from '../storage/database/database.module';
 import * as schema from '../storage/database/shared/schema';
 import { and, desc, eq, gte, lte, sql, asc } from 'drizzle-orm';
-import { CreateNoteDto, UpdateNoteDto, QueryNoteDto } from './dto';
-// import type
+import { marked } from 'marked';
+import DOMPurify from 'isomorphic-dompurify';
+import { CreateNoteDto, NoteType, QueryNoteDto, RenderMdDto, UpdateNoteDto } from './dto';
 
 @Injectable()
 export class NotesService {
@@ -13,8 +14,15 @@ export class NotesService {
     const conditions: any[] = [];
     if (query.stock_id) conditions.push(eq(schema.notes.stock_id, query.stock_id));
     if (query.direction) conditions.push(eq(schema.notes.direction, query.direction));
+    if (query.type) conditions.push(eq(schema.notes.type, query.type));
     if (query.from) conditions.push(gte(schema.notes.created_at, new Date(query.from)));
     if (query.to) conditions.push(lte(schema.notes.created_at, new Date(query.to)));
+    if (query.keyword) {
+      const kw = `%${query.keyword}%`;
+      conditions.push(
+        sql`(${schema.notes.title} ILIKE ${kw} OR ${schema.notes.content} ILIKE ${kw} OR ${schema.notes.doc_md} ILIKE ${kw})`,
+      );
+    }
 
     const rows = await this.db
       .select({
@@ -22,8 +30,10 @@ export class NotesService {
         stock_id: schema.notes.stock_id,
         stock_code: schema.stocks.code,
         stock_name: schema.stocks.name,
+        type: schema.notes.type,
         title: schema.notes.title,
         content: schema.notes.content,
+        doc_md: schema.notes.doc_md,
         direction: schema.notes.direction,
         entry_price: schema.notes.entry_price,
         target_price: schema.notes.target_price,
@@ -53,8 +63,10 @@ export class NotesService {
         stock_id: schema.notes.stock_id,
         stock_code: schema.stocks.code,
         stock_name: schema.stocks.name,
+        type: schema.notes.type,
         title: schema.notes.title,
         content: schema.notes.content,
+        doc_md: schema.notes.doc_md,
         direction: schema.notes.direction,
         entry_price: schema.notes.entry_price,
         target_price: schema.notes.target_price,
@@ -71,12 +83,11 @@ export class NotesService {
       .leftJoin(schema.stocks, eq(schema.notes.stock_id, schema.stocks.id))
       .where(eq(schema.notes.id, id))
       .limit(1);
-    if (!row) throw new NotFoundException(`观点 ${id} 不存在`);
+    if (!row) throw new NotFoundException(`观点/文档 ${id} 不存在`);
     return row;
   }
 
   async create(dto: CreateNoteDto) {
-    // 查 stock 信息，自动填充 stock_code/stock_name
     const [stock] = await this.db
       .select({ code: schema.stocks.code, name: schema.stocks.name })
       .from(schema.stocks)
@@ -84,22 +95,30 @@ export class NotesService {
       .limit(1);
     if (!stock) throw new NotFoundException(`股票 ${dto.stock_id} 不存在`);
 
+    const type = dto.type ?? NoteType.NOTE;
+    const isDoc = type === NoteType.DOC;
+
+    // 文档类型：服务端把 markdown 渲染成 HTML 存到 content
+    const renderedHtml = isDoc && dto.doc_md ? this.renderMarkdown(dto.doc_md) : dto.content ?? null;
+
     const [row] = await this.db
       .insert(schema.notes)
       .values({
         stock_id: dto.stock_id,
         stock_code: stock.code,
         stock_name: stock.name,
+        type,
         title: dto.title,
-        content: dto.content,
-        direction: dto.direction,
-        entry_price: dto.entry_price != null ? String(dto.entry_price) : null,
-        target_price: dto.target_price != null ? String(dto.target_price) : null,
-        stop_loss: dto.stop_loss != null ? String(dto.stop_loss) : null,
-        tags: dto.tags ?? [],
-        event: dto.related_event ?? null,
-        source: dto.source ?? null,
-        images: dto.images ?? [],
+        content: renderedHtml,
+        doc_md: isDoc ? dto.doc_md ?? null : null,
+        direction: isDoc ? null : (dto.direction ?? 'neutral'),
+        entry_price: isDoc ? null : (dto.entry_price != null ? String(dto.entry_price) : null),
+        target_price: isDoc ? null : (dto.target_price != null ? String(dto.target_price) : null),
+        stop_loss: isDoc ? null : (dto.stop_loss != null ? String(dto.stop_loss) : null),
+        tags: isDoc ? [] : (dto.tags ?? []),
+        event: isDoc ? null : (dto.related_event ?? null),
+        source: isDoc ? null : (dto.source ?? null),
+        images: isDoc ? [] : (dto.images ?? []),
         ai_summary: dto.ai_summary ?? null,
       })
       .returning();
@@ -107,23 +126,31 @@ export class NotesService {
   }
 
   async update(id: string, dto: UpdateNoteDto) {
-    await this.getById(id);
+    const existing = await this.getById(id);
+    const isDoc = existing.type === NoteType.DOC;
+
+    const setObj: Record<string, any> = { updated_at: new Date() };
+    if (dto.title !== undefined) setObj.title = dto.title;
+    if (dto.content !== undefined && !isDoc) setObj.content = dto.content;
+    if (dto.doc_md !== undefined && isDoc) {
+      setObj.doc_md = dto.doc_md;
+      setObj.content = this.renderMarkdown(dto.doc_md);
+    }
+    if (!isDoc) {
+      if (dto.direction !== undefined) setObj.direction = dto.direction;
+      if (dto.entry_price !== undefined) setObj.entry_price = String(dto.entry_price);
+      if (dto.target_price !== undefined) setObj.target_price = String(dto.target_price);
+      if (dto.stop_loss !== undefined) setObj.stop_loss = String(dto.stop_loss);
+      if (dto.tags !== undefined) setObj.tags = dto.tags;
+      if (dto.related_event !== undefined) setObj.event = dto.related_event;
+      if (dto.source !== undefined) setObj.source = dto.source;
+      if (dto.images !== undefined) setObj.images = dto.images;
+    }
+    if (dto.ai_summary !== undefined) setObj.ai_summary = dto.ai_summary;
+
     const [row] = await this.db
       .update(schema.notes)
-      .set({
-        title: dto.title,
-        content: dto.content,
-        direction: dto.direction,
-        entry_price: dto.entry_price != null ? String(dto.entry_price) : undefined,
-        target_price: dto.target_price != null ? String(dto.target_price) : undefined,
-        stop_loss: dto.stop_loss != null ? String(dto.stop_loss) : undefined,
-        tags: dto.tags,
-        event: dto.related_event,
-        source: dto.source,
-        images: dto.images,
-        ai_summary: dto.ai_summary,
-        updated_at: new Date(),
-      })
+      .set(setObj)
       .where(eq(schema.notes.id, id))
       .returning();
     return row;
@@ -159,6 +186,7 @@ export class NotesService {
     });
     return { data: map, total, activeDays, fromDays };
   }
+
   async distributionByStock(stock_id: string) {
     const rows = await this.db
       .select({
@@ -194,5 +222,16 @@ export class NotesService {
       avg_target_price: r.avg_target ? Number(r.avg_target) : null,
       avg_stop_loss: r.avg_stop ? Number(r.avg_stop) : null,
     };
+  }
+
+  /** 客户端预览用：纯函数 markdown → HTML，存库时也会调用 */
+  renderMarkdown(md: string): string {
+    const raw = marked.parse(md ?? '', { async: false }) as string;
+    return DOMPurify.sanitize(raw);
+  }
+
+  /** 控制器层暴露：接收 md 字符串，返回 html */
+  async renderMd(dto: RenderMdDto) {
+    return { html: this.renderMarkdown(dto.md) };
   }
 }

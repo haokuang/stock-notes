@@ -9,9 +9,10 @@ interface Note {
   stock_id: string
   stock_name: string
   stock_code: string
+  type: 'note' | 'doc'
   title: string
   content: string
-  direction: 'bull' | 'bear' | 'neutral'
+  direction: 'bull' | 'bear' | 'neutral' | null
   entry_price: number | null
   target_price: number | null
   stop_loss: number | null
@@ -43,7 +44,7 @@ export default function NoteDetailPage() {
   })
 
   const onDelete = async () => {
-    const r = await Taro.showModal({ title: '删除观点', content: '确定要删除这条观点吗？', confirmColor: '#D11A4A' })
+    const r = await Taro.showModal({ title: '删除', content: '确定要删除吗？', confirmColor: '#D11A4A' })
     if (!r.confirm) return
     try {
       await Network.request({ url: `/api/notes/${noteId}`, method: 'DELETE' })
@@ -70,6 +71,7 @@ export default function NoteDetailPage() {
     )
   }
 
+  const isDoc = note.type === 'doc'
   const dirColor = note.direction === 'bull' ? '#0F8C66' : note.direction === 'bear' ? '#D11A4A' : '#B45309'
   const dirLabel = note.direction === 'bull' ? '看多' : note.direction === 'bear' ? '看空' : '中性'
   const dirBg = note.direction === 'bull' ? 'rgba(15, 140, 102, 0.10)' : note.direction === 'bear' ? 'rgba(209, 26, 74, 0.10)' : 'rgba(180, 83, 9, 0.10)'
@@ -84,7 +86,7 @@ export default function NoteDetailPage() {
         <View className="w-10 h-10 flex items-center justify-center rounded-full active:bg-surface-container" onClick={() => Taro.navigateBack()}>
           <ArrowLeft size={20} color="#161826" />
         </View>
-        <Text className="block text-base font-semibold text-on-surface">观点详情</Text>
+        <Text className="block text-base font-semibold text-on-surface">{isDoc ? '文档详情' : '观点详情'}</Text>
         <View className="flex items-center gap-1">
           <View className="w-9 h-9 flex items-center justify-center rounded-full active:bg-surface-container" onClick={onEdit}>
             <Pencil size={18} color="#5B5E72" />
@@ -96,13 +98,20 @@ export default function NoteDetailPage() {
       </View>
 
       <ScrollView scrollY enhanced showScrollbar={false} className="w-full">
-        {/* 标题 + 方向 */}
+        {/* 类型徽章 + 股票关联 + 标题 */}
         <View className="px-4 pt-3">
           <View className="rounded-2xl p-4 bg-white bg-opacity-72 border border-white border-opacity-85">
             <View className="flex items-center gap-2 mb-3">
-              <View className="px-3 py-1 rounded-full" style={{ background: dirBg }}>
-                <Text className="block text-[11px] font-semibold" style={{ color: dirColor }}>{dirLabel}</Text>
-              </View>
+              {isDoc ? (
+                <View className="px-3 py-1 rounded-full flex items-center gap-1" style={{ background: 'rgba(15, 140, 102, 0.10)' }}>
+                  <FileText size={12} color="#0F8C66" />
+                  <Text className="block text-[11px] font-semibold" style={{ color: '#0F8C66' }}>文档</Text>
+                </View>
+              ) : (
+                <View className="px-3 py-1 rounded-full" style={{ background: dirBg }}>
+                  <Text className="block text-[11px] font-semibold" style={{ color: dirColor }}>{dirLabel}</Text>
+                </View>
+              )}
               <View
                 className="flex items-center gap-2 px-2 py-1 rounded-full"
                 style={{ background: 'rgba(109, 77, 255, 0.08)' }}
@@ -120,8 +129,22 @@ export default function NoteDetailPage() {
           </View>
         </View>
 
-        {/* 价格点位 */}
-        {(note.entry_price || note.target_price || note.stop_loss) && (
+        {/* 文档：渲染 HTML */}
+        {isDoc && note.content && (
+          <View className="px-4 pt-3">
+            <View className="rounded-2xl p-4 bg-white bg-opacity-72 border border-white border-opacity-85">
+              <View className="flex items-center gap-2 mb-3">
+                <FileText size={14} color="#5B5E72" />
+                <Text className="block text-sm font-semibold text-on-surface">文档内容</Text>
+              </View>
+              {/* @ts-ignore */}
+              <rich-text nodes={note.content} className="block text-sm text-on-surface leading-relaxed" />
+            </View>
+          </View>
+        )}
+
+        {/* 观点：价格点位 */}
+        {!isDoc && (note.entry_price || note.target_price || note.stop_loss) && (
           <View className="px-4 pt-3">
             <View className="rounded-2xl p-4 bg-white bg-opacity-72 border border-white border-opacity-85">
               <View className="grid grid-cols-3 gap-3">
@@ -142,8 +165,8 @@ export default function NoteDetailPage() {
           </View>
         )}
 
-        {/* 详细观点 */}
-        {note.content && (
+        {/* 观点：详细观点 */}
+        {!isDoc && note.content && (
           <View className="px-4 pt-3">
             <View className="rounded-2xl p-4 bg-white bg-opacity-72 border border-white border-opacity-85">
               <View className="flex items-center gap-2 mb-2">
@@ -169,7 +192,7 @@ export default function NoteDetailPage() {
         )}
 
         {/* 图片 */}
-        {note.images && note.images.length > 0 && (
+        {!isDoc && note.images && note.images.length > 0 && (
           <View className="px-4 pt-3">
             <View className="rounded-2xl p-4 bg-white bg-opacity-72 border border-white border-opacity-85">
               <Text className="block text-sm font-semibold text-on-surface mb-2">截图 ({note.images.length})</Text>
@@ -188,35 +211,37 @@ export default function NoteDetailPage() {
           </View>
         )}
 
-        {/* 标签 + 关联事件 + 来源 */}
-        <View className="px-4 pt-3">
-          <View className="rounded-2xl p-4 bg-white bg-opacity-72 border border-white border-opacity-85 space-y-3">
-            {note.tags && note.tags.length > 0 && (
-              <View>
-                <Text className="block text-xs text-on-surface-variant mb-2">标签</Text>
-                <View className="flex flex-wrap gap-2">
-                  {note.tags.map((t) => (
-                    <View key={t} className="px-3 py-1 rounded-full bg-surface-container">
-                      <Text className="block text-xs text-on-surface">{t}</Text>
-                    </View>
-                  ))}
+        {/* 标签 + 关联事件 + 来源（仅观点） */}
+        {!isDoc && (
+          <View className="px-4 pt-3">
+            <View className="rounded-2xl p-4 bg-white bg-opacity-72 border border-white border-opacity-85 space-y-3">
+              {note.tags && note.tags.length > 0 && (
+                <View>
+                  <Text className="block text-xs text-on-surface-variant mb-2">标签</Text>
+                  <View className="flex flex-wrap gap-2">
+                    {note.tags.map((t) => (
+                      <View key={t} className="px-3 py-1 rounded-full bg-surface-container">
+                        <Text className="block text-xs text-on-surface">{t}</Text>
+                      </View>
+                    ))}
+                  </View>
                 </View>
-              </View>
-            )}
-            {note.related_event && (
-              <View>
-                <Text className="block text-xs text-on-surface-variant mb-1">关联事件</Text>
-                <Text className="block text-sm text-on-surface">{note.related_event}</Text>
-              </View>
-            )}
-            {note.source && (
-              <View>
-                <Text className="block text-xs text-on-surface-variant mb-1">来源</Text>
-                <Text className="block text-sm text-on-surface">{note.source}</Text>
-              </View>
-            )}
+              )}
+              {note.related_event && (
+                <View>
+                  <Text className="block text-xs text-on-surface-variant mb-1">关联事件</Text>
+                  <Text className="block text-sm text-on-surface">{note.related_event}</Text>
+                </View>
+              )}
+              {note.source && (
+                <View>
+                  <Text className="block text-xs text-on-surface-variant mb-1">来源</Text>
+                  <Text className="block text-sm text-on-surface">{note.source}</Text>
+                </View>
+              )}
+            </View>
           </View>
-        </View>
+        )}
 
         <View className="h-4" />
       </ScrollView>
