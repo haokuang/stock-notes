@@ -1,1 +1,8 @@
 /* 优先使用 tailwindcss，如无必要请不要使用css */
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}

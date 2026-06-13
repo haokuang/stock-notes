@@ -1,11 +1,55 @@
 export default defineAppConfig({
   pages: [
-    'pages/index/index'
+    'pages/index/index',
+    'pages/library/index',
+    'pages/analysis/index',
+    'pages/profile/index',
+    'pages/stock/index',
+    'pages/note-edit/index',
+    'pages/stock-add/index',
+    'pages/note-detail/index',
+    'pages/image-ai/index',
+    'pages/ai-report/index',
+    'pages/heatmap-detail/index',
+    'pages/stock-search/index',
   ],
   window: {
     backgroundTextStyle: 'light',
-    navigationBarBackgroundColor: '#fff',
-    navigationBarTitleText: 'WeChat',
-    navigationBarTextStyle: 'black'
-  }
+    navigationBarBackgroundColor: '#EEF0F6',
+    navigationBarTitleText: '投研观点',
+    navigationBarTextStyle: 'black',
+    backgroundColor: '#EEF0F6',
+  },
+  tabBar: {
+    color: '#9498AC',
+    selectedColor: '#6D4DFF',
+    backgroundColor: '#ffffff',
+    borderStyle: 'white',
+    list: [
+      {
+        pagePath: 'pages/index/index',
+        text: '首页',
+        iconPath: './assets/tabbar/house.png',
+        selectedIconPath: './assets/tabbar/house-active.png',
+      },
+      {
+        pagePath: 'pages/library/index',
+        text: '观点库',
+        iconPath: './assets/tabbar/book-open.png',
+        selectedIconPath: './assets/tabbar/book-open-active.png',
+      },
+      {
+        pagePath: 'pages/analysis/index',
+        text: 'AI 分析',
+        iconPath: './assets/tabbar/sparkles.png',
+        selectedIconPath: './assets/tabbar/sparkles-active.png',
+      },
+      {
+        pagePath: 'pages/profile/index',
+        text: '我的',
+        iconPath: './assets/tabbar/user.png',
+        selectedIconPath: './assets/tabbar/user-active.png',
+      },
+    ],
+  },
 })

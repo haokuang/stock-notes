@@ -257,7 +257,7 @@ const PopoverHeader = React.forwardRef<
   React.ElementRef<typeof View>,
   React.ComponentPropsWithoutRef<typeof View>
 >(({ className, ...props }, ref) => (
-  <View ref={ref} className={cn("grid gap-1.5", className)} {...props} />
+  <View ref={ref} className={cn("grid gap-2", className)} {...props} />
 ))
 PopoverHeader.displayName = "PopoverHeader"
 

@@ -278,7 +278,7 @@ const DropdownMenuItem = React.forwardRef<
       data-variant={variant}
       data-disabled={disabled ? "" : undefined}
       className={cn(
-        "relative flex cursor-default select-none items-center gap-1.5 rounded-md px-2 py-1 text-sm outline-none transition-colors focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+        "relative flex cursor-default select-none items-center gap-2 rounded-md px-2 py-1 text-sm outline-none transition-colors focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
         "data-[variant=destructive]:text-destructive data-[variant=destructive]:focus:bg-destructive data-[variant=destructive]:focus:bg-opacity-10 data-[variant=destructive]:focus:text-destructive",
         inset && "pl-7",
         disabled && "pointer-events-none opacity-50",
@@ -313,7 +313,7 @@ const DropdownMenuCheckboxItem = React.forwardRef<
       data-disabled={disabled ? "" : undefined}
       data-state={checked ? "checked" : "unchecked"}
       className={cn(
-        "relative flex cursor-default select-none items-center gap-1.5 rounded-md py-1 pr-8 pl-2 text-sm outline-none transition-colors focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+        "relative flex cursor-default select-none items-center gap-2 rounded-md py-1 pr-8 pl-2 text-sm outline-none transition-colors focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
         inset && "pl-7",
         className
       )}
@@ -354,7 +354,7 @@ const DropdownMenuRadioItem = React.forwardRef<
       data-disabled={disabled ? "" : undefined}
       data-state={checked ? "checked" : "unchecked"}
       className={cn(
-        "relative flex cursor-default select-none items-center gap-1.5 rounded-md py-1 pr-8 pl-2 text-sm outline-none transition-colors focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+        "relative flex cursor-default select-none items-center gap-2 rounded-md py-1 pr-8 pl-2 text-sm outline-none transition-colors focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
         inset && "pl-7",
         className
       )}
@@ -432,7 +432,7 @@ const DropdownMenuSubTrigger = React.forwardRef<
       data-disabled={disabled ? "" : undefined}
       data-state={subContext?.open ? "open" : "closed"}
       className={cn(
-        "relative flex cursor-default select-none items-center gap-1.5 rounded-md px-2 py-1 text-sm outline-none transition-colors focus:bg-accent focus:text-accent-foreground data-[state=open]:bg-accent data-[state=open]:text-accent-foreground",
+        "relative flex cursor-default select-none items-center gap-2 rounded-md px-2 py-1 text-sm outline-none transition-colors focus:bg-accent focus:text-accent-foreground data-[state=open]:bg-accent data-[state=open]:text-accent-foreground",
         inset && "pl-7",
         disabled && "pointer-events-none opacity-50",
         className

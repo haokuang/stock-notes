@@ -1,0 +1,143 @@
+import { IsArray, IsEnum, IsInt, IsNotEmpty, IsNumber, IsOptional, IsString, Min } from 'class-validator';
+import { Type } from 'class-transformer';
+
+export enum NoteDirection {
+  BULL = 'bull',
+  BEAR = 'bear',
+  NEUTRAL = 'neutral',
+}
+
+export class CreateNoteDto {
+  @IsString()
+  @IsNotEmpty()
+  stock_id: string;
+
+  @IsString()
+  @IsNotEmpty()
+  title: string;
+
+  @IsOptional()
+  @IsString()
+  content?: string;
+
+  @IsEnum(NoteDirection)
+  direction: NoteDirection;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  entry_price?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  target_price?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  stop_loss?: number;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  tags?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  images?: string[];
+
+  @IsOptional()
+  @IsString()
+  ai_summary?: string;
+  @IsOptional()
+  @IsString()
+  related_event?: string;
+  @IsOptional()
+  @IsString()
+  source?: string;
+}
+
+export class UpdateNoteDto {
+  @IsOptional()
+  @IsString()
+  title?: string;
+
+  @IsOptional()
+  @IsString()
+  content?: string;
+
+  @IsOptional()
+  @IsEnum(NoteDirection)
+  direction?: NoteDirection;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  entry_price?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  target_price?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  stop_loss?: number;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  tags?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  images?: string[];
+
+  @IsOptional()
+  @IsString()
+  ai_summary?: string;
+  @IsOptional()
+  @IsString()
+  related_event?: string;
+  @IsOptional()
+  @IsString()
+  source?: string;
+}
+
+export class QueryNoteDto {
+  @IsOptional()
+  @IsString()
+  stock_id?: string;
+
+  @IsOptional()
+  @IsEnum(NoteDirection)
+  direction?: NoteDirection;
+
+  @IsOptional()
+  @IsString()
+  from?: string;
+
+  @IsOptional()
+  @IsString()
+  to?: string;
+
+  @IsOptional()
+  @IsString()
+  keyword?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  limit?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  offset?: number;
+}
