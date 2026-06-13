@@ -97,6 +97,28 @@ const heatmapBg = (count: number): string => {
   return 'bg-primary'
 }
 
+/* === HTML/图片语法脱敏（用于 doc 类型的纯文本预览） === */
+const stripHtml = (html: string): string => {
+  if (!html) return ''
+  return html
+    // 去掉 Markdown 图片 ![alt](url)
+    .replace(/!\[([^\]]*)\]\([^)]+\)/g, '[图片]')
+    // 去掉 Markdown 链接 [text](url) → text
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    // 去掉 HTML 标签
+    .replace(/<[^>]+>/g, ' ')
+    // 去掉 Markdown 标题符号
+    .replace(/^#{1,6}\s+/gm, '')
+    // 去掉 Markdown 引用/列表符号
+    .replace(/^[-*+>]\s+/gm, '')
+    // 去掉代码块
+    .replace(/```[\s\S]*?```/g, '[代码]')
+    .replace(/`[^`]+`/g, '')
+    // 合并多余空白
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
 export default function IndexPage() {
   const [summary, setSummary] = useState<Summary>({ stocks: 0, notes: 0, bull: 0 })
   const [stocks, setStocks] = useState<Stock[]>([])
@@ -386,6 +408,7 @@ export default function IndexPage() {
                 return (
                   <View
                     key={s.id}
+                    hoverClass="bg-surface-container"
                     className="shrink-0 w-44 rounded-2xl p-4 bg-white bg-opacity-72 border border-primary border-opacity-25"
                     onClick={() => Taro.navigateTo({ url: `/pages/stock/index?stock_id=${s.id}` })}
                   >
@@ -441,9 +464,11 @@ export default function IndexPage() {
             notes.map((n) => {
               const meta = directionMeta[n.direction] ?? directionMeta.neutral
               const cover = n.images?.[0]
+              const preview = stripHtml(n.content ?? '')
               return (
                 <View
                   key={n.id}
+                  hoverClass="bg-surface-container"
                   className="rounded-2xl p-4 flex gap-3 bg-white bg-opacity-72 border border-white border-opacity-85 active:scale-[0.99] transition-transform"
                   onClick={() => Taro.navigateTo({ url: `/pages/note-detail/index?note_id=${n.id}` })}
                 >
@@ -457,12 +482,12 @@ export default function IndexPage() {
                     <Text className="block text-base font-semibold text-on-surface leading-snug" style={{ display: '-webkit-box', WebkitLineClamp: 1, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
                       {n.title}
                     </Text>
-                    {n.content ? (
+                    {preview ? (
                       <Text
-                        className="block text-sm text-on-surface-variant mt-1 leading-[1.5]"
+                        className="block text-sm text-on-surface-variant mt-1 leading-relaxed"
                         style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}
                       >
-                        {n.content}
+                        {preview}
                       </Text>
                     ) : null}
                     <View className="mt-2 flex items-center gap-3 text-[11px] text-on-surface-variant">
