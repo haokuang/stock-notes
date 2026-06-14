@@ -1,14 +1,16 @@
 import Taro from '@tarojs/taro'
+import { sessionStore } from './auth/session'
 
 /**
  * 网络请求模块
- * 封装 Taro.request、Taro.uploadFile、Taro.downloadFile，自动添加项目域名前缀
- * 如果请求的 url 以 http:// 或 https:// 开头，则不会添加域名前缀
- *
- * IMPORTANT: 项目已经全局注入 PROJECT_DOMAIN
- * IMPORTANT: 除非你需要添加全局参数，如给所有请求加上 header，否则不能修改此文件
+ * 自动:
+ *   1. 加 PROJECT_DOMAIN 前缀
+ *   2. 从 session 注入 Authorization: Bearer <jwt>
+ *   3. 401 响应时清掉 session(由调用方跳转登录)
  */
 export namespace Network {
+    const PUBLIC_PATHS = ['/api/auth/sign-in', '/api/auth/sign-up']
+
     const createUrl = (url: string): string => {
         if (url.startsWith('http://') || url.startsWith('https://')) {
             return url
@@ -16,17 +18,62 @@ export namespace Network {
         return `${PROJECT_DOMAIN}${url}`
     }
 
-    export const request: typeof Taro.request = option => {
-        return Taro.request({
+    const injectAuth = (option: Taro.request.Option): Taro.request.Option => {
+        const isPublic = PUBLIC_PATHS.some((p) => option.url.includes(p))
+        if (isPublic) return option
+        const token = sessionStore.getAccessToken()
+        if (!token) return option
+        return {
             ...option,
-            url: createUrl(option.url),
+            header: {
+                ...(option.header || {}),
+                Authorization: `Bearer ${token}`,
+            },
+        }
+    }
+
+    /**
+     * 401/403 时清 session + 跳登录页(只在非 /api/auth/* 响应)
+     */
+    const handleUnauthorized = (status: number, url: string) => {
+        const isAuthEndpoint = PUBLIC_PATHS.some((p) => url.includes(p))
+        if (isAuthEndpoint) return
+        if (status === 401 || status === 403) {
+            sessionStore.clear()
+            // 跳登录页(用 redirectTo 避免在 tab 页面栈里留残)
+            try {
+                Taro.hideToast?.()
+                Taro.showToast({ title: '请重新登录', icon: 'none' })
+            } catch {}
+            setTimeout(() => {
+                try {
+                    Taro.reLaunch({ url: '/pages/login/index' })
+                } catch {}
+            }, 800)
+        }
+    }
+
+    export const request: typeof Taro.request = option => {
+        const opt = injectAuth({ ...option, url: createUrl(option.url) })
+        const task = Taro.request(opt) as any
+        // 401 兜底:不影响请求本身的成功/失败,只做副作用
+        const maybePromise = task?.then ? task : Promise.resolve(task)
+        maybePromise.then((res: any) => {
+            handleUnauthorized(res?.statusCode, option.url)
         })
+        return task
     }
 
     export const uploadFile: typeof Taro.uploadFile = option => {
         return Taro.uploadFile({
             ...option,
             url: createUrl(option.url),
+            header: {
+                ...(option.header || {}),
+                ...(sessionStore.getAccessToken()
+                    ? { Authorization: `Bearer ${sessionStore.getAccessToken()}` }
+                    : {}),
+            },
         })
     }
 
@@ -34,6 +81,12 @@ export namespace Network {
         return Taro.downloadFile({
             ...option,
             url: createUrl(option.url),
+            header: {
+                ...(option.header || {}),
+                ...(sessionStore.getAccessToken()
+                    ? { Authorization: `Bearer ${sessionStore.getAccessToken()}` }
+                    : {}),
+            },
         })
     }
 }

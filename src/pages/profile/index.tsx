@@ -1,8 +1,9 @@
 import { View, Text, ScrollView } from '@tarojs/components'
-import Taro, { useLoad, usePullDownRefresh } from '@tarojs/taro'
+import Taro, { useLoad, usePullDownRefresh, useDidShow } from '@tarojs/taro'
 import { useState } from 'react'
 import { Network } from '@/network'
-import { Settings, Bell, CircleAlert, ChevronRight, CirclePlus, House, Sparkles, BookOpen } from 'lucide-react-taro'
+import { sessionStore } from '@/auth/session'
+import { Settings, Bell, CircleAlert, ChevronRight, CirclePlus, House, Sparkles, BookOpen, LogOut } from 'lucide-react-taro'
 
 interface Stock {
   id: string
@@ -21,6 +22,7 @@ export default function ProfilePage() {
   const [summary, setSummary] = useState<Summary>({ stocks: 0, notes: 0, bull: 0 })
   const [stocks, setStocks] = useState<Stock[]>([])
   const [removing, setRemoving] = useState<string | null>(null)
+  const [email, setEmail] = useState<string>('')
 
   const load = async () => {
     try {
@@ -38,7 +40,19 @@ export default function ProfilePage() {
   }
 
   useLoad(() => {
+    if (!sessionStore.getAccessToken()) {
+      Taro.reLaunch({ url: '/pages/login/index' })
+      return
+    }
+    setEmail(sessionStore.get()?.user?.email ?? '')
     load()
+  })
+
+  // 每次页面显示都重新拉取(包括从 stock-add 等子页面返回时)— 2026-06-14
+  useDidShow(() => {
+    if (sessionStore.getAccessToken()) {
+      load()
+    }
   })
 
   usePullDownRefresh(async () => {
@@ -195,6 +209,36 @@ export default function ProfilePage() {
             ))}
           </View>
         </View>
+
+        {email ? (
+          <View className="px-4 mt-6">
+            <View className="rounded-2xl p-4 bg-white bg-opacity-72 border border-white border-opacity-85 flex items-center gap-3">
+              <View className="w-9 h-9 rounded-full flex items-center justify-center text-white font-bold text-sm"
+                style={{ background: 'linear-gradient(135deg, #6D4DFF 0%, #0F8C66 100%)' }}
+              >
+                <Text className="block text-white font-bold text-sm">{email.slice(0, 1).toUpperCase()}</Text>
+              </View>
+              <View className="flex-1 min-w-0">
+                <Text className="block text-sm text-on-surface truncate">{email}</Text>
+                <Text className="block text-[11px] text-on-surface-variant">已登录</Text>
+              </View>
+              <View
+                className="px-3 py-2 rounded-lg flex items-center gap-1 border"
+                style={{ backgroundColor: 'rgba(209, 26, 74, 0.10)', borderColor: 'rgba(209, 26, 74, 0.30)' }}
+                onClick={async () => {
+                  const ok = await Taro.showModal({ title: '确认登出', content: '登出后需要重新登录' })
+                  if (ok.confirm) {
+                    sessionStore.clear()
+                    Taro.reLaunch({ url: '/pages/login/index' })
+                  }
+                }}
+              >
+                <LogOut size={14} color="#D11A4A" />
+                <Text className="text-sm font-semibold text-error">登出</Text>
+              </View>
+            </View>
+          </View>
+        ) : null}
       </View>
     </ScrollView>
   )

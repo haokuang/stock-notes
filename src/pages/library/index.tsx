@@ -33,9 +33,9 @@ interface Stock {
 }
 
 const directionMeta = {
-  bull: { label: '看多', bg: 'bg-success bg-opacity-15', text: 'text-success' },
-  bear: { label: '看空', bg: 'bg-error bg-opacity-15', text: 'text-error' },
-  neutral: { label: '中性', bg: 'bg-warning bg-opacity-15', text: 'text-warning' },
+  bull: { label: '看多', bg: 'rgba(209, 26, 74, 0.15)', text: '#D11A4A' },     // 红涨
+  bear: { label: '看空', bg: 'rgba(15, 140, 102, 0.15)', text: '#0F8C66' },   // 绿跌
+  neutral: { label: '中性', bg: 'rgba(180, 83, 9, 0.15)', text: '#B45309' },
 }
 
 const typeMeta = {

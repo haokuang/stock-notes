@@ -114,17 +114,26 @@ export default function AnalysisPage() {
             基于你的历史观点，AI 自动汇总看多/看空/中性分布，{'\n'}提炼核心论点与潜在风险
           </Text>
           <View className="mt-3 flex items-center gap-2">
-            <View className="px-3 py-1 rounded-full bg-white bg-opacity-15 flex items-center gap-2">
+            <View
+              className="px-3 py-1 rounded-full flex items-center gap-1"
+              style={{ backgroundColor: 'rgba(255, 255, 255, 0.22)', minWidth: '64px' }}
+            >
               <TrendingUp size={12} color="#ffffff" />
-              <Text className="block text-[11px] font-semibold text-white">看多 {bullCount}</Text>
+              <Text className="block text-[12px] font-bold text-white">看多 {bullCount}</Text>
             </View>
-            <View className="px-3 py-1 rounded-full bg-white bg-opacity-15 flex items-center gap-2">
+            <View
+              className="px-3 py-1 rounded-full flex items-center gap-1"
+              style={{ backgroundColor: 'rgba(255, 255, 255, 0.22)', minWidth: '64px' }}
+            >
               <TrendingDown size={12} color="#ffffff" />
-              <Text className="block text-[11px] font-semibold text-white">看空 {bearCount}</Text>
+              <Text className="block text-[12px] font-bold text-white">看空 {bearCount}</Text>
             </View>
-            <View className="px-3 py-1 rounded-full bg-white bg-opacity-15 flex items-center gap-2">
+            <View
+              className="px-3 py-1 rounded-full flex items-center gap-1"
+              style={{ backgroundColor: 'rgba(255, 255, 255, 0.22)', minWidth: '64px' }}
+            >
               <Zap size={12} color="#ffffff" />
-              <Text className="block text-[11px] font-semibold text-white">中性 {neutralCount}</Text>
+              <Text className="block text-[12px] font-bold text-white">中性 {neutralCount}</Text>
             </View>
           </View>
         </View>

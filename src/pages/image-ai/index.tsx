@@ -88,7 +88,7 @@ export default function ImageAiPage() {
     Taro.setClipboardData({ data: text })
   }
 
-  const sentimentColor = result?.sentiment === 'bull' ? '#0F8C66' : result?.sentiment === 'bear' ? '#D11A4A' : '#B45309'
+  const sentimentColor = result?.sentiment === 'bull' ? '#D11A4A' : result?.sentiment === 'bear' ? '#0F8C66' : '#B45309'  // 红涨绿跌
   const sentimentLabel = result?.sentiment === 'bull' ? '看多' : result?.sentiment === 'bear' ? '看空' : '中性'
 
   return (

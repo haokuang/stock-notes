@@ -1,7 +1,8 @@
 import { View, Text, Image, ScrollView } from '@tarojs/components'
-import Taro, { useLoad, usePullDownRefresh } from '@tarojs/taro'
+import Taro, { useLoad, usePullDownRefresh, useDidShow } from '@tarojs/taro'
 import { useState } from 'react'
 import { Network } from '@/network'
+import { sessionStore } from '@/auth/session'
 import { Search, Bell, Plus, CirclePlus, PenLine, ImagePlus, Sparkles, ChevronRight, Clock } from 'lucide-react-taro'
 
 /* === 类型定义 === */
@@ -17,6 +18,15 @@ interface Stock {
   sort_order: number
   created_at: string
   updated_at: string
+  status?: 'watching' | 'holding'
+  stop_loss_alert?: {
+    status: 'ok' | 'warning' | 'danger' | 'triggered'
+    actual_rate: number
+    threshold: number
+  } | null
+  price_time?: string | null
+  price_time_label?: string | null
+  is_realtime?: boolean
 }
 
 interface Note {
@@ -52,18 +62,18 @@ interface Summary {
   bull: number
 }
 
-/* === 热力图常量 === */
-const WEEKS = 53
+/* === 热力图常量(近 3 个月 = 约 13 周) === */
+const WEEKS = 13
 const DAYS = 7
-const COL_W = 10
-const ROW_H = 10
-const GAP = 3
+const COL_W = 14
+const ROW_H = 14
+const GAP = 4
 const COL_TOTAL = COL_W + GAP
 
 const directionMeta = {
-  bull: { label: '看多', bg: 'bg-success bg-opacity-15', text: 'text-success' },
-  bear: { label: '看空', bg: 'bg-error bg-opacity-15', text: 'text-error' },
-  neutral: { label: '中性', bg: 'bg-warning bg-opacity-15', text: 'text-warning' },
+  bull: { label: '看多', bg: 'rgba(209, 26, 74, 0.15)', text: '#D11A4A' },     // 红涨
+  bear: { label: '看空', bg: 'rgba(15, 140, 102, 0.15)', text: '#0F8C66' },   // 绿跌
+  neutral: { label: '中性', bg: 'rgba(180, 83, 9, 0.15)', text: '#B45309' },
 }
 
 /* === 工具 === */
@@ -123,7 +133,7 @@ export default function IndexPage() {
   const [summary, setSummary] = useState<Summary>({ stocks: 0, notes: 0, bull: 0 })
   const [stocks, setStocks] = useState<Stock[]>([])
   const [notes, setNotes] = useState<Note[]>([])
-  const [heatmap, setHeatmap] = useState<HeatmapData>({ data: {}, total: 0, activeDays: 0, fromDays: 365 })
+  const [heatmap, setHeatmap] = useState<HeatmapData>({ data: {}, total: 0, activeDays: 0, fromDays: 90 })
 
   const loadAll = async () => {
     try {
@@ -131,7 +141,7 @@ export default function IndexPage() {
         Network.request<{ data: Summary }>({ url: '/api/stocks/summary' }),
         Network.request<{ data: Stock[] }>({ url: '/api/stocks' }),
         Network.request<{ data: Note[] }>({ url: '/api/notes?limit=10' }),
-        Network.request<HeatmapData>({ url: '/api/notes/heatmap?days=365' }),
+        Network.request<HeatmapData>({ url: '/api/notes/heatmap?days=90' }),
       ])
       console.log('[home] summary', sumRes.data)
       console.log('[home] stocks', stockRes.data)
@@ -147,7 +157,19 @@ export default function IndexPage() {
   }
 
   useLoad(() => {
+    // 启动检查:没 session 直接跳登录
+    if (!sessionStore.getAccessToken()) {
+      Taro.reLaunch({ url: '/pages/login/index' })
+      return
+    }
     loadAll()
+  })
+
+  // 每次页面显示都重新拉取(包括从 stock-add / buy 等子页面返回时)— 2026-06-14
+  useDidShow(() => {
+    if (sessionStore.getAccessToken()) {
+      loadAll()
+    }
   })
 
   usePullDownRefresh(async () => {
@@ -204,7 +226,7 @@ export default function IndexPage() {
           <View className="relative w-9 h-9 rounded-xl flex items-center justify-center bg-white bg-opacity-72 border border-white border-opacity-85"
             style={{ boxShadow: '0 1px 2px rgba(20, 18, 60, 0.04), 0 6px 24px rgba(20, 18, 60, 0.06)' }}
           >
-            <Text className="block text-[15px] font-bold text-primary tracking-wide">投研</Text>
+            <Text className="block text-base font-bold text-primary tracking-wide">投研</Text>
             <View className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-primary" />
           </View>
           <View className="w-9 h-9 rounded-full flex items-center justify-center text-white font-bold text-sm"
@@ -259,7 +281,7 @@ export default function IndexPage() {
               >
                 {summary.stocks}
               </Text>
-              <Text className="block text-[11px] text-on-surface-variant mt-1">关注股票</Text>
+              <Text className="block text-xs text-on-surface-variant mt-1">关注股票</Text>
             </View>
             <View className="flex flex-col items-center border-x border-outline-variant border-opacity-30">
               <Text className="block text-2xl font-bold tabular-nums"
@@ -267,7 +289,7 @@ export default function IndexPage() {
               >
                 {summary.notes}
               </Text>
-              <Text className="block text-[11px] text-on-surface-variant mt-1">观点总数</Text>
+              <Text className="block text-xs text-on-surface-variant mt-1">观点总数</Text>
             </View>
             <View className="flex flex-col items-center">
               <Text className="block text-2xl font-bold tabular-nums"
@@ -275,7 +297,7 @@ export default function IndexPage() {
               >
                 {summary.bull}
               </Text>
-              <Text className="block text-[11px] text-on-surface-variant mt-1">看多数</Text>
+              <Text className="block text-xs text-on-surface-variant mt-1">看多数</Text>
             </View>
           </View>
         </View>
@@ -296,7 +318,7 @@ export default function IndexPage() {
               onClick={() => Taro.navigateTo({ url: qa.url })}
             >
               {qa.icon}
-              <Text className="block text-[11px] font-medium text-on-surface">{qa.label}</Text>
+              <Text className="block text-xs font-medium text-on-surface">{qa.label}</Text>
             </View>
           ))}
         </View>
@@ -311,7 +333,7 @@ export default function IndexPage() {
           <View className="flex items-start justify-between gap-3 mb-3">
             <View className="min-w-0">
               <Text className="block text-sm font-semibold text-on-surface">观点活跃度</Text>
-              <Text className="block text-[11px] text-on-surface-variant mt-1">
+              <Text className="block text-xs text-on-surface-variant mt-1">
                 过去 {heatmap.fromDays} 天 · 共 {heatmap.total} 条观点 · 活跃 {heatmap.activeDays} 天
               </Text>
             </View>
@@ -331,18 +353,18 @@ export default function IndexPage() {
           {/* 热力图主体（横向滚动） */}
           <ScrollView scrollX enhanced showScrollbar={false} className="scrollbar-hide">
             <View className="inline-block">
-              {/* 月份标签行 */}
-              <View className="flex ml-[18px] mb-1" style={{ height: '12px' }}>
+              {/* 月份标签行(14px 高 + zIndex 防被格子覆盖) */}
+              <View className="flex ml-[18px] mb-1 relative z-10" style={{ height: '14px' }}>
                 {Array.from({ length: WEEKS }).map((_, w) => {
                   const m = months.find((x) => x.w === w)
                   return (
                     <View
                       key={w}
-                      style={{ width: `${COL_TOTAL}px`, height: '10px' }}
+                      style={{ width: `${COL_TOTAL}px`, height: '14px' }}
                       className="shrink-0"
                     >
                       {m ? (
-                        <Text className="block text-[9px] text-on-surface-variant text-opacity-70 leading-[10px]">{m.label}</Text>
+                        <Text className="block text-on-surface-variant text-opacity-70" style={{ fontSize: '11px', lineHeight: '14px' }}>{m.label}</Text>
                       ) : null}
                     </View>
                   )
@@ -350,9 +372,9 @@ export default function IndexPage() {
               </View>
               {/* 主网格：左星期 + 53 列方格 */}
               <View className="flex">
-                <View className="flex flex-col shrink-0 text-[9px] text-on-surface-variant text-opacity-70" style={{ width: '15px', marginRight: '3px' }}>
+                <View className="flex flex-col shrink-0 text-on-surface-variant text-opacity-70" style={{ width: '15px', marginRight: '3px' }}>
                   {['一', '', '三', '', '五', '', '日'].map((t, i) => (
-                    <Text key={i} className="block leading-[10px] text-[9px]" style={{ height: `${ROW_H}px`, marginBottom: `${GAP}px` }}>
+                    <Text key={i} className="block" style={{ fontSize: '11px', lineHeight: '14px', height: `${ROW_H}px`, marginBottom: `${GAP}px` }}>
                       {t}
                     </Text>
                   ))}
@@ -417,22 +439,53 @@ export default function IndexPage() {
                         <Text className="block text-base font-semibold text-on-surface truncate">{s.name}</Text>
                         <Text className="block text-xs text-on-surface-variant mt-1 tabular-nums">{s.code}</Text>
                       </View>
-                      {s.industry ? (
-                        <View className="shrink-0 inline-flex items-center px-2 py-1 rounded-md text-[11px] font-medium bg-primary-container">
-                          <Text className="block text-[11px] font-medium text-primary">{s.industry}</Text>
-                        </View>
-                      ) : null}
+                      <View className="flex items-center gap-1 shrink-0">
+                        {/* 状态徽章:watching / holding */}
+                        {s.status === 'holding' ? (
+                          <View className="px-2 py-1 rounded-md" style={{ background: 'rgba(15, 140, 102, 0.10)' }}>
+                            <Text className="block text-[11px] font-semibold" style={{ color: '#0F8C66' }}>持有</Text>
+                          </View>
+                        ) : null}
+                        {/* 止损红点:仅 holding + 接近/触及止损时 */}
+                        {s.stop_loss_alert && (s.stop_loss_alert.status === 'danger' || s.stop_loss_alert.status === 'triggered') ? (
+                          <View
+                            className="w-5 h-5 rounded-full flex items-center justify-center"
+                            style={{ background: s.stop_loss_alert.status === 'triggered' ? '#D11A4A' : '#FF7A00' }}
+                          >
+                            <Text className="block text-[10px] font-bold text-white">!</Text>
+                          </View>
+                        ) : null}
+                        {s.industry ? (
+                          <View className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-primary-container">
+                            <Text className="block text-xs font-medium text-primary">{s.industry}</Text>
+                          </View>
+                        ) : null}
+                      </View>
                     </View>
-                    <View className="mt-3 flex items-end justify-between">
-                      <Text className="block text-[22px] font-bold text-on-surface tabular-nums leading-none">
-                        {formatPrice(s.current_price)}
-                      </Text>
-                      <View
-                        className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-md ${isUp ? 'bg-success bg-opacity-10' : 'bg-error bg-opacity-10'}`}
-                      >
-                        <Text className={`block text-xs font-semibold ${isUp ? 'text-success' : 'text-error'}`}>
-                          {isUp ? '▲' : '▼'} {formatPercent(s.change_percent)}
+                    <View className="mt-3">
+                      <View className="flex items-end justify-between">
+                        <Text className="block text-[22px] font-bold text-on-surface tabular-nums leading-none">
+                          {formatPrice(s.current_price)}
                         </Text>
+                        <View
+                          className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-md ${isUp ? 'bg-success bg-opacity-10' : 'bg-error bg-opacity-10'}`}
+                        >
+                          <Text className={`block text-xs font-semibold ${isUp ? 'text-success' : 'text-error'}`}>
+                            {isUp ? '▲' : '▼'} {formatPercent(s.change_percent)}
+                          </Text>
+                        </View>
+                      </View>
+                      {/* 价格时间:今日 HH:mm / 昨日收盘 / MM-DD;非实时加灰色徽章 */}
+                      <View className="mt-1 flex items-center gap-1">
+                        <Clock size={10} color="#5B5E72" />
+                        <Text className="block text-[10px] text-on-surface-variant tabular-nums">
+                          {s.price_time_label ?? '—'}
+                        </Text>
+                        {s.is_realtime === false ? (
+                          <View className="px-1 py-1 rounded" style={{ background: 'rgba(91, 94, 114, 0.10)' }}>
+                            <Text className="block text-[9px] font-medium text-on-surface-variant">非实时</Text>
+                          </View>
+                        ) : null}
                       </View>
                     </View>
                   </View>
@@ -474,8 +527,8 @@ export default function IndexPage() {
                 >
                   <View className="flex-1 min-w-0">
                     <View className="flex items-center gap-2 mb-2">
-                      <View className={`inline-flex items-center px-2 py-1 rounded-full ${meta.bg}`}>
-                        <Text className={`block text-[11px] font-semibold ${meta.text}`}>{meta.label}</Text>
+                      <View className="inline-flex items-center px-2 py-1 rounded-full" style={{ backgroundColor: meta.bg }}>
+                        <Text className="block text-xs font-semibold" style={{ color: meta.text }}>{meta.label}</Text>
                       </View>
                       <Text className="block text-xs text-on-surface-variant truncate">{n.stock_name}</Text>
                     </View>
@@ -490,10 +543,10 @@ export default function IndexPage() {
                         {preview}
                       </Text>
                     ) : null}
-                    <View className="mt-2 flex items-center gap-3 text-[11px] text-on-surface-variant">
+                    <View className="mt-2 flex items-center gap-3 text-xs text-on-surface-variant">
                       <View className="inline-flex items-center gap-1">
                         <Clock size={12} color="#5B5E72" />
-                        <Text className="block text-[11px] text-on-surface-variant">{timeAgo(n.created_at)}</Text>
+                        <Text className="block text-xs text-on-surface-variant">{timeAgo(n.created_at)}</Text>
                       </View>
                     </View>
                   </View>

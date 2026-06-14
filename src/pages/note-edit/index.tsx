@@ -7,9 +7,9 @@ import { Network } from '@/network'
 import { ArrowLeft, X, Image as ImageIcon, Sparkles, FileText, PenLine, Eye, Upload, File } from 'lucide-react-taro'
 
 const DIRECTIONS: { value: 'bull' | 'bear' | 'neutral'; label: string; color: string; bg: string }[] = [
-  { value: 'bull', label: '看多', color: '#0F8C66', bg: 'rgba(15, 140, 102, 0.10)' },
+  { value: 'bull', label: '看多', color: '#D11A4A', bg: 'rgba(209, 26, 74, 0.10)' },     // 红涨
   { value: 'neutral', label: '中性', color: '#B45309', bg: 'rgba(180, 83, 9, 0.10)' },
-  { value: 'bear', label: '看空', color: '#D11A4A', bg: 'rgba(209, 26, 74, 0.10)' },
+  { value: 'bear', label: '看空', color: '#0F8C66', bg: 'rgba(15, 140, 102, 0.10)' },   // 绿跌
 ]
 
 type NoteType = 'note' | 'doc'
@@ -35,10 +35,8 @@ export default function NoteEditPage() {
   const [entryPrice, setEntryPrice] = useState('')
   const [targetPrice, setTargetPrice] = useState('')
   const [stopLoss, setStopLoss] = useState('')
-  const [tagInput, setTagInput] = useState('')
-  const [tags, setTags] = useState<string[]>([])
-  const [relatedEvent, setRelatedEvent] = useState('')
-  const [source, setSource] = useState('')
+  // 止损模式:'abs' = 绝对价格(¥) | 'pct' = 百分比(% 负数,表示入场跌 X%)
+  const [stopLossMode, setStopLossMode] = useState<'abs' | 'pct'>('abs')
   const [images, setImages] = useState<string[]>([])
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(false)
@@ -49,19 +47,6 @@ export default function NoteEditPage() {
     setStockId(sid)
     setStockName(opts?.stock_name ? decodeURIComponent(opts.stock_name) : '')
   })
-
-  const onAddTag = () => {
-    const t = tagInput.trim()
-    if (!t) return
-    if (tags.includes(t)) {
-      setTagInput('')
-      return
-    }
-    setTags([...tags, t])
-    setTagInput('')
-  }
-
-  const onRemoveTag = (t: string) => setTags(tags.filter((x) => x !== t))
 
   const onPickImages = async () => {
     try {
@@ -202,10 +187,34 @@ export default function NoteEditPage() {
     }
     setSaving(true)
     try {
+      // 标题留空 + note 模式 + content 够长 → 后端 AI 总结
+      let finalTitle = title.trim()
+      if (!finalTitle && type === 'note' && content.trim().length >= 10) {
+        try {
+          Taro.showLoading({ title: 'AI 总结标题中…' })
+          const aiRes = await Network.request<{ data: { title: string } }>({
+            url: '/api/ai/summarize-title',
+            method: 'POST',
+            data: { content: content.trim() },
+          })
+          Taro.hideLoading()
+          finalTitle = aiRes.data?.data?.title ?? ''
+        } catch {
+          Taro.hideLoading()
+          // LLM 失败时,title 仍空 — 后端 notes 表 title 必填,fallback 用 content 前 30 字
+          finalTitle = content.trim().slice(0, 30) + (content.trim().length > 30 ? '...' : '')
+        }
+      } else if (!finalTitle) {
+        // 完全没内容 — 不允许
+        Taro.hideLoading()
+        setSaving(false)
+        Taro.showToast({ title: '标题或内容不能都为空', icon: 'none' })
+        return
+      }
       const payload: any = {
         stock_id: stockId,
         type,
-        title: title.trim(),
+        title: finalTitle,
       }
       if (type === 'doc') {
         payload.doc_md = docMd
@@ -215,11 +224,22 @@ export default function NoteEditPage() {
         payload.direction = direction
         payload.entry_price = entryPrice ? parseFloat(entryPrice) : null
         payload.target_price = targetPrice ? parseFloat(targetPrice) : null
-        payload.stop_loss = stopLoss ? parseFloat(stopLoss) : null
-        payload.tags = tags
+        // 止损:百分比模式下,基于 entry_price 算绝对值
+        if (stopLoss) {
+          const stopNum = parseFloat(stopLoss)
+          if (stopLossMode === 'pct' && entryPrice && !Number.isNaN(stopNum)) {
+            const entry = parseFloat(entryPrice)
+            payload.stop_loss = Number((entry * (1 - Math.abs(stopNum) / 100)).toFixed(2))
+          } else if (!Number.isNaN(stopNum)) {
+            payload.stop_loss = stopNum
+          } else {
+            payload.stop_loss = null
+          }
+        } else {
+          payload.stop_loss = null
+        }
+        payload.tags = []
         payload.images = images
-        payload.related_event = relatedEvent.trim() || null
-        payload.source = source.trim() || null
       }
       await Network.request({
         url: '/api/notes',
@@ -297,18 +317,22 @@ export default function NoteEditPage() {
           </View>
         )}
 
-        {/* 标题 */}
+        {/* 标题 — doc 模式自动从文件名识别,无需手动填 */}
+        {type === 'note' && (
         <View className="px-4 pt-3">
           <View className="rounded-2xl p-4 bg-white bg-opacity-72 border border-white border-opacity-85">
             <View className="flex items-center justify-between mb-2">
               <Text className="block text-xs text-on-surface-variant">标题</Text>
-              <Text className="block text-[10px] text-on-surface-variant">{title.length}/50</Text>
+              <View className="flex items-center gap-2">
+                <Text className="block text-[10px] text-on-surface-variant">留空则 AI 总结</Text>
+                <Text className="block text-[10px] text-on-surface-variant">{title.length}/50</Text>
+              </View>
             </View>
             <View className="bg-surface-container rounded-xl px-4 py-3">
               <Input
                 className="w-full bg-transparent"
                 style={{ fontSize: '16px', fontWeight: 600, color: '#161826' }}
-                placeholder={type === 'doc' ? '文档名称...' : '一句话总结你的观点...'}
+                placeholder="一句话总结你的观点..."
 
                 value={title}
                 onInput={(e) => setTitle(e.detail.value)}
@@ -317,6 +341,7 @@ export default function NoteEditPage() {
             </View>
           </View>
         </View>
+        )}
 
         {/* ===== 观点模式 ===== */}
         {type === 'note' && (
@@ -353,19 +378,18 @@ export default function NoteEditPage() {
               <View className="rounded-2xl p-4 bg-white bg-opacity-72 border border-white border-opacity-85">
                 <Text className="block text-xs text-on-surface-variant mb-2">价格点位（可选）</Text>
                 <View className="grid grid-cols-3 gap-2">
+                  {/* 入场 + 目标:绝对价格 */}
                   {[
                     { label: '入场', value: entryPrice, set: setEntryPrice, color: '#6D4DFF' },
                     { label: '目标', value: targetPrice, set: setTargetPrice, color: '#0F8C66' },
-                    { label: '止损', value: stopLoss, set: setStopLoss, color: '#D11A4A' },
                   ].map((p) => (
                     <View key={p.label} className="bg-surface-container rounded-xl px-3 py-3">
-                      <Text className="block text-[10px] mb-1" style={{ color: p.color }}>{p.label}</Text>
+                      <Text className="block text-xs font-medium mb-2" style={{ color: p.color }}>{p.label}</Text>
                       <View style={{ display: 'flex', flexDirection: 'row', alignItems: 'center' }}>
                         <Text className="text-base font-semibold mr-1" style={{ color: '#9498AC' }}>¥</Text>
                         <Input
                           style={{ flex: 1, fontSize: '14px', fontWeight: 600, color: '#161826' }}
                           placeholder="—"
-
                           type="digit"
                           value={p.value}
                           onInput={(e) => p.set(e.detail.value)}
@@ -373,6 +397,95 @@ export default function NoteEditPage() {
                       </View>
                     </View>
                   ))}
+
+                  {/* 止损:支持 绝对值 / 百分比 切换 */}
+                  <View className="bg-surface-container rounded-xl px-3 py-3">
+                    <View className="flex items-center justify-between mb-2">
+                      <Text className="block text-xs font-medium" style={{ color: '#D11A4A' }}>止损</Text>
+                      <View
+                        className="flex items-center rounded-md"
+                        style={{ backgroundColor: 'rgba(91, 94, 114, 0.10)' }}
+                      >
+                        <View
+                          className="px-2 py-1 rounded-md"
+                          style={{
+                            backgroundColor: stopLossMode === 'abs' ? '#161826' : 'transparent',
+                          }}
+                          onClick={() => {
+                            setStopLossMode('abs')
+                            // 切到绝对值:若当前是百分比,转成绝对值
+                            if (entryPrice && stopLoss) {
+                              const pct = parseFloat(stopLoss)
+                              if (!Number.isNaN(pct)) {
+                                const abs = parseFloat(entryPrice) * (1 - Math.abs(pct) / 100)
+                                setStopLoss(abs.toFixed(2))
+                              }
+                            }
+                          }}
+                        >
+                          <Text
+                            className="block text-xs font-bold"
+                            style={{ color: stopLossMode === 'abs' ? '#ffffff' : '#5B5E72' }}
+                          >
+                            ¥
+                          </Text>
+                        </View>
+                        <View
+                          className="px-2 py-1 rounded-md"
+                          style={{
+                            backgroundColor: stopLossMode === 'pct' ? '#161826' : 'transparent',
+                          }}
+                          onClick={() => {
+                            setStopLossMode('pct')
+                            // 切到百分比:若当前是绝对值 + 已有入场价,转成百分比
+                            if (entryPrice && stopLoss) {
+                              const abs = parseFloat(stopLoss)
+                              const entry = parseFloat(entryPrice)
+                              if (!Number.isNaN(abs) && !Number.isNaN(entry) && entry > 0) {
+                                const pct = -((entry - abs) / entry * 100)
+                                setStopLoss(pct.toFixed(2))
+                              }
+                            }
+                          }}
+                        >
+                          <Text
+                            className="block text-xs font-bold"
+                            style={{ color: stopLossMode === 'pct' ? '#ffffff' : '#5B5E72' }}
+                          >
+                            %
+                          </Text>
+                        </View>
+                      </View>
+                    </View>
+                    <View style={{ display: 'flex', flexDirection: 'row', alignItems: 'center' }}>
+                      <Text
+                        className="text-base font-semibold mr-1"
+                        style={{ color: '#9498AC' }}
+                      >
+                        {stopLossMode === 'abs' ? '¥' : '%'}
+                      </Text>
+                      <Input
+                        style={{ flex: 1, fontSize: '14px', fontWeight: 600, color: '#161826' }}
+                        placeholder={stopLossMode === 'abs' ? '—' : '-2.5'}
+                        type="digit"
+                        value={stopLoss}
+                        onInput={(e) => setStopLoss(e.detail.value)}
+                      />
+                    </View>
+                    {/* 换算提示 */}
+                    {stopLoss && entryPrice && (() => {
+                      const num = parseFloat(stopLoss)
+                      const entry = parseFloat(entryPrice)
+                      if (Number.isNaN(num) || Number.isNaN(entry) || entry <= 0) return null
+                      const abs = stopLossMode === 'pct' ? entry * (1 - Math.abs(num) / 100) : num
+                      const pct = stopLossMode === 'pct' ? num : -((entry - num) / entry * 100)
+                      return (
+                        <Text className="block text-[10px] text-on-surface-variant mt-1">
+                          ≈ ¥{abs.toFixed(2)} ({pct >= 0 ? '+' : ''}{pct.toFixed(2)}%)
+                        </Text>
+                      )
+                    })()}
+                  </View>
                 </View>
               </View>
             </View>
@@ -382,21 +495,26 @@ export default function NoteEditPage() {
               <View className="rounded-2xl p-4 bg-white bg-opacity-72 border border-white border-opacity-85">
                 <View className="flex items-center justify-between mb-2">
                   <Text className="block text-xs text-on-surface-variant">详细观点</Text>
-                  <View className="flex items-center gap-1 px-2 py-1 rounded-full bg-primary-container">
-                    <Sparkles size={12} color="#6D4DFF" />
-                    <Text className="block text-[10px] font-semibold text-primary">支持 AI 总结</Text>
-                  </View>
                 </View>
-                <View className="bg-surface-container rounded-xl p-3">
-                  <Textarea
-                    style={{ width: '100%', minHeight: '140px', fontSize: '14px', lineHeight: '1.6', color: '#161826', backgroundColor: 'transparent' }}
-                    placeholder="分析逻辑、风险点、关键价位..."
+                <Textarea
+                  style={{
+                    width: '100%',
+                    minHeight: '200px',
+                    fontSize: '14px',
+                    lineHeight: '1.6',
+                    color: '#161826',
+                    backgroundColor: '#E8E8EE',
+                    border: '1px solid rgba(91, 94, 114, 0.20)',
+                    borderRadius: '12px',
+                    boxSizing: 'border-box',
+                    padding: '12px',
+                  }}
+                  placeholder="分析逻辑、风险点、关键价位..."
 
-                    value={content}
-                    onInput={(e) => setContent(e.detail.value)}
-                    maxlength={2000}
-                  />
-                </View>
+                  value={content}
+                  onInput={(e) => setContent(e.detail.value)}
+                  maxlength={2000}
+                />
               </View>
             </View>
 
@@ -426,83 +544,10 @@ export default function NoteEditPage() {
                       style={{ borderColor: 'rgba(109, 77, 255, 0.30)' }}
                       onClick={onPickImages}
                     >
-                      <ImageIcon size={20} color="#6D4DFF" />
-                      <Text className="block text-[10px] text-on-surface-variant mt-1">添加截图</Text>
+                      <ImageIcon size={24} color="#6D4DFF" />
+                      <Text className="block text-sm font-medium text-on-surface-variant mt-2">添加截图</Text>
                     </View>
                   )}
-                </View>
-              </View>
-            </View>
-
-            {/* 标签 */}
-            <View className="px-4 pt-3">
-              <View className="rounded-2xl p-4 bg-white bg-opacity-72 border border-white border-opacity-85">
-                <Text className="block text-xs text-on-surface-variant mb-2">标签</Text>
-                <View className="flex flex-wrap gap-2 mb-2">
-                  {tags.map((t) => (
-                    <View
-                      key={t}
-                      className="px-3 py-1 rounded-full flex items-center gap-1 bg-primary-container"
-                    >
-                      <Text className="block text-xs font-semibold text-primary">{t}</Text>
-                      <X size={12} color="#6D4DFF" onClick={() => onRemoveTag(t)} />
-                    </View>
-                  ))}
-                </View>
-                <View className="flex items-center gap-2">
-                  <View className="flex-1 bg-surface-container rounded-xl px-3 py-2">
-                    <Input
-                      className="w-full bg-transparent"
-                      style={{ fontSize: '13px', color: '#161826' }}
-                      placeholder="按回车添加标签"
-
-                      value={tagInput}
-                      onInput={(e) => setTagInput(e.detail.value)}
-                      onConfirm={onAddTag}
-                      confirmType="done"
-                    />
-                  </View>
-                  <View
-                    className="px-3 py-2 rounded-xl flex items-center justify-center"
-                    style={{ background: '#6D4DFF' }}
-                    onClick={onAddTag}
-                  >
-                    <Text className="block text-xs font-semibold text-white">添加</Text>
-                  </View>
-                </View>
-              </View>
-            </View>
-
-            {/* 关联事件 + 来源 */}
-            <View className="px-4 pt-3">
-              <View className="rounded-2xl p-4 bg-white bg-opacity-72 border border-white border-opacity-85 space-y-3">
-                <View>
-                  <Text className="block text-xs text-on-surface-variant mb-2">关联事件</Text>
-                  <View className="bg-surface-container rounded-xl px-3 py-3">
-                    <Input
-                      className="w-full bg-transparent"
-                      style={{ fontSize: '13px', color: '#161826' }}
-                      placeholder="例：央行降准、半年度业绩"
-
-                      value={relatedEvent}
-                      onInput={(e) => setRelatedEvent(e.detail.value)}
-                      maxlength={50}
-                    />
-                  </View>
-                </View>
-                <View>
-                  <Text className="block text-xs text-on-surface-variant mb-2">来源</Text>
-                  <View className="bg-surface-container rounded-xl px-3 py-3">
-                    <Input
-                      className="w-full bg-transparent"
-                      style={{ fontSize: '13px', color: '#161826' }}
-                      placeholder="例：东吴证券研报、雪球"
-
-                      value={source}
-                      onInput={(e) => setSource(e.detail.value)}
-                      maxlength={50}
-                    />
-                  </View>
                 </View>
               </View>
             </View>

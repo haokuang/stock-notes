@@ -69,7 +69,7 @@ body.h5-navbar-visible .sheet-content:not([data-side="bottom"]) {
  * 375px 屏幕：1rem = 16px，小程序 32rpx = 16px
  */
 html {
-    font-size: 4vw !important;
+    font-size: 4.2667vw !important;
 }
 
 /* H5 端组件默认样式修复 */
