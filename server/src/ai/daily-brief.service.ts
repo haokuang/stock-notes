@@ -3,7 +3,7 @@ import { eq, desc, and, count } from 'drizzle-orm'
 import { DRIZZLE_DB, PG_POOL } from '../storage/database/database.module'
 import * as schema from '../storage/database/shared/schema'
 import { Pool } from 'pg'
-import { deepseekChat, DEEPSEEK_FLASH_MODEL } from './deepseek.client'
+import { deepseekChat, DEEPSEEK_FLASH_MODEL, DEEPSEEK_PRO_MODEL } from './deepseek.client'
 
 const { stocks, notes, stockPrices, stockBriefs } = schema
 
@@ -144,22 +144,21 @@ export class DailyBriefService {
 }`
 
       try {
-        const llm = new LLMClient(new Config())
-        const res = await llm.invoke(
+        const content = await deepseekChat(
           [
             { role: 'system', content: '你是 A 股投资助手,只输出严格 JSON,不输出 markdown。' },
             { role: 'user', content: prompt },
           ],
-          { model: 'doubao-seed-1-8-251228', temperature: 0.4, thinking: 'disabled' },
+          { model: DEEPSEEK_PRO_MODEL, temperature: 0.4 },
         )
-        const text = res.content.trim()
+        const text = content
         const json = text.replace(/^```json\s*/i, '').replace(/```\s*$/, '')
         const parsed = JSON.parse(json) as LLMOutput
         content = String(parsed.content ?? '').slice(0, 500)  // 兜底截断
         signal = ['green', 'yellow', 'red'].includes(parsed.signal) ? parsed.signal : 'yellow'
         usedLLM = true
       } catch (e) {
-        this.logger.warn(`[brief] LLM 调用失败,使用本地兜底: ${(e as Error).message}`)
+        this.logger.warn(`[brief] DeepSeek 调用失败,使用本地兜底: ${(e as Error).message}`)
         content = `LLM 不可用,基于本地指标的占位简评。MA20=${indicators.ma20},RSI=${indicators.rsi14},量比=${indicators.volRatio}。`
         signal = stopLoss.status === 'danger' ? 'yellow' : 'green'
       }

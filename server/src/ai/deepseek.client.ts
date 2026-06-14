@@ -20,8 +20,8 @@ function getClient(): OpenAI {
   return _client
 }
 
-export const DEEPSEEK_FLASH_MODEL = process.env.DEEPSEEK_FLASH_MODEL || 'deepseek-flash'
-export const DEEPSEEK_PRO_MODEL = process.env.DEEPSEEK_PRO_MODEL || 'deepseek-pro'
+export const DEEPSEEK_FLASH_MODEL = process.env.DEEPSEEK_FLASH_MODEL || 'deepseek-v4-flash'
+export const DEEPSEEK_PRO_MODEL = process.env.DEEPSEEK_PRO_MODEL || 'deepseek-v4-pro'
 
 export interface DeepseekChatMessage {
   role: 'system' | 'user' | 'assistant'
