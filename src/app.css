@@ -186,3 +186,67 @@ image {
   background-color: var(--selection);
   color: var(--selection-foreground);
 }
+
+/* === MD 文档内容渲染样式（H5 innerHTML 注入） === */
+.md-content h1 { font-size: 1.5rem; font-weight: 700; margin: 1.25rem 0 0.5rem; line-height: 1.3; color: var(--foreground); }
+.md-content h2 { font-size: 1.25rem; font-weight: 700; margin: 1rem 0 0.4rem; line-height: 1.35; color: var(--foreground); }
+.md-content h3 { font-size: 1.1rem; font-weight: 600; margin: 0.85rem 0 0.3rem; line-height: 1.4; color: var(--foreground); }
+.md-content h4,
+.md-content h5,
+.md-content h6 { font-size: 1rem; font-weight: 600; margin: 0.7rem 0 0.25rem; line-height: 1.45; color: var(--foreground); }
+.md-content p { margin: 0.5rem 0; line-height: 1.7; color: var(--foreground); }
+.md-content a { color: var(--primary); text-decoration: underline; }
+.md-content strong { font-weight: 700; }
+.md-content em { font-style: italic; }
+.md-content ul,
+.md-content ol { padding-left: 1.5rem; margin: 0.5rem 0; }
+.md-content li { margin: 0.25rem 0; line-height: 1.6; }
+.md-content blockquote {
+  border-left: 3px solid var(--primary);
+  padding: 0.3rem 0 0.3rem 0.8rem;
+  margin: 0.6rem 0;
+  color: var(--muted-foreground);
+  background: rgba(109, 77, 255, 0.04);
+  border-radius: 0 6px 6px 0;
+}
+.md-content code {
+  font-family: 'SF Mono', 'Cascadia Code', 'Fira Code', monospace;
+  font-size: 0.85em;
+  background: rgba(91, 94, 114, 0.10);
+  padding: 0.15em 0.4em;
+  border-radius: 4px;
+  color: var(--foreground);
+}
+.md-content pre {
+  background: rgba(91, 94, 114, 0.08);
+  padding: 0.8rem 1rem;
+  border-radius: 8px;
+  overflow-x: auto;
+  margin: 0.6rem 0;
+  line-height: 1.5;
+  font-size: 0.85rem;
+}
+.md-content pre code {
+  background: transparent;
+  padding: 0;
+  font-size: inherit;
+}
+.md-content table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0.6rem 0;
+  font-size: 0.85rem;
+}
+.md-content th,
+.md-content td {
+  border: 1px solid var(--outline-variant);
+  padding: 0.4rem 0.6rem;
+  text-align: left;
+}
+.md-content th { background: rgba(91, 94, 114, 0.06); font-weight: 600; }
+.md-content img { max-width: 100%; border-radius: 8px; margin: 0.5rem 0; }
+.md-content hr { border: none; border-top: 1px solid var(--outline-variant); margin: 1rem 0; }
+.md-content ::selection {
+  background: var(--selection);
+  color: var(--selection-foreground);
+}

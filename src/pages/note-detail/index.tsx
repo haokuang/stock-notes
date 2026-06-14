@@ -1,8 +1,11 @@
 import { View, Text, ScrollView, Image } from '@tarojs/components'
-import Taro, { useLoad } from '@tarojs/taro'
-import { useState } from 'react'
+import Taro, { useDidShow, useLoad } from '@tarojs/taro'
+import { useState, useRef, useEffect } from 'react'
 import { Network } from '@/network'
+import { IS_H5_ENV } from '@/presets/env'
 import { ArrowLeft, Clock, FileText, Sparkles, Trash2, Pencil } from 'lucide-react-taro'
+import { formatNotePrice, hasNotePrice } from './note-detail-logic'
+import type { NotePrice } from './note-detail-logic'
 
 interface Note {
   id: string
@@ -12,10 +15,11 @@ interface Note {
   type: 'note' | 'doc'
   title: string
   content: string
+  doc_md?: string | null
   direction: 'bull' | 'bear' | 'neutral' | null
-  entry_price: number | null
-  target_price: number | null
-  stop_loss: number | null
+  entry_price: NotePrice
+  target_price: NotePrice
+  stop_loss: NotePrice
   tags: string[] | null
   images: string[] | null
   related_event: string | null
@@ -29,10 +33,17 @@ export default function NoteDetailPage() {
   const [note, setNote] = useState<Note | null>(null)
   const [noteId, setNoteId] = useState('')
   const [activeImg, setActiveImg] = useState<string | null>(null)
+  const mdContentRef = useRef<HTMLDivElement | null>(null)
+  const isMdDoc = (note?.type === 'doc' && note?.content) ?? false
 
-  useLoad(async (opts) => {
-    const nid = opts?.note_id ?? ''
-    setNoteId(nid)
+  // H5 端：文档内容用 innerHTML 注入渲染 markdown，支持长按选中
+  useEffect(() => {
+    if (!IS_H5_ENV || !mdContentRef.current || !isMdDoc || !note?.content) return
+    mdContentRef.current.innerHTML = note.content
+  }, [note?.content, isMdDoc])
+
+  const loadNote = async (nid: string) => {
+    if (!nid) return
     try {
       const res = await Network.request<{ data: Note }>({ url: `/api/notes/${nid}` })
       console.log('[note-detail]', res.data)
@@ -41,6 +52,16 @@ export default function NoteDetailPage() {
       console.error('[note-detail] load failed', e)
       Taro.showToast({ title: '加载失败', icon: 'none' })
     }
+  }
+
+  useLoad(async (opts) => {
+    const nid = opts?.note_id ?? ''
+    setNoteId(nid)
+    await loadNote(nid)
+  })
+
+  useDidShow(() => {
+    if (noteId) loadNote(noteId)
   })
 
   const onDelete = async () => {
@@ -129,30 +150,38 @@ export default function NoteDetailPage() {
           </View>
         </View>
 
-        {/* 文档：渲染 HTML — Taro H5 上 rich-text 行为不稳定,fallback 剥 HTML 当纯文本 */}
-        {isDoc && note.content && (
+        {/* 文档：H5 用 innerHTML 渲染 HTML（保留格式 + 长按选中），小程序 fallback 纯文本 */}
+        {isMdDoc && (
           <View className="px-4 pt-3">
             <View className="rounded-2xl p-4 bg-white bg-opacity-72 border border-white border-opacity-85">
               <View className="flex items-center gap-2 mb-3">
                 <FileText size={14} color="#5B5E72" />
                 <Text className="block text-sm font-semibold text-on-surface">文档内容</Text>
               </View>
-              <Text
-                className="block text-sm text-on-surface leading-relaxed whitespace-pre-wrap"
-                style={{ wordBreak: 'break-word' }}
-              >
-                {/* 剥 <p>/<br> 等 HTML 标签 + 实体还原,纯文本展示 */}
-                {String(note.content)
-                  .replace(/<br\s*\/?>/gi, '\n')
-                  .replace(/<[^>]+>/g, '')
-                  .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, '&')}
-              </Text>
+              {IS_H5_ENV ? (
+                <View
+                  ref={mdContentRef as any}
+                  className="md-content block text-sm text-on-surface leading-relaxed"
+                  style={{ wordBreak: 'break-word', userSelect: 'text', WebkitUserSelect: 'text' as any }}
+                />
+              ) : (
+                <Text
+                  className="block text-sm text-on-surface leading-relaxed whitespace-pre-wrap"
+                  style={{ wordBreak: 'break-word' }}
+                >
+                  {/* 剥 <p>/<br> 等 HTML 标签 + 实体还原,纯文本展示 */}
+                  {String(note!.content)
+                    .replace(/<br\s*\/?>/gi, '\n')
+                    .replace(/<[^>]+>/g, '')
+                    .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, '&')}
+                </Text>
+              )}
             </View>
           </View>
         )}
 
         {/* 观点：价格点位 */}
-        {!isDoc && (note.entry_price || note.target_price || note.stop_loss) && (
+        {!isDoc && [note.entry_price, note.target_price, note.stop_loss].some(hasNotePrice) && (
           <View className="px-4 pt-3">
             <View className="rounded-2xl p-4 bg-white bg-opacity-72 border border-white border-opacity-85">
               <View className="grid grid-cols-3 gap-3">
@@ -164,7 +193,7 @@ export default function NoteDetailPage() {
                   <View key={p.label} className="flex flex-col">
                     <Text className="block text-[10px] mb-1" style={{ color: p.color }}>{p.label}</Text>
                     <Text className="block text-base font-bold text-on-surface tabular-nums">
-                      {p.value != null ? `¥${p.value.toFixed(2)}` : '—'}
+                      {formatNotePrice(p.value)}
                     </Text>
                   </View>
                 ))}

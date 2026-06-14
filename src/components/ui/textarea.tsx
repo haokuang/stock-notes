@@ -7,12 +7,13 @@ export interface TextareaProps
   extends React.ComponentPropsWithoutRef<typeof TaroTextarea> {
   className?: string
   autoFocus?: boolean
+  autoHeight?: boolean
 }
 
 const Textarea = React.forwardRef<
   React.ElementRef<typeof TaroTextarea>,
   TextareaProps
->(({ className, autoFocus, focus, onFocus, onBlur, ...props }, ref) => {
+>(({ className, autoFocus, autoHeight, focus, onFocus, onBlur, ...props }, ref) => {
   const [isFocused, setIsFocused] = React.useState(false)
   const disabled = !!(props as any).disabled
 
@@ -38,6 +39,7 @@ const Textarea = React.forwardRef<
         placeholderClass="text-muted-foreground"
         ref={ref}
         focus={autoFocus || focus}
+        autoHeight={autoHeight}
         onFocus={(e) => {
           setIsFocused(true)
           onFocus?.(e)

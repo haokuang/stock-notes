@@ -246,11 +246,17 @@ export default function LibraryPage() {
                   </Text>
                 ) : null}
                 {isDoc && n.content ? (
-                  <View className="mt-2 text-sm text-on-surface-variant leading-[1.5]" style={{ display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-                    {/* 去掉 HTML 标签显示纯文本预览 */}
-                    {/* @ts-ignore */}
-                    <rich-text nodes={n.content.replace(/<[^>]+>/g, '').slice(0, 200)} />
-                  </View>
+                  <Text
+                    className="block text-sm text-on-surface-variant mt-2 leading-[1.5]"
+                    style={{ display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}
+                  >
+                    {/* 剥 HTML 标签显示纯文本预览 */}
+                    {String(n.content)
+                      .replace(/<br\s*\/?>/gi, '\n')
+                      .replace(/<[^>]+>/g, '')
+                      .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, '&')
+                      .slice(0, 200)}
+                  </Text>
                 ) : null}
                 {!isDoc && n.images && n.images.length > 0 ? (
                   <View className="mt-3 flex gap-2">

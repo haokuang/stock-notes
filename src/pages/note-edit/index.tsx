@@ -1,10 +1,26 @@
 import { View, Text, ScrollView, Image } from '@tarojs/components'
 import { Textarea } from '@/components/ui/textarea'
 import { Input } from '@/components/ui/input'
-import Taro, { useLoad } from '@tarojs/taro'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent } from '@/components/ui/card'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import Taro, { useDidShow, useLoad } from '@tarojs/taro'
 import { useState } from 'react'
 import { Network } from '@/network'
 import { ArrowLeft, X, Image as ImageIcon, Sparkles, FileText, PenLine, Eye, Upload, File } from 'lucide-react-taro'
+import {
+  buildNoteMutation,
+  buildNotePayload,
+  parseNoteEditorRoute,
+  resolveNoteTitle,
+} from './note-editor-logic'
+import type { NoteDirection, NoteType } from './note-editor-logic'
 
 const DIRECTIONS: { value: 'bull' | 'bear' | 'neutral'; label: string; color: string; bg: string }[] = [
   { value: 'bull', label: '看多', color: '#D11A4A', bg: 'rgba(209, 26, 74, 0.10)' },     // 红涨
@@ -12,7 +28,27 @@ const DIRECTIONS: { value: 'bull' | 'bear' | 'neutral'; label: string; color: st
   { value: 'bear', label: '看空', color: '#0F8C66', bg: 'rgba(15, 140, 102, 0.10)' },   // 绿跌
 ]
 
-type NoteType = 'note' | 'doc'
+interface StockOption {
+  id: string
+  code: string
+  name: string
+}
+
+interface ExistingNote {
+  id: string
+  stock_id: string
+  stock_code: string
+  stock_name: string
+  type: NoteType
+  title: string
+  content: string
+  doc_md?: string | null
+  direction: NoteDirection | null
+  entry_price: string | number | null
+  target_price: string | number | null
+  stop_loss: string | number | null
+  images: string[] | null
+}
 
 const formatSize = (bytes: number) => {
   if (bytes < 1024) return `${bytes} B`
@@ -21,8 +57,11 @@ const formatSize = (bytes: number) => {
 }
 
 export default function NoteEditPage() {
+  const [noteId, setNoteId] = useState('')
   const [stockId, setStockId] = useState('')
   const [stockName, setStockName] = useState('')
+  const [stocks, setStocks] = useState<StockOption[]>([])
+  const [needsStockSelection, setNeedsStockSelection] = useState(false)
   const [type, setType] = useState<NoteType>('note')
   const [title, setTitle] = useState('')
   const [content, setContent] = useState('')
@@ -31,7 +70,7 @@ export default function NoteEditPage() {
   const [docFileSize, setDocFileSize] = useState(0)
   const [previewHtml, setPreviewHtml] = useState('')
   const [showPreview, setShowPreview] = useState(false)
-  const [direction, setDirection] = useState<'bull' | 'bear' | 'neutral'>('bull')
+  const [direction, setDirection] = useState<NoteDirection>('bull')
   const [entryPrice, setEntryPrice] = useState('')
   const [targetPrice, setTargetPrice] = useState('')
   const [stopLoss, setStopLoss] = useState('')
@@ -39,13 +78,77 @@ export default function NoteEditPage() {
   const [stopLossMode, setStopLossMode] = useState<'abs' | 'pct'>('abs')
   const [images, setImages] = useState<string[]>([])
   const [saving, setSaving] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
   const [uploading, setUploading] = useState(false)
   const [docUploading, setDocUploading] = useState(false)
 
-  useLoad((opts) => {
-    const sid = opts?.stock_id ?? ''
-    setStockId(sid)
-    setStockName(opts?.stock_name ? decodeURIComponent(opts.stock_name) : '')
+  const loadStockOptions = async () => {
+    const res = await Network.request<{ data: StockOption[] }>({
+      url: '/api/stocks',
+    })
+    setStocks(res.data?.data ?? [])
+  }
+
+  useLoad(async (opts) => {
+    const route = parseNoteEditorRoute(opts)
+    setNoteId(route.noteId)
+    setStockId(route.stockId)
+    setStockName(route.stockName)
+    setType(route.requestedType)
+    setNeedsStockSelection(!route.isEditing && !route.stockId)
+    setLoading(true)
+    setLoadError('')
+
+    try {
+      if (route.isEditing) {
+        const res = await Network.request<{ data: ExistingNote }>({
+          url: `/api/notes/${route.noteId}`,
+        })
+        const note = res.data?.data
+        if (!note) throw new Error('笔记不存在')
+
+        setStockId(note.stock_id)
+        setStockName(note.stock_name)
+        setType(note.type)
+        setTitle(note.title ?? '')
+        setContent(note.content ?? '')
+        setDirection(note.direction ?? 'neutral')
+        setEntryPrice(note.entry_price != null ? String(note.entry_price) : '')
+        setTargetPrice(note.target_price != null ? String(note.target_price) : '')
+        setStopLoss(note.stop_loss != null ? String(note.stop_loss) : '')
+        setImages(Array.isArray(note.images) ? note.images : [])
+
+        if (note.type === 'doc') {
+          const md = note.doc_md ?? ''
+          setDocMd(md)
+          setDocFileName(`${note.title || 'document'}.md`)
+          setDocFileSize(md.length)
+        }
+      } else if (route.stockId) {
+        if (!route.stockName) {
+          const res = await Network.request<{ data: StockOption }>({
+            url: `/api/stocks/${route.stockId}`,
+          })
+          setStockName(res.data?.data?.name ?? '')
+        }
+      } else {
+        await loadStockOptions()
+      }
+    } catch (e) {
+      console.error('[note-edit] load failed', e)
+      setLoadError('加载编辑信息失败，请返回后重试')
+      Taro.showToast({ title: '加载失败', icon: 'none' })
+    } finally {
+      setLoading(false)
+    }
+  })
+
+  useDidShow(() => {
+    if (!needsStockSelection || loading) return
+    loadStockOptions().catch((e) => {
+      console.error('[note-edit] reload stocks failed', e)
+    })
   })
 
   const onPickImages = async () => {
@@ -173,23 +276,30 @@ export default function NoteEditPage() {
   }
 
   const onSave = async () => {
-    if (!title.trim()) {
-      Taro.showToast({ title: '请填写标题', icon: 'none' })
-      return
-    }
+    if (loading || saving || loadError) return
     if (!stockId) {
-      Taro.showToast({ title: '缺少股票信息', icon: 'none' })
+      Taro.showToast({ title: '请选择关联股票', icon: 'none' })
       return
     }
     if (type === 'doc' && !docMd.trim()) {
       Taro.showToast({ title: '请上传 MD 文件', icon: 'none' })
       return
     }
+
+    const initialTitle = resolveNoteTitle({
+      type,
+      title,
+      content,
+    })
+    if (!initialTitle.ok) {
+      Taro.showToast({ title: initialTitle.message, icon: 'none' })
+      return
+    }
+
     setSaving(true)
     try {
-      // 标题留空 + note 模式 + content 够长 → 后端 AI 总结
-      let finalTitle = title.trim()
-      if (!finalTitle && type === 'note' && content.trim().length >= 10) {
+      let finalTitle = initialTitle.title
+      if (initialTitle.shouldSummarize) {
         try {
           Taro.showLoading({ title: 'AI 总结标题中…' })
           const aiRes = await Network.request<{ data: { title: string } }>({
@@ -197,56 +307,52 @@ export default function NoteEditPage() {
             method: 'POST',
             data: { content: content.trim() },
           })
-          Taro.hideLoading()
-          finalTitle = aiRes.data?.data?.title ?? ''
+          const resolved = resolveNoteTitle({
+            type,
+            title,
+            content,
+            aiTitle: aiRes.data?.data?.title ?? '',
+          })
+          if (resolved.ok) finalTitle = resolved.title
         } catch {
+          finalTitle = initialTitle.title
+        } finally {
           Taro.hideLoading()
-          // LLM 失败时,title 仍空 — 后端 notes 表 title 必填,fallback 用 content 前 30 字
-          finalTitle = content.trim().slice(0, 30) + (content.trim().length > 30 ? '...' : '')
         }
-      } else if (!finalTitle) {
-        // 完全没内容 — 不允许
-        Taro.hideLoading()
-        setSaving(false)
-        Taro.showToast({ title: '标题或内容不能都为空', icon: 'none' })
-        return
       }
-      const payload: any = {
-        stock_id: stockId,
+
+      setTitle(finalTitle)
+      let stopLossValue: number | null = null
+      if (stopLoss) {
+        const stopNum = parseFloat(stopLoss)
+        if (stopLossMode === 'pct' && entryPrice && !Number.isNaN(stopNum)) {
+          const entry = parseFloat(entryPrice)
+          stopLossValue = Number((entry * (1 - Math.abs(stopNum) / 100)).toFixed(2))
+        } else if (!Number.isNaN(stopNum)) {
+          stopLossValue = stopNum
+        }
+      }
+
+      const payload = buildNotePayload({
+        stockId,
         type,
         title: finalTitle,
-      }
-      if (type === 'doc') {
-        payload.doc_md = docMd
-        payload.content = '' // 由后端渲染填充
-      } else {
-        payload.content = content.trim()
-        payload.direction = direction
-        payload.entry_price = entryPrice ? parseFloat(entryPrice) : null
-        payload.target_price = targetPrice ? parseFloat(targetPrice) : null
-        // 止损:百分比模式下,基于 entry_price 算绝对值
-        if (stopLoss) {
-          const stopNum = parseFloat(stopLoss)
-          if (stopLossMode === 'pct' && entryPrice && !Number.isNaN(stopNum)) {
-            const entry = parseFloat(entryPrice)
-            payload.stop_loss = Number((entry * (1 - Math.abs(stopNum) / 100)).toFixed(2))
-          } else if (!Number.isNaN(stopNum)) {
-            payload.stop_loss = stopNum
-          } else {
-            payload.stop_loss = null
-          }
-        } else {
-          payload.stop_loss = null
-        }
-        payload.tags = []
-        payload.images = images
-      }
+        content,
+        docMd,
+        direction,
+        entryPrice: entryPrice ? parseFloat(entryPrice) : null,
+        targetPrice: targetPrice ? parseFloat(targetPrice) : null,
+        stopLoss: stopLossValue,
+        images,
+      }, Boolean(noteId))
+      const mutation = buildNoteMutation(noteId)
+
       await Network.request({
-        url: '/api/notes',
-        method: 'POST',
+        url: mutation.url,
+        method: mutation.method,
         data: payload,
       })
-      Taro.showToast({ title: '已保存', icon: 'success' })
+      Taro.showToast({ title: noteId ? '已更新' : '已保存', icon: 'success' })
       setTimeout(() => Taro.navigateBack(), 600)
     } catch (e) {
       console.error('[note-edit] save failed', e)
@@ -267,25 +373,54 @@ export default function NoteEditPage() {
           <ArrowLeft size={20} color="#161826" />
         </View>
         <Text className="block text-base font-semibold text-on-surface">
-          {type === 'doc' ? '上传文档' : '记录观点'}
+          {noteId
+            ? type === 'doc' ? '编辑文档' : '编辑观点'
+            : type === 'doc' ? '上传文档' : '记录观点'}
         </Text>
-        <View
-          className="px-4 py-2 rounded-full"
-          style={{ background: saving ? 'rgba(109, 77, 255, 0.4)' : '#6D4DFF' }}
+        <Button
+          size="sm"
+          className="rounded-full"
+          disabled={loading || saving || Boolean(loadError)}
           onClick={onSave}
         >
           <Text className="block text-xs font-semibold text-white">{saving ? '保存中' : '保存'}</Text>
-        </View>
+        </Button>
       </View>
 
       <ScrollView scrollY enhanced showScrollbar={false} className="w-full">
+        {loading && (
+          <View className="px-4 pt-3">
+            <Card className="rounded-2xl bg-white bg-opacity-72 border-white border-opacity-85">
+              <CardContent className="p-4">
+                <Text className="block text-sm text-on-surface-variant text-center">正在加载编辑信息...</Text>
+              </CardContent>
+            </Card>
+          </View>
+        )}
+
+        {loadError && (
+          <View className="px-4 pt-3">
+            <Card className="rounded-2xl border-error bg-white bg-opacity-72">
+              <CardContent className="p-4">
+                <Text className="block text-sm text-error text-center">{loadError}</Text>
+              </CardContent>
+            </Card>
+          </View>
+        )}
+
         {/* 类型 Tab：观点 / 文档 */}
         <View className="px-4 pt-3">
           <View className="flex items-center gap-1 p-1 rounded-full bg-surface-container">
             <View
               className="flex-1 h-9 rounded-full flex items-center justify-center"
-              style={{ background: type === 'note' ? '#ffffff' : 'transparent', boxShadow: type === 'note' ? '0 1px 2px rgba(0,0,0,0.06)' : 'none' }}
-              onClick={() => setType('note')}
+              style={{
+                background: type === 'note' ? '#ffffff' : 'transparent',
+                boxShadow: type === 'note' ? '0 1px 2px rgba(0,0,0,0.06)' : 'none',
+                opacity: noteId ? 0.7 : 1,
+              }}
+              onClick={() => {
+                if (!noteId) setType('note')
+              }}
             >
               <View className="flex items-center gap-1">
                 <PenLine size={14} color={type === 'note' ? '#6D4DFF' : '#5B5E72'} />
@@ -294,8 +429,14 @@ export default function NoteEditPage() {
             </View>
             <View
               className="flex-1 h-9 rounded-full flex items-center justify-center"
-              style={{ background: type === 'doc' ? '#ffffff' : 'transparent', boxShadow: type === 'doc' ? '0 1px 2px rgba(0,0,0,0.06)' : 'none' }}
-              onClick={() => setType('doc')}
+              style={{
+                background: type === 'doc' ? '#ffffff' : 'transparent',
+                boxShadow: type === 'doc' ? '0 1px 2px rgba(0,0,0,0.06)' : 'none',
+                opacity: noteId ? 0.7 : 1,
+              }}
+              onClick={() => {
+                if (!noteId) setType('doc')
+              }}
             >
               <View className="flex items-center gap-1">
                 <FileText size={14} color={type === 'doc' ? '#6D4DFF' : '#5B5E72'} />
@@ -306,42 +447,92 @@ export default function NoteEditPage() {
         </View>
 
         {/* 股票关联 */}
-        {stockName && (
+        {!noteId && stocks.length > 0 ? (
           <View className="px-4 pt-3">
-            <View className="rounded-2xl p-3 bg-white bg-opacity-72 border border-white border-opacity-85 flex items-center gap-2">
-              <View className="w-8 h-8 rounded-lg bg-primary-container flex items-center justify-center">
-                <Text className="block text-sm font-bold text-primary">{stockName.slice(0, 1)}</Text>
-              </View>
-              <Text className="block text-sm font-semibold text-on-surface">{stockName}</Text>
-            </View>
+            <Card className="rounded-2xl bg-white bg-opacity-72 border-white border-opacity-85">
+              <CardContent className="p-4">
+                <Text className="block text-xs text-on-surface-variant mb-2">关联股票</Text>
+                <Select
+                  value={stockId}
+                  onValueChange={(value) => {
+                    const selected = stocks.find((stock) => stock.id === value)
+                    setStockId(value)
+                    setStockName(selected?.name ?? '')
+                  }}
+                >
+                  <SelectTrigger className="w-full h-10 bg-surface-container border-0">
+                    <SelectValue placeholder="请选择一只自选股" />
+                  </SelectTrigger>
+                  <SelectContent align="start">
+                    {stocks.map((stock) => (
+                      <SelectItem key={stock.id} value={stock.id}>
+                        {`${stock.name} · ${stock.code}`}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </CardContent>
+            </Card>
           </View>
-        )}
+        ) : stockName ? (
+          <View className="px-4 pt-3">
+            <Card className="rounded-2xl bg-white bg-opacity-72 border-white border-opacity-85">
+              <CardContent className="p-3 flex items-center gap-2">
+                <View className="w-8 h-8 rounded-lg bg-primary-container flex items-center justify-center">
+                  <Text className="block text-sm font-bold text-primary">{stockName.slice(0, 1)}</Text>
+                </View>
+                <View className="flex-1">
+                  <Text className="block text-xs text-on-surface-variant">关联股票</Text>
+                  <Text className="block text-sm font-semibold text-on-surface mt-1">{stockName}</Text>
+                </View>
+              </CardContent>
+            </Card>
+          </View>
+        ) : !loading && !loadError ? (
+          <View className="px-4 pt-3">
+            <Card className="rounded-2xl bg-white bg-opacity-72 border-white border-opacity-85">
+              <CardContent className="p-5 flex flex-col items-center">
+                <Text className="block text-sm font-semibold text-on-surface">还没有可关联的股票</Text>
+                <Text className="block text-xs text-on-surface-variant mt-2">请先添加一只自选股，再记录观点或文档</Text>
+                <Button
+                  size="sm"
+                  className="mt-4 rounded-full"
+                  onClick={() => Taro.navigateTo({ url: '/pages/stock-add/index' })}
+                >
+                  <Text className="block text-xs text-white">添加股票</Text>
+                </Button>
+              </CardContent>
+            </Card>
+          </View>
+        ) : null}
 
-        {/* 标题 — doc 模式自动从文件名识别,无需手动填 */}
-        {type === 'note' && (
+        {/* 标题 */}
         <View className="px-4 pt-3">
           <View className="rounded-2xl p-4 bg-white bg-opacity-72 border border-white border-opacity-85">
             <View className="flex items-center justify-between mb-2">
-              <Text className="block text-xs text-on-surface-variant">标题</Text>
+              <Text className="block text-xs text-on-surface-variant">
+                {type === 'doc' ? '文档标题' : '标题'}
+              </Text>
               <View className="flex items-center gap-2">
-                <Text className="block text-[10px] text-on-surface-variant">留空则 AI 总结</Text>
-                <Text className="block text-[10px] text-on-surface-variant">{title.length}/50</Text>
+                {type === 'note' && (
+                  <Text className="block text-xs text-on-surface-variant">留空则 AI 总结</Text>
+                )}
+                <Text className="block text-xs text-on-surface-variant">
+                  {title.length}/{type === 'doc' ? 200 : 50}
+                </Text>
               </View>
             </View>
             <View className="bg-surface-container rounded-xl px-4 py-3">
               <Input
-                className="w-full bg-transparent"
-                style={{ fontSize: '16px', fontWeight: 600, color: '#161826' }}
-                placeholder="一句话总结你的观点..."
-
+                className="w-full bg-transparent text-base font-semibold text-on-surface"
+                placeholder={type === 'doc' ? '输入文档标题' : '一句话总结你的观点...'}
                 value={title}
                 onInput={(e) => setTitle(e.detail.value)}
-                maxlength={50}
+                maxlength={type === 'doc' ? 200 : 50}
               />
             </View>
           </View>
         </View>
-        )}
 
         {/* ===== 观点模式 ===== */}
         {type === 'note' && (
@@ -497,6 +688,7 @@ export default function NoteEditPage() {
                   <Text className="block text-xs text-on-surface-variant">详细观点</Text>
                 </View>
                 <Textarea
+                  autoHeight
                   style={{
                     width: '100%',
                     minHeight: '200px',
