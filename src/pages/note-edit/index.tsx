@@ -506,33 +506,31 @@ export default function NoteEditPage() {
           </View>
         ) : null}
 
-        {/* 标题 */}
-        <View className="px-4 pt-3">
-          <View className="rounded-2xl p-4 bg-white bg-opacity-72 border border-white border-opacity-85">
-            <View className="flex items-center justify-between mb-2">
-              <Text className="block text-xs text-on-surface-variant">
-                {type === 'doc' ? '文档标题' : '标题'}
-              </Text>
-              <View className="flex items-center gap-2">
-                {type === 'note' && (
+        {/* 标题（仅观点模式；文档标题自动从文件名取） */}
+        {type === 'note' && (
+          <View className="px-4 pt-3">
+            <View className="rounded-2xl p-4 bg-white bg-opacity-72 border border-white border-opacity-85">
+              <View className="flex items-center justify-between mb-2">
+                <Text className="block text-xs text-on-surface-variant">标题</Text>
+                <View className="flex items-center gap-2">
                   <Text className="block text-xs text-on-surface-variant">留空则 AI 总结</Text>
-                )}
-                <Text className="block text-xs text-on-surface-variant">
-                  {title.length}/{type === 'doc' ? 200 : 50}
-                </Text>
+                  <Text className="block text-xs text-on-surface-variant">
+                    {title.length}/50
+                  </Text>
+                </View>
+              </View>
+              <View className="bg-surface-container rounded-xl px-4 py-3">
+                <Input
+                  className="w-full bg-transparent text-base font-semibold text-on-surface"
+                  placeholder="一句话总结你的观点..."
+                  value={title}
+                  onInput={(e) => setTitle(e.detail.value)}
+                  maxlength={50}
+                />
               </View>
             </View>
-            <View className="bg-surface-container rounded-xl px-4 py-3">
-              <Input
-                className="w-full bg-transparent text-base font-semibold text-on-surface"
-                placeholder={type === 'doc' ? '输入文档标题' : '一句话总结你的观点...'}
-                value={title}
-                onInput={(e) => setTitle(e.detail.value)}
-                maxlength={type === 'doc' ? 200 : 50}
-              />
-            </View>
           </View>
-        </View>
+        )}
 
         {/* ===== 观点模式 ===== */}
         {type === 'note' && (
