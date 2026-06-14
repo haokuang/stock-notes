@@ -596,6 +596,20 @@ WX_APP_SECRET=你的AppSecret
 JWT_SECRET=your-super-secret-key
 ```
 
+## 数据库与认证
+
+本项目使用 Supabase Postgres + Supabase Auth,完整接入文档见 [docs/SUPABASE.md](docs/SUPABASE.md)。
+
+股票状态机(观察/持有)与每日简评(3 色信号)的规则、数据流、API 速查见 [docs/STATE_MACHINE.md](docs/STATE_MACHINE.md)。
+
+**功能开发总账**(哪些已做 / 哪些没做 / 优先级)见 [docs/ROADMAP.md](docs/ROADMAP.md) — 每周对一次,避免方向漂移。
+
+**调研知识库**(Tushare 频次 / 腾讯接口字段下标 / Supabase Realtime 限制 / Drizzle 坑 / A 股数据源对比等)见 [docs/KNOWLEDGE.md](docs/KNOWLEDGE.md) — 翻阅式参考,跟 ROADMAP 互补。简要:
+- 5 张业务表 + 16 条 RLS 策略,所有写操作强制带 `user_id`
+- `.env.local` 模板见 `docs/SUPABASE.md` § 3.5
+- 后端用 `postgres` 角色直连 5432,业务层显式 `where user_id = $1` 隔离
+- 前端 `Network.request` 自动注入 `Authorization: Bearer <jwt>`,401 跳登录页
+
 在代码中使用 @nestjs/config 读取环境变量：
 
 ```typescript

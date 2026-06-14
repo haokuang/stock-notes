@@ -96,6 +96,9 @@ export default defineConfig<'vite'>(async (merge, _env) => {
           '',
       ),
       TARO_ENV: JSON.stringify(process.env.TARO_ENV),
+      // 前端 Realtime 订阅用 — 客户端可见,只读权限
+      SUPABASE_URL: JSON.stringify(process.env.SUPABASE_URL || ''),
+      SUPABASE_ANON_KEY: JSON.stringify(process.env.SUPABASE_ANON_KEY || ''),
     },
     copy: {
       patterns: [],
