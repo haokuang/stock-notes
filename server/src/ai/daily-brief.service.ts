@@ -144,14 +144,14 @@ export class DailyBriefService {
 }`
 
       try {
-        const content = await deepseekChat(
+        const responseContent = await deepseekChat(
           [
             { role: 'system', content: '你是 A 股投资助手,只输出严格 JSON,不输出 markdown。' },
             { role: 'user', content: prompt },
           ],
           { model: DEEPSEEK_PRO_MODEL, temperature: 0.4 },
         )
-        const text = content
+        const text = responseContent
         const json = text.replace(/^```json\s*/i, '').replace(/```\s*$/, '')
         const parsed = JSON.parse(json) as LLMOutput
         content = String(parsed.content ?? '').slice(0, 500)  // 兜底截断
