@@ -10,18 +10,18 @@ import { CreateNoteDto, NoteType, QueryNoteDto, RenderMdDto, UpdateNoteDto } fro
 export class NotesService {
   constructor(@Inject(DRIZZLE_DB) private readonly db: any) {}
 
-  async list(query: QueryNoteDto) {
-    const conditions: any[] = [];
-    if (query.stock_id) conditions.push(eq(schema.notes.stock_id, query.stock_id));
-    if (query.direction) conditions.push(eq(schema.notes.direction, query.direction));
-    if (query.type) conditions.push(eq(schema.notes.type, query.type));
-    if (query.from) conditions.push(gte(schema.notes.created_at, new Date(query.from)));
-    if (query.to) conditions.push(lte(schema.notes.created_at, new Date(query.to)));
+  async list(uid: string, query: QueryNoteDto) {
+    const conditions: any[] = [eq(schema.notes.user_id, uid)]
+    if (query.stock_id) conditions.push(eq(schema.notes.stock_id, query.stock_id))
+    if (query.direction) conditions.push(eq(schema.notes.direction, query.direction))
+    if (query.type) conditions.push(eq(schema.notes.type, query.type))
+    if (query.from) conditions.push(gte(schema.notes.created_at, new Date(query.from)))
+    if (query.to) conditions.push(lte(schema.notes.created_at, new Date(query.to)))
     if (query.keyword) {
-      const kw = `%${query.keyword}%`;
+      const kw = `%${query.keyword}%`
       conditions.push(
         sql`(${schema.notes.title} ILIKE ${kw} OR ${schema.notes.content} ILIKE ${kw} OR ${schema.notes.doc_md} ILIKE ${kw})`,
-      );
+      )
     }
 
     const rows = await this.db
@@ -48,15 +48,15 @@ export class NotesService {
       })
       .from(schema.notes)
       .leftJoin(schema.stocks, eq(schema.notes.stock_id, schema.stocks.id))
-      .where(conditions.length ? and(...conditions) : undefined)
+      .where(and(...conditions))
       .orderBy(desc(schema.notes.created_at))
       .limit(query.limit ?? 50)
-      .offset(query.offset ?? 0);
+      .offset(query.offset ?? 0)
 
-    return rows;
+    return rows
   }
 
-  async getById(id: string) {
+  async getById(uid: string, id: string) {
     const [row] = await this.db
       .select({
         id: schema.notes.id,
@@ -81,29 +81,30 @@ export class NotesService {
       })
       .from(schema.notes)
       .leftJoin(schema.stocks, eq(schema.notes.stock_id, schema.stocks.id))
-      .where(eq(schema.notes.id, id))
-      .limit(1);
-    if (!row) throw new NotFoundException(`观点/文档 ${id} 不存在`);
-    return row;
+      .where(and(eq(schema.notes.id, id), eq(schema.notes.user_id, uid)))
+      .limit(1)
+    if (!row) throw new NotFoundException(`观点/文档 ${id} 不存在`)
+    return row
   }
 
-  async create(dto: CreateNoteDto) {
+  async create(uid: string, dto: CreateNoteDto) {
     const [stock] = await this.db
-      .select({ code: schema.stocks.code, name: schema.stocks.name })
+      .select({ code: schema.stocks.code, name: schema.stocks.name, user_id: schema.stocks.user_id })
       .from(schema.stocks)
       .where(eq(schema.stocks.id, dto.stock_id))
-      .limit(1);
-    if (!stock) throw new NotFoundException(`股票 ${dto.stock_id} 不存在`);
+      .limit(1)
+    if (!stock) throw new NotFoundException(`股票 ${dto.stock_id} 不存在`)
+    if (stock.user_id !== uid) throw new NotFoundException(`股票 ${dto.stock_id} 不存在`)
 
-    const type = dto.type ?? NoteType.NOTE;
-    const isDoc = type === NoteType.DOC;
+    const type = dto.type ?? NoteType.NOTE
+    const isDoc = type === NoteType.DOC
 
-    // 文档类型：服务端把 markdown 渲染成 HTML 存到 content
-    const renderedHtml = isDoc && dto.doc_md ? this.renderMarkdown(dto.doc_md) : dto.content ?? null;
+    const renderedHtml = isDoc && dto.doc_md ? this.renderMarkdown(dto.doc_md) : dto.content ?? null
 
     const [row] = await this.db
       .insert(schema.notes)
       .values({
+        user_id: uid,
         stock_id: dto.stock_id,
         stock_code: stock.code,
         stock_name: stock.name,
@@ -121,50 +122,52 @@ export class NotesService {
         images: isDoc ? [] : (dto.images ?? []),
         ai_summary: dto.ai_summary ?? null,
       })
-      .returning();
-    return row;
+      .returning()
+    return row
   }
 
-  async update(id: string, dto: UpdateNoteDto) {
-    const existing = await this.getById(id);
-    const isDoc = existing.type === NoteType.DOC;
+  async update(uid: string, id: string, dto: UpdateNoteDto) {
+    const existing = await this.getById(uid, id)
+    const isDoc = existing.type === NoteType.DOC
 
-    const setObj: Record<string, any> = { updated_at: new Date() };
-    if (dto.title !== undefined) setObj.title = dto.title;
-    if (dto.content !== undefined && !isDoc) setObj.content = dto.content;
+    const setObj: Record<string, any> = { updated_at: new Date() }
+    if (dto.title !== undefined) setObj.title = dto.title
+    if (dto.content !== undefined && !isDoc) setObj.content = dto.content
     if (dto.doc_md !== undefined && isDoc) {
-      setObj.doc_md = dto.doc_md;
-      setObj.content = this.renderMarkdown(dto.doc_md);
+      setObj.doc_md = dto.doc_md
+      setObj.content = this.renderMarkdown(dto.doc_md)
     }
     if (!isDoc) {
-      if (dto.direction !== undefined) setObj.direction = dto.direction;
-      if (dto.entry_price !== undefined) setObj.entry_price = String(dto.entry_price);
-      if (dto.target_price !== undefined) setObj.target_price = String(dto.target_price);
-      if (dto.stop_loss !== undefined) setObj.stop_loss = String(dto.stop_loss);
-      if (dto.tags !== undefined) setObj.tags = dto.tags;
-      if (dto.related_event !== undefined) setObj.event = dto.related_event;
-      if (dto.source !== undefined) setObj.source = dto.source;
-      if (dto.images !== undefined) setObj.images = dto.images;
+      if (dto.direction !== undefined) setObj.direction = dto.direction
+      if (dto.entry_price !== undefined) setObj.entry_price = String(dto.entry_price)
+      if (dto.target_price !== undefined) setObj.target_price = String(dto.target_price)
+      if (dto.stop_loss !== undefined) setObj.stop_loss = String(dto.stop_loss)
+      if (dto.tags !== undefined) setObj.tags = dto.tags
+      if (dto.related_event !== undefined) setObj.event = dto.related_event
+      if (dto.source !== undefined) setObj.source = dto.source
+      if (dto.images !== undefined) setObj.images = dto.images
     }
-    if (dto.ai_summary !== undefined) setObj.ai_summary = dto.ai_summary;
+    if (dto.ai_summary !== undefined) setObj.ai_summary = dto.ai_summary
 
     const [row] = await this.db
       .update(schema.notes)
       .set(setObj)
-      .where(eq(schema.notes.id, id))
-      .returning();
-    return row;
+      .where(and(eq(schema.notes.id, id), eq(schema.notes.user_id, uid)))
+      .returning()
+    return row
   }
 
-  async remove(id: string) {
-    await this.getById(id);
-    await this.db.delete(schema.notes).where(eq(schema.notes.id, id));
-    return { id, deleted: true };
+  async remove(uid: string, id: string) {
+    await this.getById(uid, id)
+    await this.db
+      .delete(schema.notes)
+      .where(and(eq(schema.notes.id, id), eq(schema.notes.user_id, uid)))
+    return { id, deleted: true }
   }
 
-  async heatmap(fromDays = 365) {
-    const since = new Date();
-    since.setDate(since.getDate() - fromDays);
+  async heatmap(uid: string, fromDays = 365) {
+    const since = new Date()
+    since.setDate(since.getDate() - fromDays)
 
     const rows = await this.db
       .select({
@@ -172,39 +175,39 @@ export class NotesService {
         count: sql<number>`count(*)::int`.as('count'),
       })
       .from(schema.notes)
-      .where(gte(schema.notes.created_at, since))
+      .where(and(eq(schema.notes.user_id, uid), gte(schema.notes.created_at, since)))
       .groupBy(sql`day`)
-      .orderBy(asc(sql`day`));
+      .orderBy(asc(sql`day`))
 
-    const map: Record<string, number> = {};
-    let total = 0;
-    let activeDays = 0;
+    const map: Record<string, number> = {}
+    let total = 0
+    let activeDays = 0
     rows.forEach((r) => {
-      map[r.day] = Number(r.count);
-      total += Number(r.count);
-      if (Number(r.count) > 0) activeDays += 1;
-    });
-    return { data: map, total, activeDays, fromDays };
+      map[r.day] = Number(r.count)
+      total += Number(r.count)
+      if (Number(r.count) > 0) activeDays += 1
+    })
+    return { data: map, total, activeDays, fromDays }
   }
 
-  async distributionByStock(stock_id: string) {
+  async distributionByStock(uid: string, stock_id: string) {
     const rows = await this.db
       .select({
         direction: schema.notes.direction,
         count: sql<number>`count(*)::int`.as('count'),
       })
       .from(schema.notes)
-      .where(eq(schema.notes.stock_id, stock_id))
-      .groupBy(schema.notes.direction);
+      .where(and(eq(schema.notes.stock_id, stock_id), eq(schema.notes.user_id, uid)))
+      .groupBy(schema.notes.direction)
 
-    const map: Record<string, number> = { bull: 0, bear: 0, neutral: 0 };
+    const map: Record<string, number> = { bull: 0, bear: 0, neutral: 0 }
     rows.forEach((r) => {
-      if (r.direction in map) map[r.direction] = Number(r.count);
-    });
-    return map;
+      if (r.direction in map) map[r.direction] = Number(r.count)
+    })
+    return map
   }
 
-  async summary(stock_id: string) {
+  async summary(uid: string, stock_id: string) {
     const rows = await this.db
       .select({
         avg_entry: sql<number>`avg(${schema.notes.entry_price})`.as('avg_entry'),
@@ -213,25 +216,25 @@ export class NotesService {
         total: sql<number>`count(*)::int`.as('total'),
       })
       .from(schema.notes)
-      .where(eq(schema.notes.stock_id, stock_id));
+      .where(and(eq(schema.notes.stock_id, stock_id), eq(schema.notes.user_id, uid)))
 
-    const r = rows[0] || {};
+    const r = rows[0] || {}
     return {
       total: Number(r.total ?? 0),
       avg_entry_price: r.avg_entry ? Number(r.avg_entry) : null,
       avg_target_price: r.avg_target ? Number(r.avg_target) : null,
       avg_stop_loss: r.avg_stop ? Number(r.avg_stop) : null,
-    };
+    }
   }
 
-  /** 客户端预览用：纯函数 markdown → HTML，存库时也会调用 */
+  /** 客户端预览用：纯函数 markdown → HTML,存库时也会调用 */
   renderMarkdown(md: string): string {
-    const raw = marked.parse(md ?? '', { async: false }) as string;
-    return DOMPurify.sanitize(raw);
+    const raw = marked.parse(md ?? '', { async: false }) as string
+    return DOMPurify.sanitize(raw)
   }
 
-  /** 控制器层暴露：接收 md 字符串，返回 html */
+  /** 控制器层暴露：接收 md 字符串,返回 html */
   async renderMd(dto: RenderMdDto) {
-    return { html: this.renderMarkdown(dto.md) };
+    return { html: this.renderMarkdown(dto.md) }
   }
 }

@@ -14,6 +14,7 @@ export interface StockBasic {
 export interface DailyQuote {
   ts_code: string
   trade_date: string
+  quote_time?: string
   open: number | null
   high: number | null
   low: number | null
@@ -143,5 +144,85 @@ export class TushareService {
     const list = await this.getDaily(ts_code, 5)
     if (!list.length) return null
     return list.sort((a, b) => b.trade_date.localeCompare(a.trade_date))[0]
+  }
+
+  /**
+   * 实时行情(日内)— 调腾讯 qt.gtimg.cn 接口
+   * - A 股全市场覆盖, 免费, 无认证
+   * - 返回 GBK 编码字符串,格式:
+   *   v_sh600519="1~贵州茅台~600519~1291.91~1279.00~1271.18~50495~...~...~20260612161418~12.91~1.01~..."
+   *   [3]现价 [5]昨收 [6]今开 [7]成交量(手)
+   *   [30]时间 yyyyMMddHHmmss [32]涨跌额 [33]涨跌幅%
+   *   [36]最高 [37]最低
+   * - 失败兜底:返回 null 让调用方降级到 Tushare daily
+   */
+  async getRealtimeQuote(code: string): Promise<DailyQuote | null> {
+    const symbol = this.toTencentSymbol(code)
+    if (!symbol) return null
+    const url = `https://qt.gtimg.cn/q=${symbol}`
+    try {
+      const controller = new AbortController()
+      const timeout = setTimeout(() => controller.abort(), 5000)
+      const res = await fetch(url, { signal: controller.signal })
+      clearTimeout(timeout)
+      if (!res.ok) {
+        this.logger.warn(`tencent ${code} HTTP ${res.status}`)
+        return null
+      }
+      // 腾讯返回 GBK;Node fetch 默认 utf-8,需要转换
+      const buf = await res.arrayBuffer()
+      const text = Buffer.from(buf).toString('binary')
+      const m = text.match(/="([^"]+)"/)
+      if (!m) return null
+      const fields = m[1].split('~')
+      if (fields.length < 35) return null
+      const close = Number(fields[3])            // [3]=现价(腾讯已返回真实价格,如 1291.91,不是分)
+      const preClose = Number(fields[4])         // [4]=昨收
+      const open = Number(fields[5])             // [5]=今开
+      const high = Number(fields[33])            // [33]=最高
+      const low = Number(fields[34])             // [34]=最低
+      const change = Number(fields[31])          // [31]=涨跌额
+      const pctChg = Number(fields[32])          // [32]=涨跌幅%
+      const vol = Number(fields[6])              // [6]=成交量(手)
+      const timeStr = fields[30] || ''  // [29]=时间 yyyyMMddHHmmss
+      const tradeDate = timeStr.length >= 8 ? timeStr.slice(0, 8) : undefined
+      if (close == null) return null
+      return {
+        ts_code: code,
+        trade_date: tradeDate,
+        quote_time: timeStr.length >= 14 ? timeStr : undefined,
+        open,
+        high,
+        low,
+        close,
+        pre_close: preClose,
+        change,
+        pct_chg: pctChg,
+        vol,
+        amount: null,
+      } as DailyQuote
+    } catch (e) {
+      this.logger.warn(`tencent ${code} 异常: ${(e as Error).message}`)
+      return null
+    }
+  }
+
+  private parseNumber(v: string | undefined): number | null {
+    if (v == null || v === '') return null
+    const n = Number(v)
+    return Number.isNaN(n) ? null : n
+  }
+
+  private toTencentSymbol(code: string): string | null {
+    const c = code.trim().toUpperCase()
+    if (!c) return null
+    if (/^[0-9]{6}$/.test(c)) {
+      const prefix = /^(6|9|5)/.test(c) ? 'sh' : 'sz'
+      return `${prefix}${c}`
+    }
+    if (c.endsWith('.SH')) return `sh${c.slice(0, 6)}`
+    if (c.endsWith('.SZ')) return `sz${c.slice(0, 6)}`
+    if (c.endsWith('.BJ')) return `bj${c.slice(0, 6)}`
+    return null
   }
 }
