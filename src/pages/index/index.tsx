@@ -468,28 +468,26 @@ export default function IndexPage() {
                           {formatPrice(s.current_price)}
                         </Text>
                         {s.change_percent != null ? (
-                          <View
-                            className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-md ${isUp ? 'bg-success bg-opacity-10' : 'bg-error bg-opacity-10'}`}
-                          >
+                          <View className="inline-flex items-center gap-1">
                             <Text className={`block text-xs font-semibold ${isUp ? 'text-success' : 'text-error'}`}>
                               {isUp ? '▲' : '▼'} {formatPercent(s.change_percent)}
                             </Text>
                           </View>
                         ) : (
                           <View className="inline-flex items-center px-2 py-1 rounded-md bg-surface-container">
-                            <Text className="block text-[10px] font-medium text-on-surface-variant">未刷新</Text>
+                            <Text className="block text-xs font-medium text-on-surface-variant">未刷新</Text>
                           </View>
                         )}
                       </View>
                       {/* 价格时间:今日 HH:mm / 昨日收盘 / MM-DD;非实时加灰色徽章 */}
                       <View className="mt-1 flex items-center gap-1">
-                        <Clock size={10} color="#5B5E72" />
-                        <Text className="block text-[10px] text-on-surface-variant tabular-nums">
+                        <Clock size={12} color="#5B5E72" />
+                        <Text className="block text-xs text-on-surface-variant tabular-nums">
                           {s.price_time_label ?? '—'}
                         </Text>
                         {s.is_realtime === false ? (
                           <View className="px-1 py-1 rounded" style={{ background: 'rgba(91, 94, 114, 0.10)' }}>
-                            <Text className="block text-[9px] font-medium text-on-surface-variant">非实时</Text>
+                            <Text className="block text-[11px] font-medium text-on-surface-variant">非实时</Text>
                           </View>
                         ) : null}
                       </View>
