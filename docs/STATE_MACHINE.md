@@ -105,7 +105,7 @@ Zod schema 校验,失败回退到本地规则兜底。
 
 ### 4.3 缓存
 
-`stock_briefs` 表,`UNIQUE(stock_id, trade_date)` 防止同日重复,upsert 语义。
+`stock_briefs` 表，`UNIQUE(user_id, stock_id, trade_date)` 防止同一用户同日重复，upsert 语义。
 
 前端时间线:
 - 详情页头部:最新 1 条 brief 摘要(技术 + 逻辑 + 操作)

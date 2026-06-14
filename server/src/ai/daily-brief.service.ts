@@ -1,9 +1,13 @@
-import { Inject, Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common'
-import { eq, desc, and, count } from 'drizzle-orm'
+import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common'
+import { eq, desc, and } from 'drizzle-orm'
 import { DRIZZLE_DB, PG_POOL } from '../storage/database/database.module'
 import * as schema from '../storage/database/shared/schema'
 import { Pool } from 'pg'
 import { deepseekChat, DEEPSEEK_FLASH_MODEL, DEEPSEEK_PRO_MODEL } from './deepseek.client'
+import {
+  persistDailyBriefArtifacts,
+  type StockBriefRow,
+} from './daily-brief-persistence'
 
 const { stocks, notes, stockPrices, stockBriefs } = schema
 
@@ -15,12 +19,11 @@ const { stocks, notes, stockPrices, stockBriefs } = schema
  *   - LLM 同步判色:green / yellow / red
  *   - 落 stock_briefs 表(信号缓存,详情页时间线用)
  *   - 同时落一条 doc 笔记(进笔记库,跟手写笔记同源)
- *   - 每天最多 3 条(用户主动点会超;cron 跑的话 1 天 1 条不会超)
+ *   - 每个用户、股票、交易日只保留 1 条，重复生成覆盖更新
  *
  * 强制规则:若 actual_loss_rate >= loss_rate → 强制 signal='red',content 写"触及止损"
  */
 
-const MAX_BRIEFS_PER_DAY = 3
 const BRIEF_TARGET_LEN = 100
 
 type LLMOutput = {
@@ -84,24 +87,9 @@ export class DailyBriefService {
     const indicators = this.calcIndicators(history, stock.current_price)
     const stopLoss = this.calcStopLoss(stock)
 
-    // 5. 每天 2-3 条上限检查
+    // 5. 交易日作为幂等键的一部分
     const today = new Date()
     const tradeDate = stock.price_date ?? today.toISOString().slice(0, 10).replace(/-/g, '')
-    const todaysCount = await this.db
-      .select({ c: count() })
-      .from(stockBriefs)
-      .where(
-        and(
-          eq(stockBriefs.user_id, uid),
-          eq(stockBriefs.stock_id, stockId),
-          eq(stockBriefs.trade_date, tradeDate),
-        ),
-      )
-    if (todaysCount[0]?.c >= MAX_BRIEFS_PER_DAY) {
-      throw new BadRequestException(
-        `今日已生成 ${todaysCount[0].c} 条简评,达到上限 ${MAX_BRIEFS_PER_DAY} 条`,
-      )
-    }
 
     // 6. 生成简评内容(强止损覆盖 → 走本地;否则 LLM)
     let signal: 'green' | 'yellow' | 'red' = 'green'
@@ -164,62 +152,26 @@ export class DailyBriefService {
       }
     }
 
-    // 7. 落 stock_briefs(用 client.query() 绕开 Drizzle 0.45 的 prepared-stmt 错误吞掉问题)
+    // 7. 原子 upsert 简评与自动笔记
+    const contentHtml = `<p>${this.escapeHtml(content)}</p>`
     const client = await this.pool.connect()
-    let brief: StockBriefRow
     try {
-      const r = await client.query<StockBriefRow>(
-        `INSERT INTO stock_briefs
-          (user_id, stock_id, trade_date, signal, technical_analysis, logic_judgment, action, sell_reasons, evidence_note_ids, price_at_brief, stop_loss_triggered)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9::uuid[], $10, $11)
-         RETURNING id, user_id, stock_id, trade_date, signal, technical_analysis, logic_judgment, action, sell_reasons, evidence_note_ids, price_at_brief, stop_loss_triggered, created_at, updated_at`,
-        [
-          uid,
-          stockId,
-          tradeDate,
-          signal,
-          content,
-          '',
-          signal === 'red' ? 'sell' : signal === 'yellow' ? 'review' : 'hold',
-          JSON.stringify([]),
-          '{}',
-          stock.current_price,
-          stopLossTriggered ? 't' : 'f',
-        ],
-      )
-      brief = r.rows[0]
+      const persisted = await persistDailyBriefArtifacts(client, {
+        userId: uid,
+        stockId,
+        stockCode: stock.code,
+        stockName: stock.name,
+        tradeDate,
+        signal,
+        content,
+        contentHtml,
+        priceAtBrief: stock.current_price,
+        stopLossTriggered,
+      })
+      return { ...persisted, usedLLM }
     } finally {
       client.release()
     }
-
-    // 8. 落一条 doc 笔记
-    const noteTitle = `每日简评·${stock.name}(${stock.code}) ${tradeDate}`
-    // content 用 rich-text 渲染需要 HTML;包 <p> 标签(2026-06-14)
-    const contentHtml = `<p>${this.escapeHtml(content)}</p>`
-    const [note] = await this.db
-      .insert(notes)
-      .values({
-        user_id: uid,
-        stock_id: stockId,
-        stock_code: stock.code,
-        stock_name: stock.name,
-        type: 'doc',
-        title: noteTitle,
-        content: contentHtml,
-        doc_md: content,
-        direction: signal === 'green' ? 'bull' : signal === 'red' ? 'bear' : 'neutral',
-        entry_price: null,
-        target_price: null,
-        stop_loss: null,
-        tags: ['daily-brief', 'auto'],
-        event: null,
-        source: 'auto-brief',
-        images: [],
-        ai_summary: null,
-      })
-      .returning()
-
-    return { brief: brief as StockBriefRow, usedLLM, noteId: note?.id ?? null }
   }
 
   /**
@@ -425,19 +377,4 @@ export interface TechnicalIndicators {
   summary: string
 }
 
-export interface StockBriefRow {
-  id: string
-  user_id: string
-  stock_id: string
-  trade_date: string
-  signal: 'green' | 'yellow' | 'red'
-  technical_analysis: string  // 现存的就是 100 字主简评
-  logic_judgment: string
-  action: 'hold' | 'review' | 'sell'
-  sell_reasons: string[]
-  evidence_note_ids: string[]
-  price_at_brief: string | null
-  stop_loss_triggered: boolean | string
-  created_at: string
-  updated_at: string
-}
+export type { StockBriefRow } from './daily-brief-persistence'

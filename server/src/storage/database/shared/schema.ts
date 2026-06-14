@@ -10,6 +10,7 @@ import {
   jsonb,
   serial,
   index,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 
 // 系统表（保留，禁止删除）
@@ -93,6 +94,7 @@ export const notes = pgTable(
       .notNull(),
     event: text("event"),
     source: text("source"),
+    source_ref: text("source_ref"),
     images: jsonb("images")
       .default(sql`'[]'::jsonb`)
       .notNull(),
@@ -110,6 +112,7 @@ export const notes = pgTable(
     index("notes_direction_idx").on(table.direction),
     index("notes_type_idx").on(table.type),
     index("notes_created_at_idx").on(table.created_at),
+    uniqueIndex("notes_user_source_ref_uq").on(table.user_id, table.source, table.source_ref),
   ],
 );
 
@@ -231,6 +234,11 @@ export const stockBriefs = pgTable(
     index("stock_briefs_user_id_idx").on(table.user_id),
     index("stock_briefs_signal_idx").on(table.signal),
     index("stock_briefs_created_at_idx").on(table.created_at),
+    uniqueIndex("stock_briefs_user_stock_date_uq").on(
+      table.user_id,
+      table.stock_id,
+      table.trade_date,
+    ),
   ],
 );
 

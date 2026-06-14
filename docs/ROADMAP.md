@@ -18,7 +18,7 @@
 | 1 | 修复后端编译 | P0 | ✅ 2026-06-15 | `pnpm build:server` 成功，根目录 `pnpm build` 不再因服务端 TypeScript 错误中断 |
 | 2 | 修复 Git 断链 | P0 | ✅ 2026-06-15 | 生产代码引用的 helper 与专项测试全部纳入 Git；全新检出后 `pnpm test:note-editor`、`pnpm validate` 可直接运行 |
 | 3 | 修复编辑笔记数据丢失 | P0 | ✅ 2026-06-15 | 编辑已有笔记时保留方向、入场价、目标价、止损价、标签和图片；更新请求只发送页面实际编辑或明确传入的字段 |
-| 4 | 修复每日简评重复写入 | P0 | ⏳ | 唯一键包含用户维度；同一用户、股票、交易日重复生成时执行 upsert，自动笔记不重复创建 |
+| 4 | 修复每日简评重复写入 | P0 | ✅ 2026-06-15 | `0006_daily_brief_upsert.sql` 已应用；唯一键包含用户维度，简评与自动笔记在同一短事务内执行 upsert |
 | 5 | 打通图片上传与 AI 协议 | P0 | ⏳ | 图片上传后获得真实 TOS URL；前后端上传方式、DTO、响应字段一致；单图解读不再依赖本地临时路径或 mock 数据 |
 | 6 | 实现登录令牌自动续期 | P0 | ⏳ | access token 过期时使用 refresh token 单次续期并重放原请求；续期失败才清理 session 并跳转登录 |
 | 7 | 修复筛选与页面跳转断链 | P0 | ⏳ | 观点库筛选会重新加载；热力图格式和日期跳转正确；搜索模式切换、AI 报告请求方法及文档入口参数正确 |
@@ -46,7 +46,7 @@
 | 功能 | 优先级 | 状态 | 完成日期 | 详细说明 |
 |---|---|---|---|---|
 | 4 张业务表(stocks / notes / stock_prices / ai_reports) | P0 | ✅ | 2026-06-13 | 见 `docs/SUPABASE.md` § 4 |
-| stock_briefs 每日简评缓存表 | P0 | ✅ | 2026-06-14 | migrations/0003 |
+| stock_briefs 每日简评缓存表 | P0 | ✅ | 2026-06-15 | migrations/0003 建表；0006 补用户维度唯一键与幂等 upsert |
 | 状态机字段(status / entry_price / loss_rate / entered_at) | P0 | ✅ | 2026-06-14 | migrations/0002 |
 | stock_prices 唯一约束 | P0 | ✅ | 2026-06-14 | migrations/0004 补 `(user_id, stock_id, trade_date)` UNIQUE |
 | market_prices 全市场共享行情表 | ❌ | ⏳ | | **已砍** — 调研过方案,用户"前期不超 100 用户",不做共享 |
@@ -77,8 +77,8 @@
 |---|---|---|---|---|
 | 腾讯实时价格接口(qt.gtimg.cn) | P0 | ✅ | 2026-06-14 | 后端 `getRealtimeQuote` 调腾讯 |
 | 手动刷新价格(1 分钟限频) | P0 | ✅ | 2026-06-14 | 服务端 token bucket + 前端倒计时 |
-| 生成今日简评按钮 | P0 | ✅ | 2026-06-14 | silent 先刷价再跑简评,红色弹 modal |
-| 每日简评 3 段结构化输出 | P0 | ❌ | 2026-06-14 | **重构成 100 字单段简评** + LLM 同步判色(green/yellow/red),落 `stock_briefs` 表 + 自动落 doc 笔记,每天最多 3 条 |
+| 生成今日简评按钮 | P0 | ✅ | 2026-06-15 | silent 先刷价再跑简评；同一交易日重复生成覆盖原简评与自动笔记 |
+| 每日简评 3 段结构化输出 | P0 | ❌ | 2026-06-14 | **重构成 100 字单段简评** + LLM 同步判色(green/yellow/red)，每用户/股票/交易日保留 1 条并同步更新自动 doc 笔记 |
 | 3 色信号 + 证据链 | P0 | ✅ | 2026-06-14 | 3 色保留(LLM 判色替代了原 action→signal 映射),证据链字段 `evidence_note_ids` / `sell_reasons` 留作未来扩展,前端已不展示 |
 | cron 15:35 自动跑简评 | P0 | ✅ | 2026-06-14 | 只对 holding 跑,止损强覆盖 red |
 | 简评证据列表弹窗 | P2 | ⏳ | | 现在只弹第一个,2 小时 |
@@ -177,7 +177,8 @@
 | 2026-06-14 | ROADMAP 结构调整:把"PDF 研报上传"和"笔记图片 OCR"从 § 六(推送与通知)挪到 § 三(业务功能 — 状态机 / 记笔记),它们属于"记笔记"业务功能,不属于推送 |
 | 2026-06-14 | 修**腾讯价格除 100 bug** — `tushare.service.ts` 的 `parsePrice` 错误地 `n/100`,导致页面显示 12.92(应是 1291.91);改用 `Number()` 直接取,废弃 `parsePrice`。同时 SQL 修正存量数据 `stocks` × 1 条 / `stock_prices` × 1 条 |
 | 2026-06-14 | 股票详情页 review:删冗余"贵"头像 + 整体字号升级(`text-[10/11/12px]` → `text-xs/text-sm`)|
-| 2026-06-14 | 重构每日简评:3 段结构化 → **100 字单段自然语言简评**,LLM 同步判 green/yellow/red,落 `stock_briefs` 表 + 自动落一条 doc 笔记(`tags=['daily-brief','auto']`),每天最多 3 条 |
+| 2026-06-15 | 每日简评改为幂等写入：`stock_briefs` 与自动 doc 笔记在同一短事务内 upsert，每用户/股票/交易日保留 1 条 |
+| 2026-06-14 | 重构每日简评:3 段结构化 → **100 字单段自然语言简评**,LLM 同步判 green/yellow/red,落 `stock_briefs` 表 + 自动落一条 doc 笔记(`tags=['daily-brief','auto']`) |
 | 2026-06-14 | 详情页:刷新按钮冷却中置灰(去掉 00:06 倒计时文字 + 删"1 分钟内只能刷新一次"提示) + 买入按钮文案改为"我已买入" |
 | 2026-06-14 | 修 stock_briefs insert 5xx — Drizzle 0.45 prepared-stmt 吞错,改用 `client.query()` raw SQL(同 `stocks.service.ts:439` 模式),`evidence_note_ids` 显式 `{}` 字符串 |
 | 2026-06-14 | note-edit 价格点位:止损字段加 ¥/% 切换 pill,百分比模式输入 -2.5 表示入场跌 2.5%,下方实时换算 `≈ ¥1260.00 (-2.50%)`;提交时百分比 → 绝对价(后端 schema 不变) |

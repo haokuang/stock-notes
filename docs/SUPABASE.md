@@ -200,6 +200,7 @@ macOS Monterey+ 把 AirPlay Receiver 设在 5000。**关掉**:
 - `server/migrations/0001_init.sql` — Schema + RLS
 - `server/migrations/0002_stock_status.sql` — 股票状态机字段
 - `server/migrations/0003_brief_signal.sql` — stock_briefs 表
+- `server/migrations/0006_daily_brief_upsert.sql` — 简评与自动笔记幂等键
 - `server/src/storage/auth/` — JwtGuard + 装饰器
 - `server/src/api-auth/` — AuthController / Service
 - `server/src/ai/daily-brief.service.ts` — 每日简评(技术指标 + LLM)
