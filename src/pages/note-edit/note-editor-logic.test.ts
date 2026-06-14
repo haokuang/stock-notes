@@ -108,6 +108,7 @@ test('includes stock and type only when creating', () => {
     entryPrice: 10,
     targetPrice: null,
     stopLoss: 8,
+    tags: ['review'],
     images: ['tos-image-url'],
   }
 
@@ -120,7 +121,7 @@ test('includes stock and type only when creating', () => {
     entry_price: 10,
     target_price: null,
     stop_loss: 8,
-    tags: [],
+    tags: ['review'],
     images: ['tos-image-url'],
   })
 
@@ -131,9 +132,27 @@ test('includes stock and type only when creating', () => {
     entry_price: 10,
     target_price: null,
     stop_loss: 8,
-    tags: [],
+    tags: ['review'],
     images: ['tos-image-url'],
   })
+})
+
+test('preserves hidden note metadata when editing simplified fields', () => {
+  assert.deepEqual(
+    buildNotePayload(
+      {
+        stockId: 'stock-1',
+        type: 'note',
+        title: '更新后的标题',
+        content: '只更新正文',
+      },
+      true,
+    ),
+    {
+      title: '更新后的标题',
+      content: '只更新正文',
+    },
+  )
 })
 
 test('builds a document update without immutable fields', () => {

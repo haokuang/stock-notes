@@ -19,6 +19,7 @@ export interface NoteEditorFields {
   entryPrice?: number | null
   targetPrice?: number | null
   stopLoss?: number | null
+  tags?: string[]
   images?: string[]
 }
 
@@ -121,11 +122,21 @@ export function buildNotePayload(
   }
 
   payload.content = (fields.content ?? '').replace(/\r\n/g, '\n').trim()
-  payload.direction = fields.direction ?? 'neutral'
-  payload.entry_price = fields.entryPrice ?? null
-  payload.target_price = fields.targetPrice ?? null
-  payload.stop_loss = fields.stopLoss ?? null
-  payload.tags = []
-  payload.images = fields.images ?? []
+  if (!isEditing) {
+    payload.direction = fields.direction ?? 'neutral'
+    payload.entry_price = fields.entryPrice ?? null
+    payload.target_price = fields.targetPrice ?? null
+    payload.stop_loss = fields.stopLoss ?? null
+    payload.tags = fields.tags ?? []
+    payload.images = fields.images ?? []
+    return payload
+  }
+
+  if (fields.direction !== undefined) payload.direction = fields.direction
+  if (fields.entryPrice !== undefined) payload.entry_price = fields.entryPrice
+  if (fields.targetPrice !== undefined) payload.target_price = fields.targetPrice
+  if (fields.stopLoss !== undefined) payload.stop_loss = fields.stopLoss
+  if (fields.tags !== undefined) payload.tags = fields.tags
+  if (fields.images !== undefined) payload.images = fields.images
   return payload
 }
