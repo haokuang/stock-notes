@@ -467,13 +467,19 @@ export default function IndexPage() {
                         <Text className="block text-[22px] font-bold text-on-surface tabular-nums leading-none">
                           {formatPrice(s.current_price)}
                         </Text>
-                        <View
-                          className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-md ${isUp ? 'bg-success bg-opacity-10' : 'bg-error bg-opacity-10'}`}
-                        >
-                          <Text className={`block text-xs font-semibold ${isUp ? 'text-success' : 'text-error'}`}>
-                            {isUp ? '▲' : '▼'} {formatPercent(s.change_percent)}
-                          </Text>
-                        </View>
+                        {s.change_percent != null ? (
+                          <View
+                            className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-md ${isUp ? 'bg-success bg-opacity-10' : 'bg-error bg-opacity-10'}`}
+                          >
+                            <Text className={`block text-xs font-semibold ${isUp ? 'text-success' : 'text-error'}`}>
+                              {isUp ? '▲' : '▼'} {formatPercent(s.change_percent)}
+                            </Text>
+                          </View>
+                        ) : (
+                          <View className="inline-flex items-center px-2 py-1 rounded-md bg-surface-container">
+                            <Text className="block text-[10px] font-medium text-on-surface-variant">未刷新</Text>
+                          </View>
+                        )}
                       </View>
                       {/* 价格时间:今日 HH:mm / 昨日收盘 / MM-DD;非实时加灰色徽章 */}
                       <View className="mt-1 flex items-center gap-1">

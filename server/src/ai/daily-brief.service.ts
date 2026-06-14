@@ -195,6 +195,8 @@ export class DailyBriefService {
 
     // 8. 落一条 doc 笔记
     const noteTitle = `每日简评·${stock.name}(${stock.code}) ${tradeDate}`
+    // content 用 rich-text 渲染需要 HTML;包 <p> 标签(2026-06-14)
+    const contentHtml = `<p>${this.escapeHtml(content)}</p>`
     const [note] = await this.db
       .insert(notes)
       .values({
@@ -204,7 +206,7 @@ export class DailyBriefService {
         stock_name: stock.name,
         type: 'doc',
         title: noteTitle,
-        content,
+        content: contentHtml,
         doc_md: content,
         direction: signal === 'green' ? 'bull' : signal === 'red' ? 'bear' : 'neutral',
         entry_price: null,
@@ -345,6 +347,15 @@ export class DailyBriefService {
       lastClose,
       summary: `MA20=${ma20.toFixed(2)} RSI=${rsi14.toFixed(2)} 布林带 ${boll.lower.toFixed(2)}-${boll.upper.toFixed(2)}`,
     }
+  }
+
+  private escapeHtml(s: string): string {
+    return s
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;')
   }
 
   private sma(arr: number[], period: number): number {

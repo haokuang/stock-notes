@@ -168,4 +168,7 @@
 | 2026-06-14 | note-edit 修复 4 项:详细观点文本框容器 #F4F4F8 → #E8E8EE + Textarea 显式 backgroundColor + padding:0;删"支持 AI 总结"chip;截图附件"添加截图" 10px → sm + ImageIcon 20 → 24 |
 | 2026-06-14 | note-edit 4 项改动:① 删"来源"字段卡片(整块 + state + payload);② 标题留空时**AI 自动总结**(后端新接口 `POST /api/ai/summarize-title`,fallback 取 content 前 30 字,后续接 MiniMax coding plan 替换);③ 看多=红/看空=绿(中国习惯,note-edit 方向按钮 + 首页/观点库/截图解读 3 处方向徽章同步);④ 详细观点 textarea 用项目封装(项目封装容器改用浅灰底 #E8E8EE,允许调用方覆盖),minHeight 140→200,删 placeholderStyle;止损 ¥/% 切换 pill 字号 10px→12px(font-bold) |
 | 2026-06-14 | 页面 `useDidShow` 自动 refetch 解决"添加股票后不刷新就不出现"问题:首页 / 我的 / 股票详情 3 个页面加 `useDidShow` 触发 reload,处理从 stock-add / buy 等子页面返回时的数据同步(轻量替代 Realtime 推送) |
+| 2026-06-14 | **修"自选股没数据"根因**:① `create` 入库后**同步**调一次 `refreshPrice`(失败不阻塞,fallback 旧逻辑);② 首页涨跌 chip 数据缺失时显示灰色"未刷新"占位(避免 `▲ --` 假信号)。五粮液 000858 已用 SQL 补上 79.92 / +0.16% 演示数据 |
+| 2026-06-14 | 修 doc 笔记空白:每日简评生成的 doc 笔记 `content` 包 `<p>...</p>` 让 `rich-text` 能渲染(note-detail 之前空白,因 rich-text 只渲染 HTML);SQL 回填已存在的 1 条 auto-brief 笔记;`doc_md` 仍存纯文本(markdown 源) |
+| 2026-06-14 | note-detail rich-text fallback:Taro H5 上 `<rich-text>` 不稳定,改成直接用 `<Text>` 剥 HTML 标签后展示(`.replace(/<br\s*\/?>/gi, '\n')` + `.replace(/<[^>]+>/g, '')` + 实体还原) |
 | 2026-06-14 | 澄清:简评**两种**触发 — ① cron 15:35 对所有 holding 自动跑(`daily-sync.service.ts:56`)② 用户点"生成今日简评"按钮(详情页)。"17:00 邮件摘要前完成"是不存在的约束(邮件摘要 P2 未实现),不影响当前频次论证 |

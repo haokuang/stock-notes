@@ -129,7 +129,7 @@ export default function NoteDetailPage() {
           </View>
         </View>
 
-        {/* 文档：渲染 HTML */}
+        {/* 文档：渲染 HTML — Taro H5 上 rich-text 行为不稳定,fallback 剥 HTML 当纯文本 */}
         {isDoc && note.content && (
           <View className="px-4 pt-3">
             <View className="rounded-2xl p-4 bg-white bg-opacity-72 border border-white border-opacity-85">
@@ -137,8 +137,16 @@ export default function NoteDetailPage() {
                 <FileText size={14} color="#5B5E72" />
                 <Text className="block text-sm font-semibold text-on-surface">文档内容</Text>
               </View>
-              {/* @ts-ignore */}
-              <rich-text nodes={note.content} className="block text-sm text-on-surface leading-relaxed" />
+              <Text
+                className="block text-sm text-on-surface leading-relaxed whitespace-pre-wrap"
+                style={{ wordBreak: 'break-word' }}
+              >
+                {/* 剥 <p>/<br> 等 HTML 标签 + 实体还原,纯文本展示 */}
+                {String(note.content)
+                  .replace(/<br\s*\/?>/gi, '\n')
+                  .replace(/<[^>]+>/g, '')
+                  .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, '&')}
+              </Text>
             </View>
           </View>
         )}

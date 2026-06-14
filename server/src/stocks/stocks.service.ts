@@ -130,6 +130,15 @@ export class StocksService {
         sort_order: dto.sortOrder ?? 0,
       })
       .returning()
+
+    // 创建后立即拉一次价格(2026-06-14)— 避免"加了不刷就没数据"的 bug
+    // 失败不阻塞,继续返回 row(让用户能看到已加入;前端在详情页仍可手动刷)
+    try {
+      await this.refreshPrice(uid, row.id)
+    } catch (e) {
+      this.logger.warn(`[create] 自动拉价失败 ${dto.code}: ${(e as Error).message}`)
+    }
+
     return row
   }
 
