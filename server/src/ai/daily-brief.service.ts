@@ -1,140 +1,434 @@
-import { Injectable, Logger, Inject } from '@nestjs/common'
-import { Config, LLMClient, SearchClient } from 'coze-coding-dev-sdk'
-import { eq, desc, and, sql } from 'drizzle-orm'
-import { DRIZZLE_DB } from '../storage/database/database.module'
+import { Inject, Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common'
+import { Config, LLMClient } from 'coze-coding-dev-sdk'
+import { eq, desc, and, count } from 'drizzle-orm'
+import { DRIZZLE_DB, PG_POOL } from '../storage/database/database.module'
 import * as schema from '../storage/database/shared/schema'
+import { Pool } from 'pg'
 
-const { stocks, stockPrices } = schema
+const { stocks, notes, stockPrices, stockBriefs } = schema
 
 /**
- * AI 今日简评
- * 综合 Tushare 价格数据 + 联网搜索最新消息 + 豆包大模型
- * 输出 ≤100 字的表现 / 涨跌原因总结
+ * 每日简评 · 2026-06-14 重构
+ *
+ * MVP 简化为:
+ *   - 单段 100 字左右简评(自然语言,中文)
+ *   - LLM 同步判色:green / yellow / red
+ *   - 落 stock_briefs 表(信号缓存,详情页时间线用)
+ *   - 同时落一条 doc 笔记(进笔记库,跟手写笔记同源)
+ *   - 每天最多 3 条(用户主动点会超;cron 跑的话 1 天 1 条不会超)
+ *
+ * 强制规则:若 actual_loss_rate >= loss_rate → 强制 signal='red',content 写"触及止损"
  */
+
+const MAX_BRIEFS_PER_DAY = 3
+const BRIEF_TARGET_LEN = 100
+
+type LLMOutput = {
+  signal: 'green' | 'yellow' | 'red'
+  content: string
+}
+
 @Injectable()
 export class DailyBriefService {
   private readonly logger = new Logger(DailyBriefService.name)
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  constructor(@Inject(DRIZZLE_DB) private readonly db: any) {}
+  constructor(@Inject(DRIZZLE_DB) private readonly db: any, @Inject(PG_POOL) private readonly pool: Pool) {}
+
+  // ============ 公开 API ============
 
   /**
-   * 生成某只股票的今日简评
+   * 生成简评(uid 隔离)— 主入口
+   * 1. 拉股票 + 历史 + 近期观点
+   * 2. 本地算技术指标 + 强止损覆盖
+   * 3. LLM 生成 100 字简评 + 信号色
+   * 4. 落 stock_briefs
+   * 5. 落一条 doc 笔记到 notes 表
    */
-  async generate(stockId: string): Promise<{
-    brief: string
-    keyPoints: string[]
-    priceContext: {
-      code: string
-      name: string
-      changePercent: string
-      changeAmount: string
-      volume: string
-      vs5dAvgVol: string
-    }
-    newsSummary: string
-    mock: boolean
-  }> {
-    // 1. 取股票基础信息
-    const [stock] = await this.db.select().from(stocks).where(eq(stocks.id, stockId)).limit(1)
-    if (!stock) {
-      throw new Error(`股票不存在: ${stockId}`)
-    }
+  async generateBrief(
+    uid: string,
+    stockId: string,
+  ): Promise<{ brief: StockBriefRow; usedLLM: boolean; noteId: string | null }> {
+    // 1. 取股票
+    const [stock] = await this.db
+      .select()
+      .from(stocks)
+      .where(and(eq(stocks.id, stockId), eq(stocks.user_id, uid)))
+      .limit(1)
+    if (!stock) throw new NotFoundException(`股票 ${stockId} 不存在`)
 
-    // 2. 取最近 5 个交易日（含今日）
+    // 2. 近 60 个交易日
     const history = await this.db
       .select()
       .from(stockPrices)
-      .where(eq(stockPrices.stock_id, stockId))
+      .where(and(eq(stockPrices.stock_id, stockId), eq(stockPrices.user_id, uid)))
       .orderBy(desc(stockPrices.trade_date))
-      .limit(5)
+      .limit(60)
 
-    // 计算 5 日均量
-    const avg5dVol =
-      history.length > 0
-        ? history.reduce((sum, p) => sum + Number(p.volume ?? 0), 0) / history.length
-        : 0
-    const todayVol = Number(history[0]?.volume ?? 0)
-    const vs5dAvgVol = avg5dVol > 0 ? ((todayVol / avg5dVol - 1) * 100).toFixed(1) : '0.0'
+    // 3. 近期观点(摘要给 LLM)
+    const recentNotes = await this.db
+      .select({
+        id: notes.id,
+        title: notes.title,
+        direction: notes.direction,
+        content: notes.content,
+        tags: notes.tags,
+        created_at: notes.created_at,
+      })
+      .from(notes)
+      .where(and(eq(notes.stock_id, stockId), eq(notes.user_id, uid)))
+      .orderBy(desc(notes.created_at))
+      .limit(10)
 
-    const priceContext = {
-      code: stock.code,
-      name: stock.name,
-      changePercent: Number(stock.change_percent ?? 0).toFixed(2),
-      changeAmount: Number(stock.change_amount ?? 0).toFixed(2),
-      volume: todayVol.toLocaleString('zh-CN'),
-      vs5dAvgVol: `${Number(vs5dAvgVol) >= 0 ? '+' : ''}${vs5dAvgVol}%`,
-    }
+    // 4. 本地技术指标 + 止损检查
+    const indicators = this.calcIndicators(history, stock.current_price)
+    const stopLoss = this.calcStopLoss(stock)
 
-    // 3. 联网搜索最新消息
-    let newsSummary = ''
-    try {
-      const search = new SearchClient(new Config())
-      const res = await search.advancedSearch(
-        `${stock.name} ${stock.code} 今日 行情 涨跌原因`,
-        { count: 5, timeRange: '1d', needSummary: true },
+    // 5. 每天 2-3 条上限检查
+    const today = new Date()
+    const tradeDate = stock.price_date ?? today.toISOString().slice(0, 10).replace(/-/g, '')
+    const todaysCount = await this.db
+      .select({ c: count() })
+      .from(stockBriefs)
+      .where(
+        and(
+          eq(stockBriefs.user_id, uid),
+          eq(stockBriefs.stock_id, stockId),
+          eq(stockBriefs.trade_date, tradeDate),
+        ),
       )
-      newsSummary = res.summary ?? res.web_items?.slice(0, 3).map((i) => i.snippet).join(' / ') ?? ''
-    } catch (e) {
-      this.logger.warn(`联网搜索失败，使用空上下文: ${(e as Error).message}`)
-      newsSummary = ''
+    if (todaysCount[0]?.c >= MAX_BRIEFS_PER_DAY) {
+      throw new BadRequestException(
+        `今日已生成 ${todaysCount[0].c} 条简评,达到上限 ${MAX_BRIEFS_PER_DAY} 条`,
+      )
     }
 
-    // 4. 调豆包生成 ≤100 字简评
-    const prompt = `你是股票投资助手。请根据以下数据生成一段不超过 100 字的「今日表现 + 涨跌原因」简评，语气专业客观。
+    // 6. 生成简评内容(强止损覆盖 → 走本地;否则 LLM)
+    let signal: 'green' | 'yellow' | 'red' = 'green'
+    let content = ''
+    let usedLLM = false
+    let stopLossTriggered = false
 
-【股票】${stock.name}（${stock.code}），行业：${stock.industry ?? '未知'}
-【今日行情】最新价 ${stock.current_price} 元，涨跌幅 ${priceContext.changePercent}%，涨跌额 ${priceContext.changeAmount} 元
-【量能】今日成交量 ${priceContext.volume}，较 5 日均量 ${priceContext.vs5dAvgVol}
-【近 5 日涨跌】${history.map((p) => `${p.trade_date}:${p.change_percent}%`).join(', ')}
-【今日消息】${newsSummary || '暂无最新消息'}
+    if (stopLoss.status === 'triggered') {
+      // 强止损:不调 LLM,固定文案
+      signal = 'red'
+      content = `触及止损线(实际亏损 ${stopLoss.actual_rate.toFixed(2)}% ≥ 上限 ${stopLoss.threshold}%)。已构成原买入逻辑的实质性失效,建议重新评估或执行卖出。`
+      stopLossTriggered = true
+    } else if (stock.status === 'watching') {
+      // 观察中:不调 LLM,技术摘要 100 字
+      signal = 'green'
+      content = `观察中。MA20=${indicators.ma20},RSI14=${indicators.rsi14},量比=${indicators.volRatio}。技术面尚无明确方向,维持观察。`
+    } else {
+      // holding + 非止损触发:调 LLM
+      const buyReasonText = recentNotes.find((n) => Array.isArray(n.tags) && n.tags.includes('buy'))?.content ?? '(无明确买入理由)'
 
-输出格式（严格遵守）：
-简评：<一句话表现>
-要点：<1-2 条核心原因>
-字数：简评正文必须 ≤100 字。`
+      const prompt = `你是 A 股投资助手。基于以下数据,用一段 100 字左右的中文自然语言,给出今日简评。同时给一个信号色:green(乐观) / yellow(中性谨慎) / red(警惕)。
 
-    let brief = ''
-    let keyPoints: string[] = []
-    let mock = false
+【股票】${stock.name}(${stock.code}),行业:${stock.industry ?? '未知'}
+【状态】${stock.status} | 买入价 ¥${stock.entry_price} | 亏损率上限 ${stock.loss_rate}%
+【买入理由】${buyReasonText}
+【历史观点】${recentNotes.map((n) => `[${n.direction}] ${n.title}`).join(' | ').slice(0, 400) || '(暂无)'}
+【技术指标】MA5=${indicators.ma5} MA20=${indicators.ma20} MA60=${indicators.ma60} | MACD:DIF=${indicators.macd.dif} DEA=${indicators.macd.dea} 柱=${indicators.macd.hist} | RSI14=${indicators.rsi14} | 布林:${indicators.boll.lower}-${indicators.boll.upper} | 量比=${indicators.volRatio}
+【今日行情】最新价 ¥${stock.current_price ?? '—'} 涨跌 ${stock.change_percent ?? '—'}%
+【止损状态】${stopLoss.message}
 
+判色参考:
+- green:技术面偏多(MA5>MA20、RSI 50-70、量比>1),买入逻辑仍成立
+- yellow:技术面中性或信号矛盾,继续观察
+- red:技术面破位(跌破 MA20、RSI>80 超买或<20 超卖、量比>2 放量滞涨),或触及止损
+
+输出严格 JSON(无 markdown):
+{
+  "content": "100 字左右简评,自然语言,不分行,不空泛",
+  "signal": "green" | "yellow" | "red"
+}`
+
+      try {
+        const llm = new LLMClient(new Config())
+        const res = await llm.invoke(
+          [
+            { role: 'system', content: '你是 A 股投资助手,只输出严格 JSON,不输出 markdown。' },
+            { role: 'user', content: prompt },
+          ],
+          { model: 'doubao-seed-1-8-251228', temperature: 0.4, thinking: 'disabled' },
+        )
+        const text = res.content.trim()
+        const json = text.replace(/^```json\s*/i, '').replace(/```\s*$/, '')
+        const parsed = JSON.parse(json) as LLMOutput
+        content = String(parsed.content ?? '').slice(0, 500)  // 兜底截断
+        signal = ['green', 'yellow', 'red'].includes(parsed.signal) ? parsed.signal : 'yellow'
+        usedLLM = true
+      } catch (e) {
+        this.logger.warn(`[brief] LLM 调用失败,使用本地兜底: ${(e as Error).message}`)
+        content = `LLM 不可用,基于本地指标的占位简评。MA20=${indicators.ma20},RSI=${indicators.rsi14},量比=${indicators.volRatio}。`
+        signal = stopLoss.status === 'danger' ? 'yellow' : 'green'
+      }
+    }
+
+    // 7. 落 stock_briefs(用 client.query() 绕开 Drizzle 0.45 的 prepared-stmt 错误吞掉问题)
+    const client = await this.pool.connect()
+    let brief: StockBriefRow
+    try {
+      const r = await client.query<StockBriefRow>(
+        `INSERT INTO stock_briefs
+          (user_id, stock_id, trade_date, signal, technical_analysis, logic_judgment, action, sell_reasons, evidence_note_ids, price_at_brief, stop_loss_triggered)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9::uuid[], $10, $11)
+         RETURNING id, user_id, stock_id, trade_date, signal, technical_analysis, logic_judgment, action, sell_reasons, evidence_note_ids, price_at_brief, stop_loss_triggered, created_at, updated_at`,
+        [
+          uid,
+          stockId,
+          tradeDate,
+          signal,
+          content,
+          '',
+          signal === 'red' ? 'sell' : signal === 'yellow' ? 'review' : 'hold',
+          JSON.stringify([]),
+          '{}',
+          stock.current_price,
+          stopLossTriggered ? 't' : 'f',
+        ],
+      )
+      brief = r.rows[0]
+    } finally {
+      client.release()
+    }
+
+    // 8. 落一条 doc 笔记
+    const noteTitle = `每日简评·${stock.name}(${stock.code}) ${tradeDate}`
+    const [note] = await this.db
+      .insert(notes)
+      .values({
+        user_id: uid,
+        stock_id: stockId,
+        stock_code: stock.code,
+        stock_name: stock.name,
+        type: 'doc',
+        title: noteTitle,
+        content,
+        doc_md: content,
+        direction: signal === 'green' ? 'bull' : signal === 'red' ? 'bear' : 'neutral',
+        entry_price: null,
+        target_price: null,
+        stop_loss: null,
+        tags: ['daily-brief', 'auto'],
+        event: null,
+        source: 'auto-brief',
+        images: [],
+        ai_summary: null,
+      })
+      .returning()
+
+    return { brief: brief as StockBriefRow, usedLLM, noteId: note?.id ?? null }
+  }
+
+  /**
+   * 取最近 N 天的 brief(给股票详情页时间线)
+   */
+  async getRecent(uid: string, stockId: string, days = 7): Promise<StockBriefRow[]> {
+    const rows = await this.db
+      .select()
+      .from(stockBriefs)
+      .where(and(eq(stockBriefs.stock_id, stockId), eq(stockBriefs.user_id, uid)))
+      .orderBy(desc(stockBriefs.trade_date))
+      .limit(days)
+    return rows as StockBriefRow[]
+  }
+
+  /**
+   * AI 自动总结标题(标题留空时用)— 2026-06-14
+   * 输入:content(已写的详细观点)
+   * 输出:≤ 50 字的简洁标题
+   *
+   * 策略:
+   * 1. 优先调 LLM(MiniMax coding plan / 豆包)— 智能总结
+   * 2. LLM 失败时降级:取 content 前 30 字 + "..."(零调用)
+   *
+   * TODO:等用户配 MINIMAX_API_KEY 后,接 MiniMax coding plan API
+   *   (https://api.minimax.chat/v1/text/chatcompletion_v2,OpenAI 兼容)
+   */
+  async summarizeTitle(content: string): Promise<string> {
+    const trimmed = (content ?? '').trim()
+    if (!trimmed) {
+      return ''
+    }
+    if (trimmed.length <= 50) {
+      return trimmed
+    }
+
+    // 1. 试调 LLM
     try {
       const llm = new LLMClient(new Config())
       const res = await llm.invoke(
         [
           {
             role: 'system',
-            content: '你是 A 股投资助手，输出简洁专业的股票简评。',
+            content: '你是 A 股投研助手,根据用户给的长文,提炼一个不超过 50 字的简洁标题。只输出标题本身,不要任何标点符号、引号或前缀。',
           },
-          { role: 'user', content: prompt },
+          { role: 'user', content: trimmed.slice(0, 1500) },
         ],
-        { model: 'doubao-seed-1-8-251228', temperature: 0.5, thinking: 'disabled' },
+        { model: 'doubao-seed-1-8-251228', temperature: 0.3, thinking: 'disabled' },
       )
-      const text = res.content
-      // 解析简评与要点
-      const briefMatch = text.match(/简评[：:]\s*([\s\S]+?)(?=\n要点|\n*$)/)
-      const pointsMatch = text.match(/要点[：:]\s*([\s\S]+)/)
-      brief = (briefMatch?.[1] ?? text).trim().slice(0, 200)
-      keyPoints = (pointsMatch?.[1] ?? '')
-        .split(/\n|;|；|、/)
-        .map((s) => s.replace(/^[\s\-•·]+/, '').trim())
-        .filter((s) => s.length > 0)
-        .slice(0, 3)
+      const title = (res.content ?? '').trim().replace(/[「」"'\n\r]/g, '').slice(0, 50)
+      if (title) return title
     } catch (e) {
-      mock = true
-      this.logger.warn(`LLM 调用失败，返回占位简评: ${(e as Error).message}`)
-      const sign = Number(priceContext.changePercent) >= 0 ? '上涨' : '下跌'
-      brief = `${stock.name} 今日收${sign} ${priceContext.changePercent}%，成交额较 5 日均量${priceContext.vs5dAvgVol.startsWith('+') ? '放大' : '萎缩'}，短期维持 ${Number(priceContext.changePercent) >= 0 ? '多头' : '震荡'} 格局。`
-      keyPoints = [
-        `价格波动 ${priceContext.changePercent}%，量能 ${priceContext.vs5dAvgVol}`,
-        newsSummary ? `近期关注：${newsSummary.slice(0, 30)}` : '暂无明显催化剂',
-      ]
+      this.logger.warn(`[summarizeTitle] LLM 失败,降级: ${(e as Error).message}`)
     }
 
-    return { brief, keyPoints, priceContext, newsSummary, mock }
+    // 2. 降级:取 content 前 30 字 + "..."
+    return trimmed.slice(0, 30) + (trimmed.length > 30 ? '...' : '')
+  }
+
+  // ============ 纯本地计算 ============
+
+  /**
+   * 止损状态
+   */
+  private calcStopLoss(stock: any): {
+    status: 'inactive' | 'ok' | 'warning' | 'danger' | 'triggered'
+    actual_rate: number
+    threshold: number | null
+    message: string
+  } {
+    if (stock.status !== 'holding') {
+      return { status: 'inactive', actual_rate: 0, threshold: null, message: '股票不在持有状态' }
+    }
+    const entryPrice = Number(stock.entry_price ?? 0)
+    const lossRate = Number(stock.loss_rate ?? 0)
+    const currentPrice = Number(stock.current_price ?? 0)
+    if (entryPrice <= 0 || lossRate <= 0) {
+      return { status: 'inactive', actual_rate: 0, threshold: lossRate, message: '三件套不完整' }
+    }
+    const actualRate = ((entryPrice - currentPrice) / entryPrice) * 100
+    let status: 'ok' | 'warning' | 'danger' | 'triggered'
+    let message = ''
+    if (actualRate < lossRate * 0.5) {
+      status = 'ok'
+      message = `安全:实际亏损 ${actualRate.toFixed(2)}% / 上限 ${lossRate}%`
+    } else if (actualRate < lossRate * 0.8) {
+      status = 'warning'
+      message = `注意:实际亏损 ${actualRate.toFixed(2)}% / 上限 ${lossRate}%`
+    } else if (actualRate < lossRate) {
+      status = 'danger'
+      message = `接近止损线(实际 ${actualRate.toFixed(2)}% / 上限 ${lossRate}%)`
+    } else {
+      status = 'triggered'
+      message = `已触及止损线(实际 ${actualRate.toFixed(2)}% ≥ ${lossRate}%)`
+    }
+    return { status, actual_rate: actualRate, threshold: lossRate, message }
+  }
+
+  private calcIndicators(history: any[], currentPrice: string | null): TechnicalIndicators {
+    const closes = [...history].reverse().map((h) => Number(h.close_price)).filter((v) => v > 0)
+    const volumes = [...history].reverse().map((h) => Number(h.volume ?? 0))
+    const lastClose = closes.length > 0 ? closes[closes.length - 1] : Number(currentPrice ?? 0)
+
+    const ma5 = this.sma(closes, 5)
+    const ma20 = this.sma(closes, 20)
+    const ma60 = this.sma(closes, 60)
+
+    const macd = this.macd(closes, 12, 26, 9)
+    const rsi14 = this.rsi(closes, 14)
+    const boll = this.bollinger(closes, 20, 2)
+
+    const vol5 = volumes.slice(-5).reduce((s, v) => s + v, 0) / Math.min(5, volumes.length || 1)
+    const todayVol = volumes[volumes.length - 1] ?? 0
+    const volRatio = vol5 > 0 ? Number((todayVol / vol5).toFixed(2)) : 0
+
+    return {
+      ma5: ma5.toFixed(2),
+      ma20: ma20.toFixed(2),
+      ma60: ma60.toFixed(2),
+      macd: { dif: macd.dif.toFixed(2), dea: macd.dea.toFixed(2), hist: macd.hist.toFixed(2) },
+      rsi14: rsi14.toFixed(2),
+      boll: { upper: boll.upper.toFixed(2), mid: boll.mid.toFixed(2), lower: boll.lower.toFixed(2) },
+      volRatio,
+      lastClose,
+      summary: `MA20=${ma20.toFixed(2)} RSI=${rsi14.toFixed(2)} 布林带 ${boll.lower.toFixed(2)}-${boll.upper.toFixed(2)}`,
+    }
+  }
+
+  private sma(arr: number[], period: number): number {
+    if (arr.length === 0) return 0
+    if (arr.length < period) return arr.reduce((s, v) => s + v, 0) / arr.length
+    return arr.slice(-period).reduce((s, v) => s + v, 0) / period
+  }
+
+  private ema(arr: number[], period: number): number[] {
+    if (arr.length === 0) return []
+    const k = 2 / (period + 1)
+    const ema: number[] = []
+    arr.forEach((v, i) => {
+      if (i === 0) ema.push(v)
+      else ema.push(v * k + ema[i - 1] * (1 - k))
+    })
+    return ema
+  }
+
+  private macd(closes: number[], fast = 12, slow = 26, signal = 9) {
+    if (closes.length === 0) return { dif: 0, dea: 0, hist: 0 }
+    const emaFast = this.ema(closes, fast)
+    const emaSlow = this.ema(closes, slow)
+    const dif = (emaFast[emaFast.length - 1] ?? 0) - (emaSlow[emaSlow.length - 1] ?? 0)
+    const difSeries = emaFast.map((v, i) => v - (emaSlow[i] ?? 0))
+    const deaSeries = this.ema(difSeries, signal)
+    const dea = deaSeries[deaSeries.length - 1] ?? 0
+    const hist = (dif - dea) * 2
+    return { dif, dea, hist }
+  }
+
+  private rsi(closes: number[], period = 14): number {
+    if (closes.length < period + 1) return 50
+    let gain = 0
+    let loss = 0
+    for (let i = closes.length - period; i < closes.length; i++) {
+      const diff = closes[i] - closes[i - 1]
+      if (diff > 0) gain += diff
+      else loss -= diff
+    }
+    const avgGain = gain / period
+    const avgLoss = loss / period
+    if (avgLoss === 0) return 100
+    const rs = avgGain / avgLoss
+    return 100 - 100 / (1 + rs)
+  }
+
+  private bollinger(closes: number[], period = 20, n = 2) {
+    if (closes.length === 0) return { upper: 0, mid: 0, lower: 0 }
+    const slice = closes.slice(-period)
+    const mid = slice.reduce((s, v) => s + v, 0) / slice.length
+    const variance = slice.reduce((s, v) => s + (v - mid) ** 2, 0) / slice.length
+    const sigma = Math.sqrt(variance)
+    return { upper: mid + n * sigma, mid, lower: mid - n * sigma }
   }
 }
 
-// 避免 ESLint unused
-void sql
-void and
+// ============ 类型导出 ============
+
+export interface TechnicalIndicators {
+  ma5: string
+  ma20: string
+  ma60: string
+  macd: { dif: string; dea: string; hist: string }
+  rsi14: string
+  boll: { upper: string; mid: string; lower: string }
+  volRatio: number
+  lastClose: number
+  summary: string
+}
+
+export interface StockBriefRow {
+  id: string
+  user_id: string
+  stock_id: string
+  trade_date: string
+  signal: 'green' | 'yellow' | 'red'
+  technical_analysis: string  // 现存的就是 100 字主简评
+  logic_judgment: string
+  action: 'hold' | 'review' | 'sell'
+  sell_reasons: string[]
+  evidence_note_ids: string[]
+  price_at_brief: string | null
+  stop_loss_triggered: boolean | string
+  created_at: string
+  updated_at: string
+}

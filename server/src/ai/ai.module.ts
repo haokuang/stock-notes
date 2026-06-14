@@ -11,6 +11,7 @@ import {
 import { IsString, IsOptional, IsNotEmpty, IsArray, IsUrl, MaxLength } from 'class-validator'
 import { LLMClient } from 'coze-coding-dev-sdk'
 import { DailyBriefService } from './daily-brief.service'
+import { CurrentUser } from '../storage/auth/current-user.decorator'
 
 /**
  * AI 分析模块
@@ -121,12 +122,15 @@ export class AiController {
     }
   }
 
-  /** 今日简评：Tushare 价格 + 联网搜索 + 豆包，≤100 字 */
+  /** 今日简评:Tushare 价格 + 豆包结构化输出 + 3 色信号 */
   @Get('daily-brief/:stockId')
   @HttpCode(200)
-  async dailyBrief(@Param('stockId') stockId: string) {
+  async dailyBrief(
+    @CurrentUser() user: { id: string },
+    @Param('stockId') stockId: string,
+  ) {
     if (!stockId) throw new BadRequestException('stockId 必填')
-    const result = await this.dailyBriefService.generate(stockId)
+    const result = await this.dailyBriefService.generateBrief(user.id, stockId)
     return { data: result }
   }
 
@@ -135,13 +139,21 @@ export class AiController {
   @HttpCode(200)
   async chat(@Body() dto: ChatDto) {
     if (!dto.message) throw new BadRequestException('message 必填')
-    return {
-      data: {
-        reply: `【占位回复】收到：${dto.message.slice(0, 100)}`,
-        model: dto.model ?? 'mock',
-        mock: true,
-      },
-    }
+    return { data: { reply: `[占位]${dto.message.slice(0, 80)}`, mock: true } }
+  }
+
+  /**
+   * AI 总结标题(note-edit 标题留空时调用)— 2026-06-14
+   * body: { content: string }
+   * 返回: { data: { title: string } }
+   */
+  @Post('summarize-title')
+  @HttpCode(200)
+  async summarizeTitle(@Body() dto: { content?: string }) {
+    const content = (dto?.content ?? '').trim()
+    if (!content) throw new BadRequestException('content 必填')
+    const title = await this.dailyBriefService.summarizeTitle(content)
+    return { data: { title } }
   }
 
   /** 健康检查 */
