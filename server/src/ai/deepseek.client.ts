@@ -1,0 +1,49 @@
+import OpenAI from 'openai'
+
+/**
+ * DeepSeek (OpenAI 兼容) 客户端工厂
+ * - 模型由调用方指定(flash/pro/chat)
+ * - 走环境变量配置,key 留空时所有 invoke 都会抛错
+ */
+let _client: OpenAI | null = null
+
+function getClient(): OpenAI {
+  if (_client) return _client
+  const apiKey = process.env.DEEPSEEK_API_KEY
+  if (!apiKey) {
+    throw new Error('DEEPSEEK_API_KEY 未配置,无法调用 DeepSeek')
+  }
+  _client = new OpenAI({
+    apiKey,
+    baseURL: process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com',
+  })
+  return _client
+}
+
+export const DEEPSEEK_FLASH_MODEL = process.env.DEEPSEEK_FLASH_MODEL || 'deepseek-flash'
+export const DEEPSEEK_PRO_MODEL = process.env.DEEPSEEK_PRO_MODEL || 'deepseek-pro'
+
+export interface DeepseekChatMessage {
+  role: 'system' | 'user' | 'assistant'
+  content: string
+}
+
+export interface DeepseekInvokeOptions {
+  model?: string
+  temperature?: number
+  maxTokens?: number
+}
+
+export async function deepseekChat(
+  messages: DeepseekChatMessage[],
+  opts: DeepseekInvokeOptions = {},
+): Promise<string> {
+  const client = getClient()
+  const res = await client.chat.completions.create({
+    model: opts.model || DEEPSEEK_FLASH_MODEL,
+    messages,
+    temperature: opts.temperature ?? 0.3,
+    max_tokens: opts.maxTokens,
+  })
+  return res.choices[0]?.message?.content?.trim() ?? ''
+}

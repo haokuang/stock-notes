@@ -1,9 +1,9 @@
 import { Inject, Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common'
-import { Config, LLMClient } from 'coze-coding-dev-sdk'
 import { eq, desc, and, count } from 'drizzle-orm'
 import { DRIZZLE_DB, PG_POOL } from '../storage/database/database.module'
 import * as schema from '../storage/database/shared/schema'
 import { Pool } from 'pg'
+import { deepseekChat, DEEPSEEK_FLASH_MODEL } from './deepseek.client'
 
 const { stocks, notes, stockPrices, stockBriefs } = schema
 
@@ -259,8 +259,7 @@ export class DailyBriefService {
 
     // 1. 试调 LLM
     try {
-      const llm = new LLMClient(new Config())
-      const res = await llm.invoke(
+      const content = await deepseekChat(
         [
           {
             role: 'system',
@@ -268,12 +267,12 @@ export class DailyBriefService {
           },
           { role: 'user', content: trimmed.slice(0, 1500) },
         ],
-        { model: 'doubao-seed-1-8-251228', temperature: 0.3, thinking: 'disabled' },
+        { model: DEEPSEEK_FLASH_MODEL, temperature: 0.3 },
       )
-      const title = (res.content ?? '').trim().replace(/[「」"'\n\r]/g, '').slice(0, 50)
+      const title = content.replace(/[「」"'\n\r]/g, '').slice(0, 50)
       if (title) return title
     } catch (e) {
-      this.logger.warn(`[summarizeTitle] LLM 失败,降级: ${(e as Error).message}`)
+      this.logger.warn(`[summarizeTitle] DeepSeek 调用失败,降级: ${(e as Error).message}`)
     }
 
     // 2. 降级:取 content 前 30 字 + "..."
