@@ -123,12 +123,6 @@ export default function LoginPage() {
           </Text>
         </View>
 
-        <View className="mt-8 px-4 text-center">
-          <Text className="block text-[13px] text-on-surface-variant leading-relaxed">
-            注册时需使用真实邮箱域名(如 @gmail.com / @qq.com)
-            {'\n'}若开启邮箱确认,首次登录请查收邮件
-          </Text>
-        </View>
       </View>
     </View>
   )
