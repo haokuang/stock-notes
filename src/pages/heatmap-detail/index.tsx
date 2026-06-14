@@ -3,6 +3,7 @@ import Taro, { useLoad, usePullDownRefresh } from '@tarojs/taro'
 import { useState } from 'react'
 import { Network } from '@/network'
 import { ArrowLeft, Calendar } from 'lucide-react-taro'
+import { HeatmapResponse, normalizeHeatmap } from '../prelaunch-navigation'
 
 interface DayBucket {
   date: string
@@ -20,14 +21,14 @@ export default function HeatmapDetailPage() {
   const load = async (d: number) => {
     setLoading(true)
     try {
-      const res = await Network.request<{ data: { data: { date: string; count: number }[]; total: number; active_days: number } }>({
+      const res = await Network.request<HeatmapResponse>({
         url: `/api/notes/heatmap?days=${d}`,
       })
       console.log('[heatmap]', res.data)
-      const d2 = (res.data?.data?.data ?? []).map((item: any) => ({ ...item, notes: item.notes || [] }))
-      setBuckets(d2)
-      setTotal(res.data?.data?.total ?? 0)
-      setActiveDays(res.data?.data?.active_days ?? 0)
+      const normalized = normalizeHeatmap(res.data)
+      setBuckets(normalized.buckets)
+      setTotal(normalized.total)
+      setActiveDays(normalized.activeDays)
     } catch (e) {
       console.error('[heatmap] load failed', e)
     } finally {

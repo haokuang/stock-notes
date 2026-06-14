@@ -33,20 +33,23 @@ export default function ImageAiPage() {
       Taro.showLoading({ title: '上传中...' })
       try {
         const up = await Network.uploadFile({
-          url: '/api/upload/fetch',
+          url: '/api/upload/image',
           filePath: path,
           name: 'file',
           formData: {},
         })
         const json = JSON.parse(up.data)
-        const url = json?.data?.storedUrl ?? path
+        if (up.statusCode !== 200 || !json?.data?.url) {
+          throw new Error(json?.message ?? '上传失败')
+        }
+        const url = json.data.url
         setImageUrl(url)
         Taro.hideLoading()
         Taro.showToast({ title: '已上传', icon: 'success' })
       } catch (err) {
         Taro.hideLoading()
-        setImageUrl(path)
         console.error('[image-ai] upload failed', err)
+        Taro.showToast({ title: '图片上传失败', icon: 'none' })
       }
     } catch (e) {
       console.error('[image-ai] pick failed', e)
@@ -71,11 +74,12 @@ export default function ImageAiPage() {
       })
       console.log('[image-ai] result', res.data)
       const data = res.data?.data
+      if (!data) throw new Error('AI 返回为空')
       setResult(data ?? null)
       Taro.setStorageSync('image-ai-result', data)
     } catch (e) {
       console.error('[image-ai] failed', e)
-      Taro.showToast({ title: '分析失败', icon: 'none' })
+      Taro.showToast({ title: 'AI 服务暂不可用', icon: 'none' })
     } finally {
       setLoading(false)
     }

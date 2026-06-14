@@ -19,9 +19,9 @@
 | 2 | 修复 Git 断链 | P0 | ✅ 2026-06-15 | 生产代码引用的 helper 与专项测试全部纳入 Git；全新检出后 `pnpm test:note-editor`、`pnpm validate` 可直接运行 |
 | 3 | 修复编辑笔记数据丢失 | P0 | ✅ 2026-06-15 | 编辑已有笔记时保留方向、入场价、目标价、止损价、标签和图片；更新请求只发送页面实际编辑或明确传入的字段 |
 | 4 | 修复每日简评重复写入 | P0 | ✅ 2026-06-15 | `0006_daily_brief_upsert.sql` 已应用；唯一键包含用户维度，简评与自动笔记在同一短事务内执行 upsert |
-| 5 | 打通图片上传与 AI 协议 | P0 | ⏳ | 图片上传后获得真实 TOS URL；前后端上传方式、DTO、响应字段一致；单图解读不再依赖本地临时路径或 mock 数据 |
-| 6 | 实现登录令牌自动续期 | P0 | ⏳ | access token 过期时使用 refresh token 单次续期并重放原请求；续期失败才清理 session 并跳转登录 |
-| 7 | 修复筛选与页面跳转断链 | P0 | ⏳ | 观点库筛选会重新加载；热力图格式和日期跳转正确；搜索模式切换、AI 报告请求方法及文档入口参数正确 |
+| 5 | 打通图片上传与 AI 协议 | P0 | 🚧 代码完成，待部署配置 | 已改为后端接收图片并上传 TOS，前后端 DTO/响应字段一致，移除本地路径与 mock 兜底；当前环境仍需配置 TOS 和视觉模型凭据后完成真实上传验收 |
+| 6 | 实现登录令牌自动续期 | P0 | ✅ 2026-06-15 | access token 过期时使用 refresh token 单次续期并重放原请求；并发 401 共享同一次刷新，续期失败才清理 session 并跳转登录 |
+| 7 | 修复筛选与页面跳转断链 | P0 | ✅ 2026-06-15 | 观点库筛选会重新加载；热力图对象格式和日期边界正确；搜索模式切换、AI 报告 GET/解包及文档入口参数已修复 |
 
 ---
 
@@ -67,7 +67,7 @@
 | buy_reason 独立字段(stocks 表) | P1 | ⏳ | | 现在散落在 note.content,半天 |
 | 止盈 / 预警多价位 | P2 | ⏳ | | 1 天 |
 | **PDF 研报 / 财报上传 + MD 解析** | **P1** | ⏳ | | 选 **Supabase Storage**(RLS 跟 auth 一致、SDK 直传免后端代理);5-10MB PDF 走 `pdf-parse` 转 MD,notes 表加 `doc_pdf_url` / `doc_pdf_size` / `doc_pdf_pages` 字段,MVP 半天(同步解析,后续可改异步) |
-| **笔记图片 OCR(截图识别)** | **P1** | ⏳ | | notes.images 已有 URL 列表,新增"截图解读"链路:图片存 Supabase Storage `images/<uid>/<id>` bucket,后端调 **Minimax coding plan** 的 vision 模型返回 MD/结构化文本,落 `notes.ai_summary` 或新建 `image_ocr` 字段;估时 1-2 天 |
+| **笔记图片 OCR(截图识别)** | **P1** | 🚧 | | 单图上传与视觉模型协议已完成，图片按项目规范存 TOS；待部署环境补齐 TOS/视觉模型凭据后完成真实链路验收，再把结果落 `notes.ai_summary` 或新增 `image_ocr` 字段 |
 
 ---
 
@@ -178,6 +178,7 @@
 | 2026-06-14 | 修**腾讯价格除 100 bug** — `tushare.service.ts` 的 `parsePrice` 错误地 `n/100`,导致页面显示 12.92(应是 1291.91);改用 `Number()` 直接取,废弃 `parsePrice`。同时 SQL 修正存量数据 `stocks` × 1 条 / `stock_prices` × 1 条 |
 | 2026-06-14 | 股票详情页 review:删冗余"贵"头像 + 整体字号升级(`text-[10/11/12px]` → `text-xs/text-sm`)|
 | 2026-06-15 | 每日简评改为幂等写入：`stock_briefs` 与自动 doc 笔记在同一短事务内 upsert，每用户/股票/交易日保留 1 条 |
+| 2026-06-15 | 上线前修复队列继续推进：完成 refresh token 单飞续期与 401 重放；修复观点库筛选、热力图格式/日期、搜索模式、AI 报告和文档入口；图片上传与识图已移除 mock，本地环境待补 TOS/视觉模型凭据验收 |
 | 2026-06-14 | 重构每日简评:3 段结构化 → **100 字单段自然语言简评**,LLM 同步判 green/yellow/red,落 `stock_briefs` 表 + 自动落一条 doc 笔记(`tags=['daily-brief','auto']`) |
 | 2026-06-14 | 详情页:刷新按钮冷却中置灰(去掉 00:06 倒计时文字 + 删"1 分钟内只能刷新一次"提示) + 买入按钮文案改为"我已买入" |
 | 2026-06-14 | 修 stock_briefs insert 5xx — Drizzle 0.45 prepared-stmt 吞错,改用 `client.query()` raw SQL(同 `stocks.service.ts:439` 模式),`evidence_note_ids` 显式 `{}` 字符串 |

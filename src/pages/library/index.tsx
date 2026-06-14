@@ -1,8 +1,9 @@
 import { View, Text, Image } from '@tarojs/components'
-import Taro, { useLoad, usePullDownRefresh } from '@tarojs/taro'
-import { useState } from 'react'
+import Taro, { useDidShow, useLoad, usePullDownRefresh } from '@tarojs/taro'
+import { useCallback, useEffect, useState } from 'react'
 import { Network } from '@/network'
 import { PenLine, Search, FileText } from 'lucide-react-taro'
+import { buildLibraryNotesUrl, resolveLibraryRoute } from '../prelaunch-navigation'
 
 interface Note {
   id: string
@@ -60,37 +61,59 @@ export default function LibraryPage() {
   const [typeFilter, setTypeFilter] = useState<'all' | 'note' | 'doc'>('all')
   const [filter, setFilter] = useState<'all' | 'bull' | 'bear' | 'neutral'>('all')
   const [stockId, setStockId] = useState<string>('')
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
 
-  const buildUrl = () => {
-    const params = new URLSearchParams()
-    if (stockId) params.set('stock_id', stockId)
-    if (typeFilter !== 'all') params.set('type', typeFilter)
-    if (filter !== 'all') params.set('direction', filter)
-    params.set('limit', '100')
-    return `/api/notes?${params.toString()}`
-  }
-
-  const load = async () => {
+  const loadNotes = useCallback(async () => {
     try {
-      const [nRes, sRes] = await Promise.all([
-        Network.request<{ data: Note[] }>({ url: buildUrl() }),
-        Network.request<{ data: Stock[] }>({ url: '/api/stocks' }),
-      ])
+      const nRes = await Network.request<{ data: Note[] }>({
+        url: buildLibraryNotesUrl({
+          stockId,
+          type: typeFilter,
+          direction: filter,
+          dateFrom,
+          dateTo,
+        }),
+      })
       console.log('[library] notes', nRes.data)
-      console.log('[library] stocks', sRes.data)
       setNotes(nRes.data?.data ?? [])
-      setStocks(sRes.data?.data ?? [])
     } catch (e) {
-      console.error('[library] load failed', e)
+      console.error('[library] notes load failed', e)
     }
-  }
+  }, [dateFrom, dateTo, filter, stockId, typeFilter])
+
+  const loadStocks = useCallback(async () => {
+    const sRes = await Network.request<{ data: Stock[] }>({ url: '/api/stocks' })
+    console.log('[library] stocks', sRes.data)
+    setStocks(sRes.data?.data ?? [])
+  }, [])
 
   useLoad(() => {
-    load()
+    loadStocks().catch((e) => console.error('[library] stocks load failed', e))
   })
 
+  useDidShow(() => {
+    const route = Taro.getCurrentInstance().router?.params ?? {}
+    const next = resolveLibraryRoute({
+      stockId,
+      type: typeFilter,
+      direction: filter,
+      dateFrom,
+      dateTo,
+    }, route)
+    setStockId(next.stockId)
+    setTypeFilter(next.type)
+    setFilter(next.direction)
+    setDateFrom(next.dateFrom)
+    setDateTo(next.dateTo)
+  })
+
+  useEffect(() => {
+    loadNotes()
+  }, [loadNotes])
+
   usePullDownRefresh(async () => {
-    await load()
+    await Promise.all([loadNotes(), loadStocks()])
     Taro.stopPullDownRefresh()
   })
 
@@ -200,7 +223,11 @@ export default function LibraryPage() {
             </Text>
             <View
               className="mt-4 px-5 py-3 rounded-full bg-primary flex items-center gap-2"
-              onClick={() => Taro.navigateTo({ url: '/pages/note-edit/index' })}
+              onClick={() => Taro.navigateTo({
+                url: typeFilter === 'doc'
+                  ? '/pages/note-edit/index?type=doc'
+                  : '/pages/note-edit/index',
+              })}
             >
               <PenLine size={16} color="#ffffff" />
               <Text className="block text-sm font-semibold text-white">立即{typeFilter === 'doc' ? '上传' : '记录'}</Text>

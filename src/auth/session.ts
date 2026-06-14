@@ -4,7 +4,7 @@ import Taro from '@tarojs/taro'
  * 持久化 session 到 Taro storage(H5 走 localStorage,小程序走 wx.setStorageSync)
  * 字段:
  *   - access_token  短 JWT,每次请求带
- *   - refresh_token 刷新用(暂未实现自动 refresh)
+ *   - refresh_token access token 过期时换取新 session
  *   - user_id / email 给前端展示用
  */
 const KEYS = {

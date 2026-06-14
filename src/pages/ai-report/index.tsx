@@ -3,6 +3,10 @@ import Taro, { useLoad } from '@tarojs/taro'
 import { useState } from 'react'
 import { Network } from '@/network'
 import { ArrowLeft, Sparkles, Share2, TrendingUp, TrendingDown, Activity } from 'lucide-react-taro'
+import {
+  DailyBriefApiResult,
+  normalizeDailyBrief,
+} from '../prelaunch-navigation'
 
 interface Brief {
   stock_code: string
@@ -45,10 +49,18 @@ export default function AiReportPage() {
     // 兼容 stock_id 直查
     if (opts?.stock_id) {
       try {
-        const sRes = await Network.request<{ data: { name: string } }>({ url: `/api/stocks/${opts.stock_id}` })
-        setStockName(sRes.data?.data?.name ?? '今日简评')
-        const bRes = await Network.request<{ data: Brief }>({ url: `/api/ai/daily-brief/${opts.stock_id}`, method: 'POST' })
-        setBrief(bRes.data?.data ?? null)
+        const sRes = await Network.request<{ data: { code: string; name: string } }>({ url: `/api/stocks/${opts.stock_id}` })
+        const stock = sRes.data?.data
+        if (!stock) throw new Error('股票不存在')
+        setStockName(stock.name)
+        const bRes = await Network.request<{ data: DailyBriefApiResult }>({
+          url: `/api/ai/daily-brief/${opts.stock_id}`,
+        })
+        const result = bRes.data?.data
+        if (!result) throw new Error('简评返回为空')
+        const data = normalizeDailyBrief(result, stock)
+        setBrief(data)
+        setShareText(`【${data.stock_name} 今日简评】\n\n${data.summary}\n\n${data.key_points.join('\n')}`)
       } catch (e) {
         console.error('[ai-report] load failed', e)
       }

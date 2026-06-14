@@ -13,6 +13,12 @@ class CredentialsDto {
   password!: string
 }
 
+class RefreshTokenDto {
+  @IsString()
+  @MinLength(1)
+  refresh_token!: string
+}
+
 @Controller('auth')
 export class AuthController {
   constructor(private readonly auth: AuthService) {}
@@ -31,6 +37,13 @@ export class AuthController {
   async signIn(@Body() dto: CredentialsDto) {
     const data = await this.auth.signIn(dto.email, dto.password)
     return { data }
+  }
+
+  @Public()
+  @Post('refresh')
+  @HttpCode(200)
+  async refresh(@Body() dto: RefreshTokenDto) {
+    return { data: await this.auth.refresh(dto.refresh_token) }
   }
 
   @Get('me')

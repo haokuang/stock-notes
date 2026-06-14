@@ -5,5 +5,9 @@ export default {
   mini: {
     debugReact: true,
   },
-  h5: {}
+  h5: {
+    devServer: {
+      port: 5001,
+    },
+  },
 } satisfies UserConfigExport<'vite'>

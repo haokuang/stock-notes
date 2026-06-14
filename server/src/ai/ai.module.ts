@@ -11,6 +11,7 @@ import {
 import { IsString, IsOptional, IsNotEmpty, IsArray, IsUrl, MaxLength } from 'class-validator'
 import { LLMClient } from 'coze-coding-dev-sdk'
 import { DailyBriefService } from './daily-brief.service'
+import { ImageAnalysisService } from './image-analysis.service'
 import { CurrentUser } from '../storage/auth/current-user.decorator'
 
 /**
@@ -34,7 +35,7 @@ class ImageUnderstandDto {
   @IsString()
   @IsOptional()
   @MaxLength(200)
-  context?: string
+  prompt?: string
 }
 
 class AnalyzeStockDto {
@@ -72,29 +73,18 @@ class ChatDto {
 
 @Controller('ai')
 export class AiController {
-  constructor(private readonly dailyBriefService: DailyBriefService) {}
+  constructor(
+    private readonly dailyBriefService: DailyBriefService,
+    private readonly imageAnalysisService: ImageAnalysisService,
+  ) {}
 
   /** 单图解读：把图片 URL + 上下文传给多模态模型 */
   @Post('image-understand')
   @HttpCode(200)
   async imageUnderstand(@Body() dto: ImageUnderstandDto) {
     if (!dto.imageUrl) throw new BadRequestException('imageUrl 必填')
-    // 占位实现：返回模拟分析结果
-    return {
-      data: {
-        summary: '【占位解读】K 线图显示过去 30 日呈震荡上行趋势，MACD 金叉后量能配合良好。',
-        keyPoints: [
-          '近 30 日累计涨幅 +12.4%',
-          '成交量较 30 日均值放大 1.3 倍',
-          '突破前期箱体上沿 218.50 元',
-        ],
-        sentiment: 'neutral',
-        confidence: 0.78,
-        imageUrl: dto.imageUrl,
-        mock: true,
-        msg: 'AI 模型凭据未配置，当前返回占位结果',
-      },
-    }
+    const prompt = dto.prompt?.trim() || '分析图片中的趋势、关键位置、风险与可验证结论'
+    return { data: await this.imageAnalysisService.analyze(dto.imageUrl, prompt) }
   }
 
   /** 跨观点分析：汇总该股所有历史观点 */
@@ -173,7 +163,7 @@ void LLMClient
 
 @Module({
   controllers: [AiController],
-  providers: [DailyBriefService],
+  providers: [DailyBriefService, ImageAnalysisService],
   exports: [DailyBriefService],
 })
 export class AiModule {}

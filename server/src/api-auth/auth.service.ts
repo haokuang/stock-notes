@@ -68,6 +68,23 @@ export class AuthService {
     }
   }
 
+  async refresh(refreshToken: string): Promise<SignInResult> {
+    if (!refreshToken) throw new BadRequestException('refresh_token is required')
+    const { data, error } = await this.supabase.auth.refreshSession({
+      refresh_token: refreshToken,
+    })
+    if (error || !data.session || !data.user) {
+      throw new UnauthorizedException(`Session refresh failed: ${error?.message ?? 'unknown'}`)
+    }
+
+    return {
+      user: { id: data.user.id, email: data.user.email ?? '' },
+      access_token: data.session.access_token,
+      refresh_token: data.session.refresh_token,
+      expires_in: data.session.expires_in ?? 3600,
+    }
+  }
+
   me(uid: string, email?: string): MeResult {
     return { user: { id: uid, email: email ?? '' } }
   }

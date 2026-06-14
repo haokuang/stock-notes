@@ -4,6 +4,7 @@ import Taro, { useLoad } from '@tarojs/taro'
 import { useState } from 'react'
 import { Network } from '@/network'
 import { Search, X } from 'lucide-react-taro'
+import { buildSearchUrl } from '../prelaunch-navigation'
 
 interface Stock {
   id: string
@@ -33,14 +34,14 @@ export default function StockSearchPage() {
     onSearch('')
   })
 
-  const onSearch = async (kw: string) => {
+  const onSearch = async (kw: string, targetMode: 'stock' | 'note' = mode) => {
     setLoading(true)
     try {
-      if (mode === 'stock') {
-        const res = await Network.request<{ data: Stock[] }>({ url: `/api/stocks?keyword=${encodeURIComponent(kw)}` })
+      if (targetMode === 'stock') {
+        const res = await Network.request<{ data: Stock[] }>({ url: buildSearchUrl(targetMode, kw) })
         setStocks(res.data?.data ?? [])
       } else {
-        const res = await Network.request<{ data: Note[] }>({ url: `/api/notes?keyword=${encodeURIComponent(kw)}&limit=50` })
+        const res = await Network.request<{ data: Note[] }>({ url: buildSearchUrl(targetMode, kw) })
         setNotes(res.data?.data ?? [])
       }
     } catch (e) {
@@ -52,7 +53,7 @@ export default function StockSearchPage() {
 
   const onChangeMode = (m: 'stock' | 'note') => {
     setMode(m)
-    onSearch(keyword)
+    onSearch(keyword, m)
   }
 
   return (
