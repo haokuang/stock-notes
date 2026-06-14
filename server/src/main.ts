@@ -1,8 +1,11 @@
 import 'dotenv/config'
 import { NestFactory } from '@nestjs/core';
+import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from '@/app.module';
 import * as express from 'express';
 import { HttpStatusInterceptor } from '@/interceptors/http-status.interceptor';
+import { GlobalExceptionFilter } from '@/monitoring/global-exception.filter';
+import { AlertService } from '@/monitoring/alert.service';
 
 function parsePort(): number {
   const args = process.argv.slice(2);
@@ -27,8 +30,20 @@ async function bootstrap() {
   app.use(express.json({ limit: '50mb' }));
   app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
+  // 全局启用 DTO 校验(class-validator)
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,            // 剥掉未声明的字段
+      forbidNonWhitelisted: true, // 多余字段 → 400
+      transform: true,            // 自动转类型(string → number)
+      transformOptions: { enableImplicitConversion: true },
+    }),
+  );
+
   // 全局拦截器：统一将 POST 请求的 201 状态码改为 200
   app.useGlobalInterceptors(new HttpStatusInterceptor());
+  // 全局异常过滤器:5xx 落库 + 邮件告警
+  app.useGlobalFilters(new GlobalExceptionFilter(app.get(AlertService)));
   // 1. 开启优雅关闭 Hooks (关键!)
   app.enableShutdownHooks();
 

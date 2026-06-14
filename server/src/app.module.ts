@@ -3,17 +3,23 @@ import { ScheduleModule } from '@nestjs/schedule'
 import { AppController } from './app.controller'
 import { AppService } from './app.service'
 import { DatabaseModule } from './storage/database/database.module'
+import { AuthModule } from './storage/auth/auth.module'
+import { ApiAuthModule } from './api-auth/auth.module'
 import { TushareModule } from './tushare/tushare.module'
 import { StocksModule } from './stocks/stocks.module'
 import { NotesModule } from './notes/notes.module'
 import { UploadModule } from './upload/upload.module'
 import { AiModule } from './ai/ai.module'
+import { MonitoringModule } from './monitoring/monitoring.module'
 
 @Module({
   imports: [
     DatabaseModule,
+    AuthModule,
+    ApiAuthModule,
     TushareModule,
     ScheduleModule.forRoot(),
+    MonitoringModule,
     StocksModule,
     NotesModule,
     UploadModule,

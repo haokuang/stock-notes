@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import {
   pgTable,
+  uuid,
   varchar,
   text,
   timestamp,
@@ -26,6 +27,7 @@ export const stocks = pgTable(
     id: varchar("id", { length: 36 })
       .primaryKey()
       .default(sql`gen_random_uuid()`),
+    user_id: uuid("user_id").notNull(),
     code: varchar("code", { length: 20 }).notNull(),
     name: varchar("name", { length: 100 }).notNull(),
     industry: varchar("industry", { length: 100 }),
@@ -42,6 +44,11 @@ export const stocks = pgTable(
     last_sync_at: timestamp("last_sync_at", { withTimezone: true }),
     note: text("note"),
     sort_order: integer("sort_order").default(0).notNull(),
+    // 状态机字段(2026-06-14 改造)
+    status: varchar("status", { length: 10 }).default("watching").notNull(),  // 'watching' | 'holding'
+    entry_price: numeric("entry_price", { precision: 12, scale: 2 }),
+    loss_rate: numeric("loss_rate", { precision: 5, scale: 2 }),  // 百分比 0-100
+    entered_at: timestamp("entered_at", { withTimezone: true }),
     created_at: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -50,8 +57,10 @@ export const stocks = pgTable(
       .notNull(),
   },
   (table) => [
+    index("stocks_user_id_idx").on(table.user_id),
     index("stocks_code_idx").on(table.code),
     index("stocks_created_at_idx").on(table.created_at),
+    index("stocks_status_idx").on(table.status),
   ],
 );
 
@@ -64,6 +73,7 @@ export const notes = pgTable(
     id: varchar("id", { length: 36 })
       .primaryKey()
       .default(sql`gen_random_uuid()`),
+    user_id: uuid("user_id").notNull(),
     stock_id: varchar("stock_id", { length: 36 })
       .notNull()
       .references(() => stocks.id, { onDelete: "cascade" }),
@@ -95,6 +105,7 @@ export const notes = pgTable(
       .notNull(),
   },
   (table) => [
+    index("notes_user_id_idx").on(table.user_id),
     index("notes_stock_id_idx").on(table.stock_id),
     index("notes_direction_idx").on(table.direction),
     index("notes_type_idx").on(table.type),
@@ -111,6 +122,7 @@ export const stockPrices = pgTable(
     id: varchar("id", { length: 36 })
       .primaryKey()
       .default(sql`gen_random_uuid()`),
+    user_id: uuid("user_id").notNull(),
     stock_id: varchar("stock_id", { length: 36 })
       .notNull()
       .references(() => stocks.id, { onDelete: "cascade" }),
@@ -129,6 +141,7 @@ export const stockPrices = pgTable(
       .notNull(),
   },
   (table) => [
+    index("stock_prices_user_id_idx").on(table.user_id),
     index("stock_prices_stock_id_idx").on(table.stock_id),
     index("stock_prices_trade_date_idx").on(table.trade_date),
   ],
@@ -143,6 +156,7 @@ export const aiReports = pgTable(
     id: varchar("id", { length: 36 })
       .primaryKey()
       .default(sql`gen_random_uuid()`),
+    user_id: uuid("user_id").notNull(),
     stock_id: varchar("stock_id", { length: 36 }).references(
       () => stocks.id,
       { onDelete: "set null" },
@@ -159,6 +173,7 @@ export const aiReports = pgTable(
       .notNull(),
   },
   (table) => [
+    index("ai_reports_user_id_idx").on(table.user_id),
     index("ai_reports_stock_id_idx").on(table.stock_id),
     index("ai_reports_type_idx").on(table.type),
     index("ai_reports_created_at_idx").on(table.created_at),
@@ -173,3 +188,83 @@ export type AiReport = typeof aiReports.$inferSelect;
 export type NewAiReport = typeof aiReports.$inferInsert;
 export type StockPrice = typeof stockPrices.$inferSelect;
 export type NewStockPrice = typeof stockPrices.$inferInsert;
+
+/**
+ * 每日简评结构化缓存(2026-06-14 改造)
+ * - signal:  green/yellow/red 3 色
+ * - action:  hold/review/sell 操作建议
+ * - evidence_note_ids: 引用让买入逻辑失效的 notes
+ * - stop_loss_triggered: 是否被止损逻辑强制覆盖为 red
+ */
+export const stockBriefs = pgTable(
+  "stock_briefs",
+  {
+    id: varchar("id", { length: 36 })
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    user_id: uuid("user_id").notNull(),
+    stock_id: varchar("stock_id", { length: 36 })
+      .notNull()
+      .references(() => stocks.id, { onDelete: "cascade" }),
+    trade_date: varchar("trade_date", { length: 10 }).notNull(),  // YYYYMMDD
+    signal: varchar("signal", { length: 10 }).notNull(),           // 'green' | 'yellow' | 'red'
+    technical_analysis: text("technical_analysis").notNull().default(""),
+    logic_judgment: text("logic_judgment").notNull().default(""),
+    action: varchar("action", { length: 10 }).notNull(),            // 'hold' | 'review' | 'sell'
+    sell_reasons: jsonb("sell_reasons").notNull().default(sql`'[]'::jsonb`),
+    evidence_note_ids: uuid("evidence_note_ids")
+      .array()
+      .notNull()
+      .default(sql`'{}'::uuid[]`),
+    price_at_brief: numeric("price_at_brief", { precision: 12, scale: 2 }),
+    stop_loss_triggered: varchar("stop_loss_triggered", { length: 1 })
+      .notNull()
+      .default("f"),  // 借用 varchar 存 boolean(避免引入 boolean 类型额外迁移)
+    created_at: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updated_at: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("stock_briefs_user_id_idx").on(table.user_id),
+    index("stock_briefs_signal_idx").on(table.signal),
+    index("stock_briefs_created_at_idx").on(table.created_at),
+  ],
+);
+
+export type StockBrief = typeof stockBriefs.$inferSelect;
+export type NewStockBrief = typeof stockBriefs.$inferInsert;
+
+/**
+ * 错误监控日志(2026-06-14)
+ * - NestJS 全局 5xx + cron 失败 + 手动 alert() 调用
+ * - notified=true 表示已发送过告警邮件(避免重复)
+ */
+export const errorLogs = pgTable(
+  "error_logs",
+  {
+    id: varchar("id", { length: 36 })
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    level: varchar("level", { length: 10 }).notNull(),     // 'error' | 'warn' | 'critical'
+    source: varchar("source", { length: 50 }).notNull(),   // 'http' | 'cron-sync' | 'cron-brief' | 'manual'
+    message: text("message").notNull(),
+    stack: text("stack"),
+    context: jsonb("context").notNull().default(sql`'{}'::jsonb`),
+    user_id: uuid("user_id"),
+    notified: varchar("notified", { length: 1 })
+      .notNull()
+      .default("f"),  // 复用 stock_briefs 的 varchar(1) boolean 模式(避免 boolean 类型迁移)
+    created_at: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("error_logs_created_at_idx").on(table.created_at),
+    index("error_logs_level_idx").on(table.level),
+    index("error_logs_source_idx").on(table.source),
+  ],
+);
+
+export type ErrorLog = typeof errorLogs.$inferSelect;
+export type NewErrorLog = typeof errorLogs.$inferInsert;
