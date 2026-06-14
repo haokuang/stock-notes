@@ -41,17 +41,17 @@ export class CreateNoteDto {
   @IsOptional()
   @IsNumber()
   @Min(0)
-  entry_price?: number;
+  entry_price?: number | null;
 
   @IsOptional()
   @IsNumber()
   @Min(0)
-  target_price?: number;
+  target_price?: number | null;
 
   @IsOptional()
   @IsNumber()
   @Min(0)
-  stop_loss?: number;
+  stop_loss?: number | null;
 
   @IsOptional()
   @IsArray()
@@ -96,17 +96,17 @@ export class UpdateNoteDto {
   @IsOptional()
   @IsNumber()
   @Min(0)
-  entry_price?: number;
+  entry_price?: number | null;
 
   @IsOptional()
   @IsNumber()
   @Min(0)
-  target_price?: number;
+  target_price?: number | null;
 
   @IsOptional()
   @IsNumber()
   @Min(0)
-  stop_loss?: number;
+  stop_loss?: number | null;
 
   @IsOptional()
   @IsArray()

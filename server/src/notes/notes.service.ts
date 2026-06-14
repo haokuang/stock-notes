@@ -5,6 +5,7 @@ import { and, desc, eq, gte, lte, sql, asc } from 'drizzle-orm';
 import { marked } from 'marked';
 import DOMPurify from 'isomorphic-dompurify';
 import { CreateNoteDto, NoteType, QueryNoteDto, RenderMdDto, UpdateNoteDto } from './dto';
+import { normalizeOptionalPrice } from './note-value';
 
 @Injectable()
 export class NotesService {
@@ -139,9 +140,9 @@ export class NotesService {
     }
     if (!isDoc) {
       if (dto.direction !== undefined) setObj.direction = dto.direction
-      if (dto.entry_price !== undefined) setObj.entry_price = String(dto.entry_price)
-      if (dto.target_price !== undefined) setObj.target_price = String(dto.target_price)
-      if (dto.stop_loss !== undefined) setObj.stop_loss = String(dto.stop_loss)
+      if (dto.entry_price !== undefined) setObj.entry_price = normalizeOptionalPrice(dto.entry_price)
+      if (dto.target_price !== undefined) setObj.target_price = normalizeOptionalPrice(dto.target_price)
+      if (dto.stop_loss !== undefined) setObj.stop_loss = normalizeOptionalPrice(dto.stop_loss)
       if (dto.tags !== undefined) setObj.tags = dto.tags
       if (dto.related_event !== undefined) setObj.event = dto.related_event
       if (dto.source !== undefined) setObj.source = dto.source

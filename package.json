@@ -24,6 +24,7 @@
     "new": "taro new",
     "preview:tt": "taro build --type tt --preview",
     "preview:weapp": "taro build --type weapp --preview",
+    "test:note-editor": "tsx --test src/pages/note-edit/note-editor-logic.test.ts src/pages/note-detail/note-detail-logic.test.ts server/src/notes/note-value.test.ts",
     "tsc": "npx tsc --noEmit --skipLibCheck",
     "validate": "pnpm exec concurrently --kill-others-on-fail --kill-signal SIGKILL -n lint,tsc -c red,blue \"pnpm lint:build\" \"pnpm tsc\""
   },
@@ -92,6 +93,7 @@
     "stylelint-config-standard": "^38.0.0",
     "tailwindcss": "^4.1.18",
     "terser": "^5.30.4",
+    "tsx": "^4.22.4",
     "tt-ide-cli": "^0.1.31",
     "typescript": "^5.4.5",
     "vite": "^4.2.0",
