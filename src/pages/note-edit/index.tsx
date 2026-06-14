@@ -463,18 +463,12 @@ export default function NoteEditPage() {
                 autoHeight
                 style={{
                   width: '100%',
-                  minHeight: '240px',
+                  minHeight: '160px',
                   fontSize: '14px',
                   lineHeight: '1.6',
                   color: '#161826',
-                  backgroundColor: '#E8E8EE',
-                  border: '1px solid rgba(91, 94, 114, 0.20)',
-                  borderRadius: '12px',
-                  boxSizing: 'border-box',
-                  padding: '12px',
                 }}
                 placeholder="记录你的笔记…"
-
                 value={content}
                 onInput={(e) => setContent(e.detail.value)}
                 maxlength={2000}

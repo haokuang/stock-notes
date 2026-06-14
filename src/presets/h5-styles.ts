@@ -6,6 +6,11 @@
 import { IS_H5_ENV } from './env';
 
 const H5_BASE_STYLES = `
+/* Taro H5 textarea 默认 -internal 白色背景,显式覆盖让 wrapper 灰底透出来 */
+textarea.taro-textarea {
+    background-color: transparent !important;
+}
+
 /* H5 端隐藏 TabBar 空图标（只隐藏没有 src 的图标） */
 .weui-tabbar__icon:not([src]),
 .weui-tabbar__icon[src=''] {

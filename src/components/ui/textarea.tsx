@@ -37,7 +37,7 @@ const Textarea = React.forwardRef<
       }}
     >
       <TaroTextarea
-        className="flex-1 w-full h-full bg-transparent text-base text-foreground placeholder:text-muted-foreground focus:outline-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm selection:bg-selection selection:text-selection-foreground"
+        className="flex-1 w-full h-full text-base text-foreground placeholder:text-muted-foreground focus:outline-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm selection:bg-selection selection:text-selection-foreground"
         placeholderClass="text-muted-foreground"
         ref={ref}
         focus={autoFocus || focus}
