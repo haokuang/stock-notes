@@ -8,8 +8,10 @@ import {
   persistDailyBriefArtifacts,
   type StockBriefRow,
 } from './daily-brief-persistence'
+import { TushareService } from '../tushare/tushare.service'
+import { ensurePriceHistory } from '../stocks/price-history'
 
-const { stocks, notes, stockPrices, stockBriefs } = schema
+const { stocks, notes, stockBriefs } = schema
 
 /**
  * 每日简评 · 2026-06-14 重构
@@ -36,7 +38,11 @@ export class DailyBriefService {
   private readonly logger = new Logger(DailyBriefService.name)
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  constructor(@Inject(DRIZZLE_DB) private readonly db: any, @Inject(PG_POOL) private readonly pool: Pool) {}
+  constructor(
+    @Inject(DRIZZLE_DB) private readonly db: any,
+    @Inject(PG_POOL) private readonly pool: Pool,
+    private readonly tushare: TushareService,
+  ) {}
 
   // ============ 公开 API ============
 
@@ -51,7 +57,13 @@ export class DailyBriefService {
   async generateBrief(
     uid: string,
     stockId: string,
-  ): Promise<{ brief: StockBriefRow; usedLLM: boolean; noteId: string | null }> {
+  ): Promise<{
+    brief: StockBriefRow
+    usedLLM: boolean
+    noteId: string | null
+    historySampleSize: number
+    historyBackfilled: boolean
+  }> {
     // 1. 取股票
     const [stock] = await this.db
       .select()
@@ -60,13 +72,25 @@ export class DailyBriefService {
       .limit(1)
     if (!stock) throw new NotFoundException(`股票 ${stockId} 不存在`)
 
-    // 2. 近 60 个交易日
-    const history = await this.db
-      .select()
-      .from(stockPrices)
-      .where(and(eq(stockPrices.stock_id, stockId), eq(stockPrices.user_id, uid)))
-      .orderBy(desc(stockPrices.trade_date))
-      .limit(60)
+    // 2. 近 60 个交易日；数据库不足时先从 Tushare 补齐再重读
+    const historyClient = await this.pool.connect()
+    let historyState: Awaited<ReturnType<typeof ensurePriceHistory>>
+    try {
+      historyState = await ensurePriceHistory(historyClient, {
+        userId: uid,
+        stockId,
+        tsCode: this.toTushareCode(stock.code),
+        fetchQuotes: (tsCode, days) => this.tushare.getDaily(tsCode, days),
+      })
+    } finally {
+      historyClient.release()
+    }
+    const history = historyState.history
+    if (historyState.backfilled) {
+      this.logger.log(
+        `[brief] 已补齐历史行情 stock=${stock.code},样本=${historyState.sampleSize}`,
+      )
+    }
 
     // 3. 近期观点(摘要给 LLM)
     const recentNotes = await this.db
@@ -105,7 +129,7 @@ export class DailyBriefService {
     } else if (stock.status === 'watching') {
       // 观察中:不调 LLM,技术摘要 100 字
       signal = 'green'
-      content = `观察中。MA20=${indicators.ma20},RSI14=${indicators.rsi14},量比=${indicators.volRatio}。技术面尚无明确方向,维持观察。`
+      content = `观察中。基于 ${historyState.sampleSize} 个交易日样本，MA20=${indicators.ma20},RSI14=${indicators.rsi14},量比=${indicators.volRatio}。技术面尚无明确方向,维持观察。`
     } else {
       // holding + 非止损触发:调 LLM
       const buyReasonText = recentNotes.find((n) => Array.isArray(n.tags) && n.tags.includes('buy'))?.content ?? '(无明确买入理由)'
@@ -116,6 +140,7 @@ export class DailyBriefService {
 【状态】${stock.status} | 买入价 ¥${stock.entry_price} | 亏损率上限 ${stock.loss_rate}%
 【买入理由】${buyReasonText}
 【历史观点】${recentNotes.map((n) => `[${n.direction}] ${n.title}`).join(' | ').slice(0, 400) || '(暂无)'}
+【技术指标样本】${historyState.sampleSize} 个交易日${historyState.sampleSize < 60 ? '(样本不足 60 日，谨慎解读)' : ''}
 【技术指标】MA5=${indicators.ma5} MA20=${indicators.ma20} MA60=${indicators.ma60} | MACD:DIF=${indicators.macd.dif} DEA=${indicators.macd.dea} 柱=${indicators.macd.hist} | RSI14=${indicators.rsi14} | 布林:${indicators.boll.lower}-${indicators.boll.upper} | 量比=${indicators.volRatio}
 【今日行情】最新价 ¥${stock.current_price ?? '—'} 涨跌 ${stock.change_percent ?? '—'}%
 【止损状态】${stopLoss.message}
@@ -168,7 +193,12 @@ export class DailyBriefService {
         priceAtBrief: stock.current_price,
         stopLossTriggered,
       })
-      return { ...persisted, usedLLM }
+      return {
+        ...persisted,
+        usedLLM,
+        historySampleSize: historyState.sampleSize,
+        historyBackfilled: historyState.backfilled,
+      }
     } finally {
       client.release()
     }
@@ -297,6 +327,15 @@ export class DailyBriefService {
       lastClose,
       summary: `MA20=${ma20.toFixed(2)} RSI=${rsi14.toFixed(2)} 布林带 ${boll.lower.toFixed(2)}-${boll.upper.toFixed(2)}`,
     }
+  }
+
+  private toTushareCode(code: string): string {
+    const normalized = code.trim().toUpperCase()
+    if (normalized.includes('.')) return normalized
+    if (/^(600|601|603|605|688|689)/.test(normalized)) return `${normalized}.SH`
+    if (/^(000|001|002|003|300|301)/.test(normalized)) return `${normalized}.SZ`
+    if (/^(4|8|9)/.test(normalized)) return `${normalized}.BJ`
+    return normalized
   }
 
   private escapeHtml(s: string): string {
