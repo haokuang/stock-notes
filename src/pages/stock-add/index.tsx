@@ -1,164 +1,190 @@
-import { View, Text } from '@tarojs/components'
+import { Text, View } from '@tarojs/components'
+import Taro, { useLoad } from '@tarojs/taro'
+import { useEffect, useRef, useState } from 'react'
+import { Check, CirclePlus, Search } from 'lucide-react-taro'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
-import Taro from '@tarojs/taro'
-import { useState } from 'react'
 import { Network } from '@/network'
-import { Search, CirclePlus, Check } from 'lucide-react-taro'
 
 interface SearchResult {
   code: string
+  tsCode: string
   name: string
   market: string
   industry: string
+  exchange: 'SSE' | 'SZSE' | 'BSE'
 }
 
-const POPULAR: SearchResult[] = [
-  { code: '600519', name: '贵州茅台', market: '上交所', industry: '白酒' },
-  { code: '300750', name: '宁德时代', market: '深交所', industry: '新能源' },
-  { code: '000858', name: '五粮液', market: '深交所', industry: '白酒' },
-  { code: '601318', name: '中国平安', market: '上交所', industry: '保险' },
-  { code: '000001', name: '平安银行', market: '深交所', industry: '银行' },
-  { code: '600036', name: '招商银行', market: '上交所', industry: '银行' },
-]
+interface ExistingStock {
+  code: string
+}
+
+const EXCHANGE_LABELS: Record<SearchResult['exchange'], string> = {
+  SSE: '上交所',
+  SZSE: '深交所',
+  BSE: '北交所',
+}
 
 export default function StockAddPage() {
   const [keyword, setKeyword] = useState('')
-  const [results, setResults] = useState<SearchResult[]>(POPULAR)
+  const [results, setResults] = useState<SearchResult[]>([])
+  const [loading, setLoading] = useState(false)
+  const [searchError, setSearchError] = useState('')
   const [adding, setAdding] = useState<string | null>(null)
   const [added, setAdded] = useState<Set<string>>(new Set())
-  const [saving, setSaving] = useState(false)
+  const searchSequence = useRef(0)
 
-  const onSearch = (val: string) => {
-    setKeyword(val)
-    if (!val.trim()) {
-      setResults(POPULAR)
+  useLoad(async () => {
+    try {
+      const res = await Network.request<{ data: ExistingStock[] }>({ url: '/api/stocks' })
+      setAdded(new Set((res.data?.data ?? []).map((stock) => stock.code)))
+    } catch (error) {
+      console.error('[stock-add] load existing stocks failed', error)
+    }
+  })
+
+  const searchStocks = async (value: string) => {
+    const normalized = value.trim()
+    const sequence = ++searchSequence.current
+    if (!normalized) {
+      setResults([])
+      setSearchError('')
+      setLoading(false)
       return
     }
-    const k = val.trim().toLowerCase()
-    setResults(POPULAR.filter((s) => s.code.includes(k) || s.name.includes(val)))
+
+    setLoading(true)
+    setSearchError('')
+    try {
+      const res = await Network.request<{ data: SearchResult[] }>({
+        url: `/api/stocks/search?keyword=${encodeURIComponent(normalized)}&limit=20`,
+      })
+      if (sequence !== searchSequence.current) return
+      setResults(res.data?.data ?? [])
+    } catch (error) {
+      if (sequence !== searchSequence.current) return
+      console.error('[stock-add] search failed', error)
+      setResults([])
+      setSearchError('股票搜索暂不可用，请稍后重试')
+    } finally {
+      if (sequence === searchSequence.current) setLoading(false)
+    }
   }
 
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      searchStocks(keyword)
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [keyword])
+
   const onAdd = async (item: SearchResult) => {
-    if (saving) return
-    setSaving(true)
+    if (adding || added.has(item.code)) return
     setAdding(item.code)
     try {
       await Network.request({
         url: '/api/stocks',
         method: 'POST',
-        data: {
-          code: item.code,
-          name: item.name,
-          market: item.market,
-          industry: item.industry,
-        },
+        data: { code: item.code },
       })
-      setAdded(new Set([...added, item.code]))
+      setAdded((current) => new Set([...current, item.code]))
       Taro.showToast({ title: '已添加', icon: 'success' })
-    } catch (e: any) {
-      console.error('[stock-add] failed', e)
-      const msg = e?.data?.msg ?? '添加失败'
-      Taro.showToast({ title: msg, icon: 'none' })
+    } catch (error: any) {
+      console.error('[stock-add] add failed', error)
+      const message = error?.data?.message ?? error?.data?.msg ?? '添加失败'
+      Taro.showToast({ title: message, icon: 'none' })
     } finally {
       setAdding(null)
-      setSaving(false)
     }
-  }
-
-  const onCustomAdd = async () => {
-    if (!keyword.trim()) {
-      Taro.showToast({ title: '请输入股票代码或名称', icon: 'none' })
-      return
-    }
-    await onAdd({ code: keyword.trim(), name: keyword.trim(), market: '深交所', industry: '自选' })
-    setKeyword('')
   }
 
   return (
-    <View className="w-full min-h-full pb-[calc(2rem+env(safe-area-inset-bottom))]" style={{ background: '#EEF0F6' }}>
-      {/* 搜索框 */}
+    <View className="min-h-full w-full bg-surface pb-[calc(2rem+env(safe-area-inset-bottom))]">
       <View className="px-4 pt-3">
-        <View className="rounded-2xl p-3 bg-white bg-opacity-72 border border-white border-opacity-85 flex items-center gap-2">
-          <Search size={18} color="#5B5E72" />
+        <View className="flex items-center gap-2">
+          <Search size={20} color="#5B5E72" />
           <Input
-            className="flex-1 bg-transparent"
-            style={{ fontSize: '14px', color: '#161826' }}
-            placeholder="搜索股票代码或名称"
-            placeholderTextColor="#9498AC"
+            className="flex-1"
+            placeholder="输入股票代码或名称"
             value={keyword}
-            onInput={(e) => onSearch(e.detail.value)}
+            onInput={(event) => setKeyword(event.detail.value)}
             confirmType="search"
-            onConfirm={onCustomAdd}
+            onConfirm={() => searchStocks(keyword)}
           />
-          {keyword && (
-            <View
-              className="px-3 py-2 rounded-lg flex items-center gap-1 bg-primary"
-              onClick={onCustomAdd}
-            >
-              <CirclePlus size={12} color="#ffffff" />
-              <Text className="block text-xs font-semibold text-white">添加</Text>
-            </View>
-          )}
         </View>
-      </View>
-
-      {/* 提示 */}
-      <View className="px-4 pt-3">
-        <View className="rounded-xl px-3 py-2 flex items-center gap-2" style={{ background: 'rgba(109, 77, 255, 0.08)' }}>
-          <Text className="block text-xs text-primary">{keyword ? '搜索结果' : '热门自选'}（{results.length}）</Text>
-        </View>
-      </View>
-
-      {/* 列表 */}
-      <View className="px-4 pt-2">
-        <View className="rounded-2xl bg-white bg-opacity-72 border border-white border-opacity-85 overflow-hidden">
-          {results.length === 0 ? (
-            <View className="p-6">
-              <Text className="block text-sm text-on-surface-variant text-center">没有匹配的股票</Text>
-            </View>
-          ) : (
-            results.map((s, i) => {
-              const isAdded = added.has(s.code)
-              return (
-                <View
-                  key={s.code}
-                  className="flex items-center gap-3 px-4 py-4"
-                  style={{ borderTop: i > 0 ? '1px solid rgba(221, 223, 233, 0.5)' : 'none' }}
-                >
-                  <View className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 bg-primary-container">
-                    <Text className="block text-base font-bold text-primary">{s.name.slice(0, 1)}</Text>
-                  </View>
-                  <View className="flex-1 min-w-0">
-                    <Text className="block text-sm font-semibold text-on-surface truncate">{s.name}</Text>
-                    <Text className="block text-xs text-on-surface-variant mt-1 tabular-nums">{s.code} · {s.industry}</Text>
-                  </View>
-                  {isAdded ? (
-                    <View className="px-3 py-1 rounded-md flex items-center gap-1" style={{ background: 'rgba(15, 140, 102, 0.10)' }}>
-                      <Check size={12} color="#0F8C66" />
-                      <Text className="block text-xs font-semibold" style={{ color: '#0F8C66' }}>已添加</Text>
-                    </View>
-                  ) : (
-                    <View
-                      className="px-3 py-2 rounded-md"
-                      style={{ background: '#6D4DFF' }}
-                      onClick={() => onAdd(s)}
-                    >
-                      <Text className="block text-xs font-semibold text-white">
-                        {adding === s.code ? '添加中' : '添加'}
-                      </Text>
-                    </View>
-                  )}
-                </View>
-              )
-            })
-          )}
-        </View>
+        <Text className="mt-2 block text-xs text-on-surface-variant">
+          仅支持沪深北已上市的 A 股普通股票
+        </Text>
       </View>
 
       <View className="px-4 pt-4">
-        <Text className="block text-[11px] text-on-surface-variant text-center leading-relaxed">
-          暂未对接实时行情，添加后可在「我的」管理{'\n'}后续将接入 tushare 自动同步
-        </Text>
+        {!keyword.trim() ? (
+          <Card>
+            <CardContent className="p-6">
+              <Text className="block text-center text-sm text-on-surface-variant">
+                输入 6 位股票代码或中文名称开始搜索
+              </Text>
+            </CardContent>
+          </Card>
+        ) : loading ? (
+          <Card>
+            <CardContent className="p-6">
+              <Text className="block text-center text-sm text-on-surface-variant">正在搜索...</Text>
+            </CardContent>
+          </Card>
+        ) : searchError ? (
+          <Card>
+            <CardContent className="p-6">
+              <Text className="block text-center text-sm text-error">{searchError}</Text>
+            </CardContent>
+          </Card>
+        ) : results.length === 0 ? (
+          <Card>
+            <CardContent className="p-6">
+              <Text className="block text-center text-sm text-on-surface-variant">
+                没有找到符合条件的 A 股普通股票
+              </Text>
+            </CardContent>
+          </Card>
+        ) : (
+          <Card>
+            <CardContent className="p-0">
+              {results.map((stock, index) => {
+                const isAdded = added.has(stock.code)
+                return (
+                  <View
+                    key={stock.tsCode}
+                    className="flex items-center gap-3 px-4 py-4"
+                    style={{ borderTop: index > 0 ? '1px solid rgba(221, 223, 233, 0.5)' : 'none' }}
+                  >
+                    <View className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary-container">
+                      <Text className="block text-base font-bold text-primary">{stock.name.slice(0, 1)}</Text>
+                    </View>
+                    <View className="min-w-0 flex-1">
+                      <Text className="block truncate text-sm font-semibold text-on-surface">{stock.name}</Text>
+                      <Text className="mt-1 block text-xs text-on-surface-variant">
+                        {stock.code} · {EXCHANGE_LABELS[stock.exchange]}
+                        {stock.industry ? ` · ${stock.industry}` : ''}
+                      </Text>
+                    </View>
+                    <Button
+                      size="sm"
+                      variant={isAdded ? 'secondary' : 'default'}
+                      disabled={isAdded || adding === stock.code}
+                      onClick={() => onAdd(stock)}
+                    >
+                      {isAdded ? <Check size={14} color="#0F8C66" /> : <CirclePlus size={14} color="#ffffff" />}
+                      <Text className="block text-xs font-semibold">
+                        {isAdded ? '已添加' : adding === stock.code ? '添加中' : '添加'}
+                      </Text>
+                    </Button>
+                  </View>
+                )
+              })}
+            </CardContent>
+          </Card>
+        )}
       </View>
     </View>
   )

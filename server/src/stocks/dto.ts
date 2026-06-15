@@ -1,33 +1,9 @@
-import { IsNotEmpty, IsNumber, IsOptional, IsString, Min, Max, MinLength } from 'class-validator';
+import { IsNumber, IsOptional, IsString, Matches, Min, Max, MinLength } from 'class-validator';
 
 export class CreateStockDto {
   @IsString()
-  @IsNotEmpty()
+  @Matches(/^\d{6}$/, { message: '股票代码必须是 6 位数字' })
   code: string;
-
-  @IsString()
-  @IsNotEmpty()
-  name: string;
-
-  @IsOptional()
-  @IsString()
-  market?: string;
-
-  @IsOptional()
-  @IsString()
-  industry?: string;
-
-  @IsOptional()
-  @IsNumber()
-  currentPrice?: number;
-
-  @IsOptional()
-  @IsNumber()
-  changeAmount?: number;
-
-  @IsOptional()
-  @IsNumber()
-  changePct?: number;
 
   @IsOptional()
   @IsNumber()

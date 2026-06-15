@@ -35,6 +35,15 @@ export class StocksController {
     return { data };
   }
 
+  @Get('search')
+  async search(
+    @Query('keyword') keyword?: string,
+    @Query('limit') limit?: string,
+  ) {
+    const data = await this.service.searchMarket(keyword ?? '', limit ? Number(limit) : 20);
+    return { data };
+  }
+
   @Get(':id')
   async getById(
     @CurrentUser() user: { id: string },
@@ -163,12 +172,4 @@ export class StocksController {
     return { data };
   }
 
-  private toTushareCode(code: string): string {
-    const c = code.trim().toUpperCase();
-    if (c.includes('.')) return c;
-    if (/^(6|9|5|1)/.test(c)) return `${c}.SH`;
-    if (/^(0|3|2)/.test(c)) return `${c}.SZ`;
-    if (/^(4|8)/.test(c)) return `${c}.BJ`;
-    return `${c}.SZ`;
-  }
 }

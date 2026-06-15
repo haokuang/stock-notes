@@ -106,27 +106,33 @@ export class StocksService {
     return row
   }
 
+  async searchMarket(keyword: string, limit = 20) {
+    const normalized = keyword.trim()
+    if (!normalized) return []
+    return this.tushare.searchListedOrdinaryStocks(normalized, limit)
+  }
+
   async create(uid: string, dto: CreateStockDto) {
+    const code = dto.code.trim()
     const existing = await this.db
       .select({ id: schema.stocks.id })
       .from(schema.stocks)
-      .where(and(eq(schema.stocks.user_id, uid), eq(schema.stocks.code, dto.code)))
+      .where(and(eq(schema.stocks.user_id, uid), eq(schema.stocks.code, code)))
       .limit(1)
-    if (existing.length) throw new ConflictException(`股票 ${dto.code} 已在自选股中`)
+    if (existing.length) throw new ConflictException(`股票 ${code} 已在自选股中`)
 
-    const tsCode = this.toTushareCode(dto.code)
-    const basic = await this.tushare.getStockBasic(tsCode)
+    const basic = await this.tushare.getListedOrdinaryStock(code)
+    if (!basic) {
+      throw new BadRequestException('仅支持沪深北已上市的 A 股普通股票')
+    }
 
     const [row] = await this.db
       .insert(schema.stocks)
       .values({
         user_id: uid,
-        code: dto.code,
-        name: basic?.name ?? dto.name,
-        industry: basic?.industry ?? dto.industry ?? null,
-        current_price: dto.currentPrice != null ? String(dto.currentPrice) : null,
-        change_amount: dto.changeAmount != null ? String(dto.changeAmount) : null,
-        change_percent: dto.changePct != null ? String(dto.changePct) : null,
+        code: basic.code,
+        name: basic.name,
+        industry: basic.industry || null,
         sort_order: dto.sortOrder ?? 0,
       })
       .returning()
@@ -136,7 +142,7 @@ export class StocksService {
     try {
       await this.refreshPrice(uid, row.id)
     } catch (e) {
-      this.logger.warn(`[create] 自动拉价失败 ${dto.code}: ${(e as Error).message}`)
+      this.logger.warn(`[create] 自动拉价失败 ${code}: ${(e as Error).message}`)
     }
 
     return row

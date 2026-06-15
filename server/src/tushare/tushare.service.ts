@@ -1,4 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common'
+import {
+  filterOrdinaryAStocks,
+  isOrdinaryAStock,
+  StockBasicRecord,
+} from './stock-search'
 
 const TUSHARE_API = 'https://api.tushare.pro'
 
@@ -8,7 +13,18 @@ export interface StockBasic {
   name: string
   industry: string
   market: string
+  exchange: string
+  list_status: string
   list_date?: string
+}
+
+export interface StockSearchResult {
+  code: string
+  tsCode: string
+  name: string
+  industry: string
+  market: string
+  exchange: string
 }
 
 export interface DailyQuote {
@@ -43,6 +59,8 @@ interface TushareResponse<T = unknown> {
 @Injectable()
 export class TushareService {
   private readonly logger = new Logger(TushareService.name)
+  private listedStocksCache: StockBasicRecord[] | null = null
+  private listedStocksCacheExpiresAt = 0
 
   /** 任意 Tushare 接口调用 */
   async request<T = Record<string, unknown>>(
@@ -96,18 +114,25 @@ export class TushareService {
     const rows = await this.request<StockBasic>(
       'stock_basic',
       { ts_code },
-      'ts_code,symbol,name,industry,market,list_date',
+      'ts_code,symbol,name,industry,market,exchange,list_status,list_date',
     )
     if (!rows.length) return null
-    const r = rows[0]
-    return {
-      ts_code: String(r.ts_code ?? ''),
-      symbol: String(r.symbol ?? ''),
-      name: String(r.name ?? ''),
-      industry: String(r.industry ?? ''),
-      market: String(r.market ?? 'CN'),
-      list_date: r.list_date ? String(r.list_date) : undefined,
-    }
+    return this.toStockBasic(rows[0])
+  }
+
+  async searchListedOrdinaryStocks(keyword: string, limit = 20): Promise<StockSearchResult[]> {
+    const stocks = await this.getListedStocks()
+    return filterOrdinaryAStocks(stocks, keyword, limit).map((stock) => this.toSearchResult(stock))
+  }
+
+  async getListedOrdinaryStock(code: string): Promise<StockSearchResult | null> {
+    const normalizedCode = code.trim().toUpperCase()
+    const tsCode = normalizedCode.includes('.')
+      ? normalizedCode
+      : this.toTushareCode(normalizedCode)
+    const stock = await this.getStockBasic(tsCode)
+    if (!stock || !isOrdinaryAStock(stock)) return null
+    return this.toSearchResult(stock)
   }
 
   /** 拉取最近 N 天的日线（默认 5 天），用于同步最新行情 */
@@ -211,6 +236,51 @@ export class TushareService {
     if (v == null || v === '') return null
     const n = Number(v)
     return Number.isNaN(n) ? null : n
+  }
+
+  private async getListedStocks(): Promise<StockBasicRecord[]> {
+    if (this.listedStocksCache && Date.now() < this.listedStocksCacheExpiresAt) {
+      return this.listedStocksCache
+    }
+    const rows = await this.request<StockBasicRecord>(
+      'stock_basic',
+      { list_status: 'L' },
+      'ts_code,symbol,name,industry,market,exchange,list_status,list_date',
+    )
+    this.listedStocksCache = rows.map((row) => this.toStockBasic(row))
+    this.listedStocksCacheExpiresAt = Date.now() + 6 * 60 * 60 * 1000
+    return this.listedStocksCache
+  }
+
+  private toStockBasic(row: Record<string, unknown>): StockBasicRecord {
+    return {
+      ts_code: String(row.ts_code ?? ''),
+      symbol: String(row.symbol ?? ''),
+      name: String(row.name ?? ''),
+      industry: String(row.industry ?? ''),
+      market: String(row.market ?? ''),
+      exchange: String(row.exchange ?? ''),
+      list_status: String(row.list_status ?? ''),
+      list_date: row.list_date ? String(row.list_date) : undefined,
+    }
+  }
+
+  private toSearchResult(stock: StockBasicRecord): StockSearchResult {
+    return {
+      code: stock.symbol,
+      tsCode: stock.ts_code,
+      name: stock.name,
+      industry: stock.industry,
+      market: stock.market,
+      exchange: stock.exchange,
+    }
+  }
+
+  private toTushareCode(code: string): string {
+    if (/^(600|601|603|605|688|689)/.test(code)) return `${code}.SH`
+    if (/^(000|001|002|003|300|301)/.test(code)) return `${code}.SZ`
+    if (/^(4|8|9)/.test(code)) return `${code}.BJ`
+    return code
   }
 
   private toTencentSymbol(code: string): string | null {
