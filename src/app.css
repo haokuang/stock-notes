@@ -250,3 +250,15 @@ image {
   background: var(--selection);
   color: var(--selection-foreground);
 }
+/* === 笔记高亮(H5 + 微信 RichText) === */
+.md-content [data-highlight-id] {
+  background-color: #F6D365;
+  border-radius: 2px;
+  padding: 0 1px;
+  cursor: pointer;
+}
+.md-content {
+  line-height: 1.75;
+  -webkit-user-select: text;
+  user-select: text;
+}

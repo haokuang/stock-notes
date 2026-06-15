@@ -1,4 +1,4 @@
-import { View, Text, ScrollView, Image } from '@tarojs/components'
+import { View, Text, ScrollView, Image, RichText } from '@tarojs/components'
 import Taro, { useDidShow, useLoad } from '@tarojs/taro'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Network } from '@/network'
@@ -389,15 +389,13 @@ export default function NoteDetailPage() {
                 style={{ wordBreak: 'break-word', userSelect: 'text', WebkitUserSelect: 'text' as any }}
               />
             ) : (
-              <Text
-                className="block text-sm text-on-surface leading-relaxed whitespace-pre-wrap"
+              <RichText
+                nodes={note.rendered_content || note.content || ''}
+                userSelect
+                selectable
+                className="md-content block text-sm text-on-surface leading-relaxed"
                 style={{ wordBreak: 'break-word' }}
-              >
-                {String(note.content || '')
-                  .replace(/<br\s*\/?>/gi, '\n')
-                  .replace(/<[^>]+>/g, '')
-                  .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, '&')}
-              </Text>
+              />
             )}
           </View>
         </View>
