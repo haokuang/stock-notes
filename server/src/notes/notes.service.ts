@@ -1,15 +1,55 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { DRIZZLE_DB } from '../storage/database/database.module';
+import { Inject, Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { DRIZZLE_DB, PG_POOL } from '../storage/database/database.module';
 import * as schema from '../storage/database/shared/schema';
 import { and, desc, eq, gte, lte, sql, asc } from 'drizzle-orm';
 import { marked } from 'marked';
 import DOMPurify from 'isomorphic-dompurify';
-import { CreateNoteDto, NoteType, QueryNoteDto, RenderMdDto, UpdateNoteDto } from './dto';
+import type { Pool, PoolClient } from 'pg';
+import { CreateHighlightDto, CreateNoteDto, NoteType, QueryNoteDto, RenderMdDto, UpdateNoteDto } from './dto';
 import { normalizeOptionalPrice } from './note-value';
+import {
+  injectHighlights,
+  renderNoteMarkdown,
+} from './highlight-renderer';
+import {
+  createNoteHighlight as createHighlightRecord,
+  deleteNoteHighlight as deleteHighlightRecord,
+  listNoteHighlights,
+  reconcileNoteHighlights,
+  type StoredHighlight,
+} from './highlight-persistence';
+
+export interface NoteDetailResponse {
+  id: string
+  stock_id: string
+  stock_code: string
+  stock_name: string
+  type: string
+  title: string
+  content: string
+  doc_md: string | null
+  direction: string | null
+  entry_price: string | null
+  target_price: string | null
+  stop_loss: string | null
+  tags: string[]
+  event: string | null
+  source: string | null
+  images: any[]
+  ai_summary: string | null
+  created_at: string
+  updated_at: string
+  rendered_content: string
+  content_hash: string
+  highlights: { id: string; selected_text: string; start_offset: number; end_offset: number }[]
+}
 
 @Injectable()
 export class NotesService {
-  constructor(@Inject(DRIZZLE_DB) private readonly db: any) {}
+  constructor(
+    @Inject(DRIZZLE_DB) private readonly db: any,
+    @Inject(PG_POOL) private readonly pool: Pool,
+  ) {}
 
   async list(uid: string, query: QueryNoteDto) {
     const conditions: any[] = [eq(schema.notes.user_id, uid)]
@@ -57,7 +97,7 @@ export class NotesService {
     return rows
   }
 
-  async getById(uid: string, id: string) {
+  async getById(uid: string, id: string): Promise<NoteDetailResponse> {
     const [row] = await this.db
       .select({
         id: schema.notes.id,
@@ -85,7 +125,113 @@ export class NotesService {
       .where(and(eq(schema.notes.id, id), eq(schema.notes.user_id, uid)))
       .limit(1)
     if (!row) throw new NotFoundException(`观点/文档 ${id} 不存在`)
-    return row
+
+    // Markdown 渲染 + 文本指纹
+    const markdownSource = row.type === NoteType.DOC && row.doc_md
+      ? row.doc_md
+      : row.content ?? ''
+    const rendered = renderNoteMarkdown(markdownSource)
+
+    // 重定位已有高亮
+    const client = await this.pool.connect()
+    let validHighlights: StoredHighlight[] = []
+    try {
+      validHighlights = await reconcileNoteHighlights(client, {
+        userId: uid,
+        noteId: id,
+        text: rendered.text,
+        currentHash: rendered.hash,
+      })
+    } finally {
+      client.release()
+    }
+
+    const renderedContent = injectHighlights(
+      rendered.html,
+      validHighlights.map((h) => ({
+        id: h.id,
+        selectedText: h.selected_text,
+        startOffset: h.start_offset,
+        endOffset: h.end_offset,
+      })),
+    )
+
+    return {
+      ...row,
+      rendered_content: renderedContent,
+      content_hash: rendered.hash,
+      highlights: validHighlights.map((h) => ({
+        id: h.id,
+        selected_text: h.selected_text,
+        start_offset: h.start_offset,
+        end_offset: h.end_offset,
+      })),
+    }
+  }
+
+  async createHighlight(
+    uid: string,
+    noteId: string,
+    dto: CreateHighlightDto,
+  ): Promise<{ id: string; created: true }> {
+    // 先确认 note 归属,然后基于当前正文重建 hash 校验客户端
+    const note = await this.getById(uid, noteId)
+    const markdownSource = note.type === NoteType.DOC && note.doc_md
+      ? note.doc_md
+      : note.content ?? ''
+    const rendered = renderNoteMarkdown(markdownSource)
+
+    if (dto.source_hash !== rendered.hash) {
+      throw new ConflictException('正文已更新,请重新加载后再选区')
+    }
+    const expected = rendered.text.slice(dto.start_offset, dto.end_offset)
+    if (expected !== dto.selected_text) {
+      throw new ConflictException('选区与正文不一致,请重新选择')
+    }
+
+    const client = await this.pool.connect()
+    try {
+      // 重叠校验(同一 source_hash 下同 user/note)
+      const existing = await listNoteHighlights(client, uid, noteId)
+      const overlap = existing.find(
+        (h) =>
+          h.source_hash === rendered.hash &&
+          h.start_offset < dto.end_offset &&
+          dto.start_offset < h.end_offset,
+      )
+      if (overlap) {
+        throw new ConflictException('与已有高亮重叠')
+      }
+      const created = await createHighlightRecord(client, {
+        userId: uid,
+        noteId,
+        selectedText: dto.selected_text,
+        prefixText: dto.prefix_text,
+        suffixText: dto.suffix_text,
+        startOffset: dto.start_offset,
+        endOffset: dto.end_offset,
+        sourceHash: dto.source_hash,
+      })
+      return { id: created.id, created: true }
+    } finally {
+      client.release()
+    }
+  }
+
+  async deleteHighlight(
+    uid: string,
+    noteId: string,
+    highlightId: string,
+  ): Promise<{ id: string; deleted: true }> {
+    await this.getById(uid, noteId) // 确认归属
+    const client = await this.pool.connect()
+    try {
+      const ok = await deleteHighlightRecord(client, uid, noteId, highlightId)
+      if (!ok) throw new NotFoundException(`高亮 ${highlightId} 不存在`)
+      return { id: highlightId, deleted: true }
+    } finally {
+      client.release()
+    }
   }
 
   async create(uid: string, dto: CreateNoteDto) {

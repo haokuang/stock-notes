@@ -1,5 +1,5 @@
 import { Body, Controller, Delete, Get, HttpCode, Param, Post, Put, Query } from '@nestjs/common';
-import { CreateNoteDto, NoteDirection, NoteType, QueryNoteDto, RenderMdDto, UpdateNoteDto } from './dto';
+import { CreateHighlightDto, CreateNoteDto, NoteDirection, NoteType, QueryNoteDto, RenderMdDto, UpdateNoteDto } from './dto';
 import { NotesService } from './notes.service';
 import { CurrentUser } from '../storage/auth/current-user.decorator';
 
@@ -59,6 +59,28 @@ export class NotesController {
     @Param('id') id: string,
   ) {
     const data = await this.notesService.getById(user.id, id);
+    return { data };
+  }
+
+  @Post(':id/highlights')
+  @HttpCode(200)
+  async createHighlight(
+    @CurrentUser() user: { id: string },
+    @Param('id') id: string,
+    @Body() dto: CreateHighlightDto,
+  ) {
+    const data = await this.notesService.createHighlight(user.id, id, dto);
+    return { data };
+  }
+
+  @Delete(':id/highlights/:highlightId')
+  @HttpCode(200)
+  async deleteHighlight(
+    @CurrentUser() user: { id: string },
+    @Param('id') id: string,
+    @Param('highlightId') highlightId: string,
+  ) {
+    const data = await this.notesService.deleteHighlight(user.id, id, highlightId);
     return { data };
   }
 

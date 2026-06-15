@@ -1,4 +1,4 @@
-import { IsArray, IsEnum, IsIn, IsInt, IsNotEmpty, IsNumber, IsOptional, IsString, Min } from 'class-validator';
+import { IsArray, IsEnum, IsIn, IsInt, IsNotEmpty, IsNumber, IsOptional, IsString, MaxLength, Min } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export enum NoteDirection {
@@ -174,4 +174,31 @@ export class RenderMdDto {
   @IsString()
   @IsNotEmpty()
   md: string;
+}
+
+export class CreateHighlightDto {
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(2000)
+  selected_text!: string;
+
+  @IsString()
+  @MaxLength(32)
+  prefix_text!: string;
+
+  @IsString()
+  @MaxLength(32)
+  suffix_text!: string;
+
+  @IsInt()
+  @Min(0)
+  start_offset!: number;
+
+  @IsInt()
+  @Min(1)
+  end_offset!: number;
+
+  @IsString()
+  @IsNotEmpty()
+  source_hash!: string;
 }
