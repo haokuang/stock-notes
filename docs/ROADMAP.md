@@ -23,7 +23,7 @@
 | 6 | 实现登录令牌自动续期 | P0 | ✅ 2026-06-15 | access token 过期时使用 refresh token 单次续期并重放原请求；并发 401 共享同一次刷新，续期失败才清理 session 并跳转登录 |
 | 7 | 修复筛选与页面跳转断链 | P0 | ✅ 2026-06-15 | 观点库筛选会重新加载；热力图对象格式和日期边界正确；搜索模式切换、AI 报告 GET/解包及文档入口参数已修复 |
 | 8 | 接入 A 股普通股票真实搜索 | P0 | ✅ 2026-06-15 | 仅返回沪深北上市普通 A 股；支持股票代码和名称搜索；添加时以后端 Tushare 主数据为准，拒绝任意文本、B 股、ETF、指数和无效代码 |
-| 9 | 修复 Supabase Realtime 用户鉴权 | P0 | ⏳ 待开发 | 订阅前向 Realtime 设置当前 access token；登录、续期、退出时同步更新鉴权状态；RLS 下只能收到当前用户的简评事件 |
+| 9 | 修复 Supabase Realtime 用户鉴权 | P0 | ✅ 2026-06-15 | Supabase 客户端通过 `accessToken` 回调读取应用 session，登录、续期、退出时再用 `realtime.setAuth` 即时同步；已用测试账号在 RLS + `stock_id` 过滤下完成真实事件验收 |
 | 10 | 修复数据库模型与真实 Schema 漂移 | P0 | ⏳ 待开发 | Drizzle 中 `stop_loss_triggered` 与真实 boolean 类型一致；补齐股票及日线唯一索引声明和迁移；重复添加同一股票由数据库约束兜底 |
 | 11 | 买入 / 卖出改为原子事务 | P0 | ⏳ 待开发 | 股票状态更新与买卖笔记写入必须同时成功；任一步失败全部回滚；并发行锁避免重复买入或重复卖出 |
 | 12 | 自动补齐技术指标 60 个交易日 | P0 | ⏳ 待开发 | 生成简评前先读取数据库；不足 60 条时从 Tushare 拉取约 120 个自然日并 upsert，再从数据库读取最近 60 条计算；停牌或次新股使用实际可获得样本并记录样本数 |
@@ -41,7 +41,7 @@
 | Tushare 真实日线 fallback | P0 | ✅ | 2026-06-14 | `refreshPrice` 内已实现:腾讯失败 → Tushare daily(最近 1 天)→ 旧快照 |
 | 错误监控 + 告警 | P0 | ✅ | 2026-06-14 | `migrations/0005_error_logs` + `GlobalExceptionFilter`(5xx 落库 + 邮件)+ `AlertService`(Resend 集成,无 API key 时降级 console)+ cron 失败告警;`RESEND_API_KEY` / `ALERT_EMAIL` env 留空即可纯落库 |
 | 价格数据时间标签 | P0 | ✅ | 2026-06-14 | 后端返回 `price_time` + `is_realtime`;前端首页/详情页显示 `今日 14:30` / `今日收盘` / `昨日收盘` / `MM-DD`,非实时加灰色徽章 |
-| Supabase Realtime 推送 | P0 | 🚧 | | 已定位主要问题为前端订阅未设置用户 access token；本轮修复鉴权与续期同步，节点异常仅作为验证失败后的备选排查项 |
+| Supabase Realtime 推送 | P0 | ✅ | 2026-06-15 | 已修复前端订阅 JWT 注入和续期同步；`stock_briefs` publication、RLS、带 `stock_id` 过滤的真实 INSERT 事件均已验收 |
 | cron 走 Postgres 队列 | P1 | ⏳ | | 用 `pg_cron` 替代 NestJS 进程内 cron,服务重启不丢任务,半天 |
 
 ---
@@ -121,7 +121,7 @@
 | 功能 | 优先级 | 状态 | 完成日期 | 详细说明 |
 |---|---|---|---|---|
 | 浏览器原生 Notification(详情页 red brief 弹窗) | P1 | 🚧 | | hook 写好；本轮修复 Realtime 鉴权，通知权限设置页仍放下一版 |
-| Supabase Realtime 推送(已写未生效) | P0 | 🚧 | | 见 § 一 Realtime 行 |
+| Supabase Realtime 推送 | P0 | ✅ | 2026-06-15 | 见 § 一 Realtime 行 |
 | 首页持仓实时小红点 | P1 | 🚧 | | 见 § 五 |
 | 微信 / 抖音小程序推送 | P2 | ⏳ | | `wx.requestSubscribeMessage` + 服务端 `subscribeMessage.send`,1 周 |
 | 邮件每日摘要(17:00 推) | P2 | ⏳ | | Resend / SendGrid,3 天 |
@@ -191,6 +191,7 @@
 | 2026-06-15 | 上线前修复队列继续推进：完成 refresh token 单飞续期与 401 重放；修复观点库筛选、热力图格式/日期、搜索模式、AI 报告和文档入口；图片上传与识图已移除 mock，本地环境待补 TOS/视觉模型凭据验收 |
 | 2026-06-15 | 重新核查上线范围：AI 分析主入口与图片视觉真实验收调整为 P1；新增 A 股普通股票真实搜索、Realtime 用户鉴权、数据库模型一致性、买卖原子事务、技术指标 60 交易日自动补齐 5 项 P0，并按此顺序开发 |
 | 2026-06-15 | 完成 A 股普通股票真实搜索：新增 `/api/stocks/search`、6 小时主数据缓存和沪深北普通 A 股过滤；添加接口只接收 6 位代码并以后端主数据为准；前端移除静态列表及任意文本添加 |
+| 2026-06-15 | 修复 Supabase Realtime 用户鉴权：客户端通过 `accessToken` 回调读取应用 session，并在登录、自动续期、退出时调用 `realtime.setAuth`；真实测试账号在 RLS 与 `stock_id` 过滤下成功收到 `stock_briefs` INSERT |
 | 2026-06-14 | 重构每日简评:3 段结构化 → **100 字单段自然语言简评**,LLM 同步判 green/yellow/red,落 `stock_briefs` 表 + 自动落一条 doc 笔记(`tags=['daily-brief','auto']`) |
 | 2026-06-14 | 详情页:刷新按钮冷却中置灰(去掉 00:06 倒计时文字 + 删"1 分钟内只能刷新一次"提示) + 买入按钮文案改为"我已买入" |
 | 2026-06-14 | 修 stock_briefs insert 5xx — Drizzle 0.45 prepared-stmt 吞错,改用 `client.query()` raw SQL(同 `stocks.service.ts:439` 模式),`evidence_note_ids` 显式 `{}` 字符串 |

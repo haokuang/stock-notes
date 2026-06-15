@@ -1,4 +1,5 @@
 import Taro from '@tarojs/taro'
+import { sessionEvents } from './session-events'
 
 /**
  * 持久化 session 到 Taro storage(H5 走 localStorage,小程序走 wx.setStorageSync)
@@ -41,6 +42,7 @@ export const sessionStore = {
     Taro.setStorageSync(KEYS.access, s.access_token)
     Taro.setStorageSync(KEYS.refresh, s.refresh_token)
     Taro.setStorageSync(KEYS.user, s.user)
+    sessionEvents.emit(s.access_token)
   },
 
   clear() {
@@ -49,6 +51,7 @@ export const sessionStore = {
       Taro.removeStorageSync(KEYS.refresh)
       Taro.removeStorageSync(KEYS.user)
     } catch {}
+    sessionEvents.emit(null)
   },
 
   getAccessToken(): string | null {

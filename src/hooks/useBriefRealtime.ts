@@ -83,7 +83,11 @@ export function useBriefRealtime({ stockId, onBrief, requestNotificationPermissi
           }
         },
       )
-      .subscribe()
+      .subscribe((status, error) => {
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          console.error('[realtime] brief subscription failed', { stockId, status, error })
+        }
+      })
 
     return () => {
       supabase.removeChannel(channel)

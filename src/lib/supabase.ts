@@ -1,4 +1,7 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
+import { sessionEvents } from '../auth/session-events'
+import { sessionStore } from '../auth/session'
+import { syncRealtimeAuth } from './realtime-auth'
 
 /**
  * Supabase 客户端工厂(前端专用)
@@ -12,19 +15,30 @@ declare const SUPABASE_URL: string
 declare const SUPABASE_ANON_KEY: string
 
 let _client: SupabaseClient | null = null
+let _sessionSyncBound = false
 
 export function getSupabase(): SupabaseClient {
   if (_client) return _client
 
-  // 兜底:开发期 .env.local 没填,直连跑得起来
-  const url = SUPABASE_URL || 'https://hgpxchebcipynrfjssiq.supabase.co'
-  const anonKey = SUPABASE_ANON_KEY || 'sb_publishable_TXYFJXtnyLn6drvp9YFXDg_AIV03vLE'
+  const url = SUPABASE_URL
+  const anonKey = SUPABASE_ANON_KEY
+  if (!url || !anonKey) {
+    throw new Error('SUPABASE_URL / SUPABASE_ANON_KEY 未配置')
+  }
 
   _client = createClient(url, anonKey, {
+    accessToken: async () => sessionStore.getAccessToken(),
     auth: { persistSession: false, autoRefreshToken: false },
     realtime: {
       params: { eventsPerSecond: 10 },  // 限速:10 事件 / 秒
     },
   })
+  syncRealtimeAuth(_client.realtime, sessionStore.getAccessToken())
+  if (!_sessionSyncBound) {
+    sessionEvents.subscribe((accessToken) => {
+      if (_client) syncRealtimeAuth(_client.realtime, accessToken)
+    })
+    _sessionSyncBound = true
+  }
   return _client
 }
