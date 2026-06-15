@@ -283,3 +283,51 @@ export const errorLogs = pgTable(
 
 export type ErrorLog = typeof errorLogs.$inferSelect;
 export type NewErrorLog = typeof errorLogs.$inferInsert;
+
+/**
+ * 笔记高亮(2026-06-15 改造)
+ * - 以"渲染后纯文本"为坐标系,保存 start/end offset + selected/prefix/suffix text
+ * - 文档编辑后由后端重定位,失效高亮在事务中删除
+ * - source_hash 为最近一次重定位时的内容指纹,用于 409 冲突检测
+ */
+export const noteHighlights = pgTable(
+  "note_highlights",
+  {
+    id: varchar("id", { length: 36 })
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    user_id: uuid("user_id").notNull(),
+    note_id: varchar("note_id", { length: 36 })
+      .notNull()
+      .references(() => notes.id, { onDelete: "cascade" }),
+    selected_text: text("selected_text").notNull(),
+    prefix_text: text("prefix_text").notNull().default(""),
+    suffix_text: text("suffix_text").notNull().default(""),
+    start_offset: integer("start_offset").notNull(),
+    end_offset: integer("end_offset").notNull(),
+    source_hash: varchar("source_hash", { length: 64 }).notNull(),
+    created_at: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updated_at: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("note_highlights_user_note_idx").on(
+      table.user_id,
+      table.note_id,
+      table.start_offset,
+    ),
+    uniqueIndex("note_highlights_exact_uq").on(
+      table.user_id,
+      table.note_id,
+      table.source_hash,
+      table.start_offset,
+      table.end_offset,
+    ),
+  ],
+);
+
+export type NoteHighlight = typeof noteHighlights.$inferSelect;
+export type NewNoteHighlight = typeof noteHighlights.$inferInsert;
