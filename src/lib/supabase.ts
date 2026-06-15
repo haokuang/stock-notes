@@ -23,7 +23,7 @@ export function getSupabase(): SupabaseClient {
   const url = SUPABASE_URL
   const anonKey = SUPABASE_ANON_KEY
   if (!url || !anonKey) {
-    throw new Error('SUPABASE_URL / SUPABASE_ANON_KEY 未配置')
+    throw new Error('Supabase 客户端地址或匿名密钥未配置')
   }
 
   _client = createClient(url, anonKey, {

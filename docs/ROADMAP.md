@@ -35,7 +35,7 @@
 | 功能 | 优先级 | 状态 | 完成日期 | 详细说明 |
 |---|---|---|---|---|
 | Supabase 集成 | P0 | ✅ | 2026-06-14 | 后端直连 Postgres + 前端 Realtime 订阅架构 |
-| Supabase Auth + RLS | P0 | ✅ | 2026-06-14 | 邮箱注册/登录,4 张业务表 16 条 RLS 策略,FK 引用 `auth.users` |
+| Supabase Auth + RLS | P0 | ✅ | 2026-06-14 | 邮箱注册/登录，5 张用户业务表共 20 条 RLS 策略，FK 引用 `auth.users` |
 | JWT 全局鉴权 | P0 | ✅ | 2026-06-14 | `JwtGuard` 全局拦截 + `@Public()` 放行,前端自动注入 Bearer 头 |
 | Drizzle ORM + pg 直连 | P0 | ✅ | 2026-06-14 | `PG_POOL` + `client.query()` 混合模式,绕开 Drizzle 0.45 的 prepared-stmt 错误吞掉 bug |
 | Tushare 真实日线 fallback | P0 | ✅ | 2026-06-14 | `refreshPrice` 内已实现:腾讯失败 → Tushare daily(最近 1 天)→ 旧快照 |
@@ -50,7 +50,7 @@
 
 | 功能 | 优先级 | 状态 | 完成日期 | 详细说明 |
 |---|---|---|---|---|
-| 4 张业务表(stocks / notes / stock_prices / ai_reports) | P0 | ✅ | 2026-06-13 | 见 `docs/SUPABASE.md` § 4 |
+| 5 张用户业务表(stocks / notes / stock_prices / ai_reports / stock_briefs) | P0 | ✅ | 2026-06-15 | 全部按 `user_id` 隔离；`error_logs` 为内部监控表，见 `docs/SUPABASE.md` |
 | stock_briefs 每日简评缓存表 | P0 | ✅ | 2026-06-15 | migrations/0003 建表；0006 补用户维度唯一键与幂等 upsert |
 | 状态机字段(status / entry_price / loss_rate / entered_at) | P0 | ✅ | 2026-06-14 | migrations/0002 |
 | stock_prices 唯一约束 | P0 | ✅ | 2026-06-14 | migrations/0004 补 `(user_id, stock_id, trade_date)` UNIQUE |
@@ -138,7 +138,7 @@
 |---|---|---|---|---|
 | 错误监控 + 告警 | P0 | ✅ | 2026-06-14 | 见 § 一 |
 | useStockRefresh 单元测试 | P2 | ⏳ | | vitest + jsdom,半天 |
-| Coze SDK 完全移除 | P2 | ⏳ | | `coze-coding-dev-sdk` 装但代码已不用,1 天 |
+| Coze SDK 依赖收敛 | P2 | ⏳ | | 数据库能力已不用；当前 TOS/S3 上传仍使用 `S3Storage`，AI 模块残留无效 `LLMClient` 引用，替换存储实现后再完整移除 |
 | 跑 pnpm validate 不通过项修复 | 持续 | ✅ | 2026-06-14 | lint + tsc 全过 |
 
 ---
@@ -194,6 +194,7 @@
 | 2026-06-15 | 修复 Supabase Realtime 用户鉴权：客户端通过 `accessToken` 回调读取应用 session，并在登录、自动续期、退出时调用 `realtime.setAuth`；真实测试账号在 RLS 与 `stock_id` 过滤下成功收到 `stock_briefs` INSERT |
 | 2026-06-15 | 完成数据库一致性与交易事务：`0007_schema_consistency.sql` 已应用，补齐股票唯一约束并修正 boolean 模型；买入/卖出使用行锁事务，专项测试验证笔记写入失败会回滚股票状态 |
 | 2026-06-15 | 完成技术指标历史自动补齐：简评生成前检查数据库最近 60 个交易日，不足时拉取约 120 个自然日并批量 upsert；真实验收平安银行从 4 条补到 60 条，后续调用只读数据库 |
+| 2026-06-15 | 修复 Realtime 配置的跨端编译：避免 Taro `defineConstants` 误替换错误文案中的常量名；H5、微信小程序、抖音小程序构建均恢复通过 |
 | 2026-06-14 | 重构每日简评:3 段结构化 → **100 字单段自然语言简评**,LLM 同步判 green/yellow/red,落 `stock_briefs` 表 + 自动落一条 doc 笔记(`tags=['daily-brief','auto']`) |
 | 2026-06-14 | 详情页:刷新按钮冷却中置灰(去掉 00:06 倒计时文字 + 删"1 分钟内只能刷新一次"提示) + 买入按钮文案改为"我已买入" |
 | 2026-06-14 | 修 stock_briefs insert 5xx — Drizzle 0.45 prepared-stmt 吞错,改用 `client.query()` raw SQL(同 `stocks.service.ts:439` 模式),`evidence_note_ids` 显式 `{}` 字符串 |
