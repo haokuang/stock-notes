@@ -4,12 +4,12 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Network } from '@/network'
 import { IS_H5_ENV } from '@/presets/env'
 import { ArrowLeft, Clock, FileText, Sparkles, Trash2, Pencil } from 'lucide-react-taro'
-import { formatNotePrice, hasNotePrice } from './note-detail-logic'
-import type { NotePrice } from './note-detail-logic'
 import {
   NoteSelectionToolbar,
   type NoteSelectionToolbarProps,
 } from '@/components/note-selection-toolbar'
+import { formatNotePrice, hasNotePrice } from './note-detail-logic'
+import type { NotePrice } from './note-detail-logic'
 import {
   buildSelectionAnchor,
   clampToolbarPosition,
@@ -391,8 +391,8 @@ export default function NoteDetailPage() {
             ) : (
               <RichText
                 nodes={note.rendered_content || note.content || ''}
-                userSelect
-                selectable
+                userSelect={true as any}
+                selectable={true as any}
                 className="md-content block text-sm text-on-surface leading-relaxed"
                 style={{ wordBreak: 'break-word' }}
               />

@@ -230,3 +230,56 @@ test('createHighlight validates selected text at the submitted offsets', async (
     /选区与正文不一致/,
   )
 })
+
+test('preserves a highlight after text is inserted before it', async () => {
+  const { resolveHighlightAnchor } = await import('./highlight-anchor')
+  const oldText = 'say hello world today'
+  const newText = 'say HELLO there. then say hello world today'
+  const anchor = {
+    selectedText: 'hello world',
+    prefixText: 'say ',
+    suffixText: ' today',
+    startOffset: 4,
+    endOffset: 15,
+    sourceHash: 'old',
+  }
+  const old = resolveHighlightAnchor(oldText, anchor, 'old')
+  const relocated = resolveHighlightAnchor(newText, anchor, 'new')
+  assert.ok(old)
+  assert.ok(relocated)
+  // 插入前缀后位置平移
+  assert.equal(relocated.startOffset, 26)
+  assert.equal(relocated.endOffset, 37)
+})
+
+test('deletes a highlight when its quote no longer exists', async () => {
+  const { resolveHighlightAnchor } = await import('./highlight-anchor')
+  const oldText = 'say hello world today'
+  const newText = 'totally different content now'
+  const anchor = {
+    selectedText: 'hello world',
+    prefixText: 'say ',
+    suffixText: ' today',
+    startOffset: 4,
+    endOffset: 15,
+    sourceHash: 'old',
+  }
+  const old = resolveHighlightAnchor(oldText, anchor, 'old')
+  const none = resolveHighlightAnchor(newText, anchor, 'new')
+  assert.ok(old)
+  assert.equal(none, null)
+})
+
+test('deletes a highlight when repeated candidates are ambiguous', async () => {
+  const { resolveHighlightAnchor } = await import('./highlight-anchor')
+  const text = 'alpha hello world beta. gamma hello world delta.'
+  const anchor = {
+    selectedText: 'hello world',
+    prefixText: '',
+    suffixText: '',
+    startOffset: 6,
+    endOffset: 17,
+    sourceHash: 'old',
+  }
+  assert.equal(resolveHighlightAnchor(text, anchor, 'new'), null)
+})

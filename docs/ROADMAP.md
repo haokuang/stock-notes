@@ -74,6 +74,7 @@
 | 减仓 / 加仓 / 调仓状态 | P3 | ⏳ | | 复杂状态机,飞书流程图里没 |
 | buy_reason 独立字段(stocks 表) | P1 | ⏳ | | 现在散落在 note.content,半天 |
 | 止盈 / 预警多价位 | P2 | ⏳ | | 1 天 |
+| 笔记 Markdown 渲染 + 永久高亮 | P1 | ✅ | 2026-06-15 | 服务端 `renderNoteMarkdown` (marked + DOMPurify) + sha256 指纹；`note_highlights` 表持久化 quote/prefix/suffix/offset；编辑后自动重定位，失效高亮原子删除；H5 浮动工具条"高亮 / 复制" + 点击已有高亮"取消 / 复制"；微信 `RichText` 展示 Markdown 与已存高亮(系统原生复制)；抖音端暂不支持。冲突时返回 409 |
 | **PDF 研报 / 财报上传 + MD 解析** | **P1** | ⏳ | | 选 **Supabase Storage**(RLS 跟 auth 一致、SDK 直传免后端代理);5-10MB PDF 走 `pdf-parse` 转 MD,notes 表加 `doc_pdf_url` / `doc_pdf_size` / `doc_pdf_pages` 字段,MVP 半天(同步解析,后续可改异步) |
 | **笔记图片 OCR(截图识别)** | **P1** | 🚧 | | 单图上传与视觉模型协议已完成，图片按项目规范存 TOS；待部署环境补齐 TOS/视觉模型凭据后完成真实链路验收，再把结果落 `notes.ai_summary` 或新增 `image_ocr` 字段 |
 
