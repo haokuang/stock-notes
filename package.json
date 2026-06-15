@@ -26,6 +26,7 @@
     "preview:weapp": "taro build --type weapp --preview",
     "test:daily-brief": "tsx --test server/src/ai/daily-brief-persistence.test.ts",
     "test:prelaunch": "tsx --test server/src/ai/image-analysis.test.ts server/src/tushare/stock-search.test.ts src/auth/authenticated-request.test.ts src/auth/session-events.test.ts src/lib/realtime-auth.test.ts src/pages/prelaunch-navigation.test.ts",
+    "test:trade": "tsx --test server/src/stocks/trade-persistence.test.ts",
     "test:note-editor": "tsx --test src/pages/note-edit/note-editor-logic.test.ts src/pages/note-detail/note-detail-logic.test.ts server/src/notes/note-value.test.ts",
     "tsc": "npx tsc --noEmit --skipLibCheck",
     "validate": "pnpm exec concurrently --kill-others-on-fail --kill-signal SIGKILL -n lint,tsc -c red,blue \"pnpm lint:build\" \"pnpm tsc\""

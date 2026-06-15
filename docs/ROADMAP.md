@@ -24,8 +24,8 @@
 | 7 | 修复筛选与页面跳转断链 | P0 | ✅ 2026-06-15 | 观点库筛选会重新加载；热力图对象格式和日期边界正确；搜索模式切换、AI 报告 GET/解包及文档入口参数已修复 |
 | 8 | 接入 A 股普通股票真实搜索 | P0 | ✅ 2026-06-15 | 仅返回沪深北上市普通 A 股；支持股票代码和名称搜索；添加时以后端 Tushare 主数据为准，拒绝任意文本、B 股、ETF、指数和无效代码 |
 | 9 | 修复 Supabase Realtime 用户鉴权 | P0 | ✅ 2026-06-15 | Supabase 客户端通过 `accessToken` 回调读取应用 session，登录、续期、退出时再用 `realtime.setAuth` 即时同步；已用测试账号在 RLS + `stock_id` 过滤下完成真实事件验收 |
-| 10 | 修复数据库模型与真实 Schema 漂移 | P0 | ⏳ 待开发 | Drizzle 中 `stop_loss_triggered` 与真实 boolean 类型一致；补齐股票及日线唯一索引声明和迁移；重复添加同一股票由数据库约束兜底 |
-| 11 | 买入 / 卖出改为原子事务 | P0 | ⏳ 待开发 | 股票状态更新与买卖笔记写入必须同时成功；任一步失败全部回滚；并发行锁避免重复买入或重复卖出 |
+| 10 | 修复数据库模型与真实 Schema 漂移 | P0 | ✅ 2026-06-15 | Drizzle 中 `stop_loss_triggered` 已与真实 boolean 类型一致；股票及日线唯一索引已同步到模型并通过 `0007_schema_consistency.sql` 应用 |
+| 11 | 买入 / 卖出改为原子事务 | P0 | ✅ 2026-06-15 | 股票状态更新与买卖笔记写入已放入同一 PostgreSQL 事务；通过 `SELECT ... FOR UPDATE` 串行化同一股票操作，并验证笔记失败时状态完整回滚 |
 | 12 | 自动补齐技术指标 60 个交易日 | P0 | ⏳ 待开发 | 生成简评前先读取数据库；不足 60 条时从 Tushare 拉取约 120 个自然日并 upsert，再从数据库读取最近 60 条计算；停牌或次新股使用实际可获得样本并记录样本数 |
 
 ---
@@ -54,8 +54,8 @@
 | stock_briefs 每日简评缓存表 | P0 | ✅ | 2026-06-15 | migrations/0003 建表；0006 补用户维度唯一键与幂等 upsert |
 | 状态机字段(status / entry_price / loss_rate / entered_at) | P0 | ✅ | 2026-06-14 | migrations/0002 |
 | stock_prices 唯一约束 | P0 | ✅ | 2026-06-14 | migrations/0004 补 `(user_id, stock_id, trade_date)` UNIQUE |
-| stocks 用户股票唯一约束 | P0 | ⏳ | | 增加 `(user_id, code)` UNIQUE，服务层预检查只负责友好提示，数据库负责并发一致性 |
-| Drizzle / 真实 Schema 一致性 | P0 | ⏳ | | `stock_briefs.stop_loss_triggered` 收回 boolean；将真实唯一索引同步到代码模型 |
+| stocks 用户股票唯一约束 | P0 | ✅ | 2026-06-15 | `(user_id, code)` UNIQUE 已应用，服务层预检查负责友好提示，数据库负责并发一致性 |
+| Drizzle / 真实 Schema 一致性 | P0 | ✅ | 2026-06-15 | `stock_briefs.stop_loss_triggered` 已收回 boolean；真实唯一索引已同步到代码模型 |
 | market_prices 全市场共享行情表 | ❌ | ⏳ | | **已砍** — 调研过方案,用户"前期不超 100 用户",不做共享 |
 
 ---
@@ -67,7 +67,7 @@
 | CRUD:股票 / 笔记 | P0 | ✅ | 2026-06-13 | 增删改查 + 列表 + 搜索 |
 | 买入三件套(entry_price / buy_reason / loss_rate) | P0 | ✅ | 2026-06-14 | `POST /:id/buy`,watching → holding,落 note tags=['buy'] |
 | 卖出(回 watching + 落 note) | P0 | ✅ | 2026-06-14 | `POST /:id/sell` |
-| 买入 / 卖出原子事务 | P0 | ⏳ | | 状态更新与买卖笔记写入放入同一数据库事务，并通过 `SELECT ... FOR UPDATE` 串行化同一股票的并发操作 |
+| 买入 / 卖出原子事务 | P0 | ✅ | 2026-06-15 | 状态更新与买卖笔记写入已放入同一数据库事务，并通过 `SELECT ... FOR UPDATE` 串行化同一股票的并发操作 |
 | 止损 4 档(ok / warning / danger / triggered) | P0 | ✅ | 2026-06-14 | 基于 `loss_rate` 百分比 |
 | "形成投资判断" 节点 | ❌ | ⏳ | | **已砍** — 用户:"不需要产品替用户判断" |
 | "买点出现" 信号 | ❌ | ⏳ | | **已砍** — 同上 |
@@ -192,6 +192,7 @@
 | 2026-06-15 | 重新核查上线范围：AI 分析主入口与图片视觉真实验收调整为 P1；新增 A 股普通股票真实搜索、Realtime 用户鉴权、数据库模型一致性、买卖原子事务、技术指标 60 交易日自动补齐 5 项 P0，并按此顺序开发 |
 | 2026-06-15 | 完成 A 股普通股票真实搜索：新增 `/api/stocks/search`、6 小时主数据缓存和沪深北普通 A 股过滤；添加接口只接收 6 位代码并以后端主数据为准；前端移除静态列表及任意文本添加 |
 | 2026-06-15 | 修复 Supabase Realtime 用户鉴权：客户端通过 `accessToken` 回调读取应用 session，并在登录、自动续期、退出时调用 `realtime.setAuth`；真实测试账号在 RLS 与 `stock_id` 过滤下成功收到 `stock_briefs` INSERT |
+| 2026-06-15 | 完成数据库一致性与交易事务：`0007_schema_consistency.sql` 已应用，补齐股票唯一约束并修正 boolean 模型；买入/卖出使用行锁事务，专项测试验证笔记写入失败会回滚股票状态 |
 | 2026-06-14 | 重构每日简评:3 段结构化 → **100 字单段自然语言简评**,LLM 同步判 green/yellow/red,落 `stock_briefs` 表 + 自动落一条 doc 笔记(`tags=['daily-brief','auto']`) |
 | 2026-06-14 | 详情页:刷新按钮冷却中置灰(去掉 00:06 倒计时文字 + 删"1 分钟内只能刷新一次"提示) + 买入按钮文案改为"我已买入" |
 | 2026-06-14 | 修 stock_briefs insert 5xx — Drizzle 0.45 prepared-stmt 吞错,改用 `client.query()` raw SQL(同 `stocks.service.ts:439` 模式),`evidence_note_ids` 显式 `{}` 字符串 |

@@ -12,7 +12,7 @@ export interface StockBriefRow {
   sell_reasons: string[]
   evidence_note_ids: string[]
   price_at_brief: string | null
-  stop_loss_triggered: boolean | string
+  stop_loss_triggered: boolean
   created_at: string
   updated_at: string
 }

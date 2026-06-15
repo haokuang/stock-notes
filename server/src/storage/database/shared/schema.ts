@@ -9,6 +9,7 @@ import {
   integer,
   jsonb,
   serial,
+  boolean,
   index,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
@@ -62,6 +63,7 @@ export const stocks = pgTable(
     index("stocks_code_idx").on(table.code),
     index("stocks_created_at_idx").on(table.created_at),
     index("stocks_status_idx").on(table.status),
+    uniqueIndex("stocks_user_code_uq").on(table.user_id, table.code),
   ],
 );
 
@@ -147,6 +149,11 @@ export const stockPrices = pgTable(
     index("stock_prices_user_id_idx").on(table.user_id),
     index("stock_prices_stock_id_idx").on(table.stock_id),
     index("stock_prices_trade_date_idx").on(table.trade_date),
+    uniqueIndex("stock_prices_user_stock_date_uq").on(
+      table.user_id,
+      table.stock_id,
+      table.trade_date,
+    ),
   ],
 );
 
@@ -220,9 +227,9 @@ export const stockBriefs = pgTable(
       .notNull()
       .default(sql`'{}'::uuid[]`),
     price_at_brief: numeric("price_at_brief", { precision: 12, scale: 2 }),
-    stop_loss_triggered: varchar("stop_loss_triggered", { length: 1 })
+    stop_loss_triggered: boolean("stop_loss_triggered")
       .notNull()
-      .default("f"),  // 借用 varchar 存 boolean(避免引入 boolean 类型额外迁移)
+      .default(false),
     created_at: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),

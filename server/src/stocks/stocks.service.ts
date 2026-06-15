@@ -6,6 +6,11 @@ import { NodePgDatabase } from 'drizzle-orm/node-postgres'
 import { Pool } from 'pg'
 import { BuyStockDto, CreateStockDto, SellStockDto, UpdateStockDto } from './dto';
 import { TushareService } from '../tushare/tushare.service';
+import {
+  buyStockTransaction,
+  sellStockTransaction,
+  TradeStateError,
+} from './trade-persistence';
 
 /**
  * 服务端价格刷新限频:1 分钟 / 股
@@ -126,16 +131,24 @@ export class StocksService {
       throw new BadRequestException('仅支持沪深北已上市的 A 股普通股票')
     }
 
-    const [row] = await this.db
-      .insert(schema.stocks)
-      .values({
-        user_id: uid,
-        code: basic.code,
-        name: basic.name,
-        industry: basic.industry || null,
-        sort_order: dto.sortOrder ?? 0,
-      })
-      .returning()
+    let row: schema.Stock
+    try {
+      [row] = await this.db
+        .insert(schema.stocks)
+        .values({
+          user_id: uid,
+          code: basic.code,
+          name: basic.name,
+          industry: basic.industry || null,
+          sort_order: dto.sortOrder ?? 0,
+        })
+        .returning()
+    } catch (error) {
+      if ((error as { code?: string }).code === '23505') {
+        throw new ConflictException(`股票 ${code} 已在自选股中`)
+      }
+      throw error
+    }
 
     // 创建后立即拉一次价格(2026-06-14)— 避免"加了不刷就没数据"的 bug
     // 失败不阻塞,继续返回 row(让用户能看到已加入;前端在详情页仍可手动刷)
@@ -211,60 +224,25 @@ export class StocksService {
    * - 同时落一条 note 记录 buy_reason(tags=['buy']),direction='bull'
    */
   async buy(uid: string, id: string, dto: BuyStockDto) {
-    const [stock] = await this.db
-      .select()
-      .from(schema.stocks)
-      .where(and(eq(schema.stocks.id, id), eq(schema.stocks.user_id, uid)))
-      .limit(1)
-    if (!stock) throw new NotFoundException(`股票 ${id} 不存在`)
-    if (stock.status === 'holding') {
-      throw new ConflictException(`股票已在持有状态,如需重新设置请先卖出`)
-    }
-
-    const enteredAt = new Date()
-    // 1. 更新 stocks
-    await this.db
-      .update(schema.stocks)
-      .set({
-        status: 'holding',
-        entry_price: String(dto.entryPrice),
-        loss_rate: String(dto.lossRate),
-        entered_at: enteredAt,
-        updated_at: new Date(),
+    const client = await this.pool.connect()
+    try {
+      return await buyStockTransaction(client, {
+        userId: uid,
+        stockId: id,
+        entryPrice: dto.entryPrice,
+        lossRate: dto.lossRate,
+        buyReason: dto.buyReason,
       })
-      .where(and(eq(schema.stocks.id, id), eq(schema.stocks.user_id, uid)))
-
-    // 2. 落一条 note 记录买入理由
-    const [note] = await this.db
-      .insert(schema.notes)
-      .values({
-        user_id: uid,
-        stock_id: stock.id,
-        stock_code: stock.code,
-        stock_name: stock.name,
-        type: 'note',
-        title: `买入:${stock.name}(${stock.code}) @ ¥${dto.entryPrice}`,
-        content: dto.buyReason,
-        direction: 'bull',
-        entry_price: String(dto.entryPrice),
-        target_price: null,
-        stop_loss: String(((dto.entryPrice * (100 - dto.lossRate)) / 100).toFixed(2)),
-        tags: ['buy'],
-        event: null,
-        source: 'manual',
-        images: [],
-        ai_summary: null,
-      })
-      .returning()
-
-    return {
-      stock_id: stock.id,
-      status: 'holding' as const,
-      entry_price: dto.entryPrice,
-      loss_rate: dto.lossRate,
-      stop_loss_price: Number(((dto.entryPrice * (100 - dto.lossRate)) / 100).toFixed(2)),
-      entered_at: enteredAt.toISOString(),
-      buy_note_id: note?.id ?? null,
+    } catch (error) {
+      if (error instanceof TradeStateError) {
+        if (error.code === 'not_found') throw new NotFoundException(`股票 ${id} 不存在`)
+        if (error.code === 'already_holding') {
+          throw new ConflictException('股票已在持有状态,如需重新设置请先卖出')
+        }
+      }
+      throw error
+    } finally {
+      client.release()
     }
   }
 
@@ -274,61 +252,23 @@ export class StocksService {
    * - 落一条 note 记录卖出理由(direction='bear', tags=['sell', 'exit'])
    */
   async sell(uid: string, id: string, dto: SellStockDto) {
-    const [stock] = await this.db
-      .select()
-      .from(schema.stocks)
-      .where(and(eq(schema.stocks.id, id), eq(schema.stocks.user_id, uid)))
-      .limit(1)
-    if (!stock) throw new NotFoundException(`股票 ${id} 不存在`)
-    if (stock.status !== 'holding') {
-      throw new BadRequestException(`股票不在持有状态(当前:${stock.status}),无法卖出`)
-    }
-
-    const currentPrice = Number(stock.current_price ?? 0)
-    const entryPrice = Number(stock.entry_price ?? 0)
-    const actualReturnPct = entryPrice > 0 ? ((currentPrice - entryPrice) / entryPrice) * 100 : 0
-
-    // 1. 清状态字段
-    await this.db
-      .update(schema.stocks)
-      .set({
-        status: 'watching',
-        entry_price: null,
-        loss_rate: null,
-        entered_at: null,
-        updated_at: new Date(),
+    const client = await this.pool.connect()
+    try {
+      return await sellStockTransaction(client, {
+        userId: uid,
+        stockId: id,
+        exitReason: dto.exitReason,
       })
-      .where(and(eq(schema.stocks.id, id), eq(schema.stocks.user_id, uid)))
-
-    // 2. 落一条卖出 note
-    const exitReason = dto.exitReason?.trim() || `手动卖出,实际收益率 ${actualReturnPct.toFixed(2)}%`
-    const [note] = await this.db
-      .insert(schema.notes)
-      .values({
-        user_id: uid,
-        stock_id: stock.id,
-        stock_code: stock.code,
-        stock_name: stock.name,
-        type: 'note',
-        title: `卖出:${stock.name}(${stock.code}) @ ¥${currentPrice.toFixed(2)}`,
-        content: exitReason,
-        direction: 'bear',
-        entry_price: stock.entry_price,
-        target_price: null,
-        stop_loss: null,
-        tags: ['sell', 'exit'],
-        event: null,
-        source: 'manual',
-        images: [],
-        ai_summary: null,
-      })
-      .returning()
-
-    return {
-      stock_id: stock.id,
-      status: 'watching' as const,
-      actual_return_pct: Number(actualReturnPct.toFixed(2)),
-      sell_note_id: note?.id ?? null,
+    } catch (error) {
+      if (error instanceof TradeStateError) {
+        if (error.code === 'not_found') throw new NotFoundException(`股票 ${id} 不存在`)
+        if (error.code === 'not_holding') {
+          throw new BadRequestException('股票不在持有状态,无法卖出')
+        }
+      }
+      throw error
+    } finally {
+      client.release()
     }
   }
 
