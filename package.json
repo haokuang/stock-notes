@@ -30,6 +30,7 @@
     "test:trade": "tsx --test server/src/stocks/trade-persistence.test.ts",
     "test:note-editor": "tsx --test src/pages/note-edit/note-editor-logic.test.ts src/pages/note-detail/note-detail-logic.test.ts server/src/notes/note-value.test.ts",
     "test:note-highlights": "tsx --test --tsconfig=server/tsconfig.json server/src/notes/highlight-migration.test.ts server/src/notes/highlight-anchor.test.ts server/src/notes/highlight-renderer.test.ts server/src/notes/note-highlight-api.test.ts src/pages/note-detail/selection-logic.test.ts",
+    "test:agent:batch1": "tsx --test --tsconfig=server/tsconfig.json server/src/agent/agent.types.test.ts server/src/agent/agent-migration.test.ts server/src/agent/agent.repository.test.ts server/src/agent/agent-api.test.ts",
     "tsc": "npx tsc --noEmit --skipLibCheck",
     "validate": "pnpm exec concurrently --kill-others-on-fail --kill-signal SIGKILL -n lint,tsc -c red,blue \"pnpm lint:build\" \"pnpm tsc\""
   },

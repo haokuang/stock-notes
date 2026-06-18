@@ -11,6 +11,7 @@ import { NotesModule } from './notes/notes.module'
 import { UploadModule } from './upload/upload.module'
 import { AiModule } from './ai/ai.module'
 import { MonitoringModule } from './monitoring/monitoring.module'
+import { AgentModule } from './agent/agent.module'
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { MonitoringModule } from './monitoring/monitoring.module'
     NotesModule,
     UploadModule,
     AiModule,
+    AgentModule,
   ],
   controllers: [AppController],
   providers: [AppService],
