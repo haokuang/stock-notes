@@ -11,6 +11,11 @@ import {
   SubmissionOutcome,
 } from './runs/run-submission'
 import { SubmitAgentMessageDto, RetryAgentRunDto } from './agent.dto'
+import {
+  AgentReportError,
+  createAgentReportService,
+  type AgentReportDetail,
+} from './report.service'
 
 export interface SubmitMessageInput {
   userId: string
@@ -132,6 +137,35 @@ export class AgentService {
       run: submit.run,
       retryOfRunId: originalRun.id,
     }
+  }
+
+  async saveReport(input: { userId: string; runId: string }): Promise<AgentReportDetail> {
+    const service = createAgentReportService({ clientFactory: () => this.pool.connect() })
+    try {
+      return await service.saveReport(input)
+    } catch (cause) {
+      if (cause instanceof AgentReportError) {
+        if (cause.statusCode === 404) throw new NotFoundException('资源不存在')
+      }
+      throw cause
+    }
+  }
+
+  async getReport(input: { userId: string; reportId: string }): Promise<AgentReportDetail> {
+    const service = createAgentReportService({ clientFactory: () => this.pool.connect() })
+    try {
+      return await service.getReport(input)
+    } catch (cause) {
+      if (cause instanceof AgentReportError && cause.statusCode === 404) {
+        throw new NotFoundException('资源不存在')
+      }
+      throw cause
+    }
+  }
+
+  async listReports(input: { userId: string; stockId: string }) {
+    const service = createAgentReportService({ clientFactory: () => this.pool.connect() })
+    return service.listReports(input)
   }
 }
 

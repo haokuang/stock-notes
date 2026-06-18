@@ -38,6 +38,17 @@ export class AgentController {
     return { data: await this.service.retryRun({ userId: user.id, runId, dto }) }
   }
 
+  @Post('runs/:id/save-report')
+  @HttpCode(200)
+  async saveReport(@CurrentUser() user: { id: string }, @Param('id') runId: string) {
+    return { data: await this.service.saveReport({ userId: user.id, runId }) }
+  }
+
+  @Get('reports/:id')
+  async getReport(@CurrentUser() user: { id: string }, @Param('id') reportId: string) {
+    return { data: await this.service.getReport({ userId: user.id, reportId }) }
+  }
+
   @Get('threads/:id/messages')
   async getMessages(
     @CurrentUser() user: { id: string },
