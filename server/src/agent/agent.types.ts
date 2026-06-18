@@ -99,6 +99,16 @@ export interface AgentReportSummary {
   createdAt: string
 }
 
+export interface AgentModelOption {
+  provider: AgentProvider
+  model: string
+  label: string
+  available: boolean
+  credentialMode?: AgentCredentialMode
+  unavailableReason?: string
+  retryAfter?: number
+}
+
 export interface MessagePage<T> {
   items: T[]
   nextCursor: string | null
