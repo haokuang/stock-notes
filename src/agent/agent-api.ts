@@ -76,7 +76,8 @@ export class AgentApiError extends Error {
   }
 }
 
-const isDev = typeof process !== 'undefined' && process.env.NODE_ENV !== 'production'
+declare const __DEV__: boolean | undefined
+const isDev = typeof __DEV__ === 'undefined' ? true : __DEV__
 
 interface Envelope<T> {
   data?: T
