@@ -1,4 +1,4 @@
-import type { AgentProvider, AgentRun } from '../agent.types'
+import type { AgentCitation, AgentProvider, AgentRun } from '../agent.types'
 
 export interface ClaimedRun {
   id: string
@@ -140,6 +140,74 @@ export class AgentRunQueueRepository {
       [],
     )
     return (result.rows as Array<{ id: string }>).map((row) => row.id)
+  }
+
+  async finalizeSuccess(input: {
+    runId: string
+    workerId: string
+    userId: string
+    threadId: string
+    content: string
+    model: string
+    provider: AgentProvider
+    citations: AgentCitation[]
+    providerMetadata: Record<string, unknown>
+  }): Promise<{ messageId: string }> {
+    const client = this.clientFactory()
+    await client.query('BEGIN')
+    let committed = false
+    try {
+      const messageResult = await client.query(
+        `INSERT INTO agent_messages
+          (thread_id, user_id, run_id, role, content, provider, model, citations, metadata)
+         VALUES ($1, $2, $3, 'assistant', $4, $5, $6, $7::jsonb, $8::jsonb)
+         RETURNING id`,
+        [
+          input.threadId,
+          input.userId,
+          input.runId,
+          input.content,
+          input.provider,
+          input.model,
+          JSON.stringify(input.citations),
+          JSON.stringify(input.providerMetadata ?? {}),
+        ],
+      )
+      const messageId = (messageResult.rows[0] as { id?: string } | undefined)?.id
+      if (!messageId) throw new Error('Failed to insert assistant message')
+      await client.query(
+        `UPDATE agent_tool_calls
+         SET status = 'completed', completed_at = COALESCE(completed_at, NOW())
+         WHERE run_id = $1 AND status = 'running'`,
+        [input.runId],
+      )
+      const update = await client.query(
+        `UPDATE agent_runs
+         SET status = 'completed',
+             stage = 'completed',
+             locked_at = NULL,
+             locked_by = NULL,
+             completed_at = NOW(),
+             updated_at = NOW()
+         WHERE id = $1 AND status = 'running' AND locked_by = $2
+         RETURNING id`,
+        [input.runId, input.workerId],
+      )
+      if (!update.rows[0]) {
+        throw new Error('Run not owned by worker or already finalized')
+      }
+      await client.query('COMMIT')
+      committed = true
+      return { messageId }
+    } finally {
+      if (!committed) {
+        try {
+          await client.query('ROLLBACK')
+        } catch {
+          // already rolled back
+        }
+      }
+    }
   }
 }
 
