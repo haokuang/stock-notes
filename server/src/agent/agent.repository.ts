@@ -56,6 +56,19 @@ export class AgentRepository {
     return mapAgentThreadRow(result.rows[0])
   }
 
+  async findUserMessage(userId: string, messageId: string): Promise<AgentMessage | null> {
+    const result = await this.pool.query<AgentMessageRow>(
+      `SELECT m.id, m.thread_id, m.user_id, m.role, m.content, m.provider, m.model,
+              m.run_id, m.citations, m.metadata, m.created_at
+       FROM agent_messages m
+       JOIN agent_threads t ON t.id = m.thread_id AND t.user_id = $1
+       WHERE m.user_id = $1 AND m.id = $2
+       LIMIT 1`,
+      [userId, messageId],
+    )
+    return result.rows[0] ? mapAgentMessageRow(result.rows[0]) : null
+  }
+
   async findThread(userId: string, threadId: string): Promise<AgentThread | null> {
     const result = await this.pool.query<AgentThreadRow>(
       `SELECT id, user_id, stock_id, title, created_at, updated_at

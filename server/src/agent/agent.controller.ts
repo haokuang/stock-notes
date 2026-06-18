@@ -1,6 +1,6 @@
 import { Body, Controller, Get, HttpCode, Param, Post, Query } from '@nestjs/common'
 import { CurrentUser } from '../storage/auth/current-user.decorator'
-import { CreateAgentThreadDto } from './agent.dto'
+import { CreateAgentThreadDto, RetryAgentRunDto, SubmitAgentMessageDto } from './agent.dto'
 import { AgentService } from './agent.service'
 
 @Controller('agent')
@@ -16,6 +16,26 @@ export class AgentController {
   @HttpCode(200)
   async createThread(@CurrentUser() user: { id: string }, @Body() dto: CreateAgentThreadDto) {
     return { data: await this.service.createThread(user.id, dto.stock_id) }
+  }
+
+  @Post('threads/:id/messages')
+  @HttpCode(200)
+  async submitMessage(
+    @CurrentUser() user: { id: string },
+    @Param('id') threadId: string,
+    @Body() dto: SubmitAgentMessageDto,
+  ) {
+    return { data: await this.service.submitMessage({ userId: user.id, threadId, dto }) }
+  }
+
+  @Post('runs/:id/retry')
+  @HttpCode(200)
+  async retryRun(
+    @CurrentUser() user: { id: string },
+    @Param('id') runId: string,
+    @Body() dto: RetryAgentRunDto,
+  ) {
+    return { data: await this.service.retryRun({ userId: user.id, runId, dto }) }
   }
 
   @Get('threads/:id/messages')

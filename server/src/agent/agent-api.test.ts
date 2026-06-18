@@ -23,12 +23,14 @@ test('returns one data envelope for batch-one routes', async () => {
     findThreadByStock: async () => thread,
     getOrCreateThread: async () => thread,
     findThread: async () => thread,
+    findUserMessage: async () => ({ id: 'msg-1', content: 'hi' }),
     listMessages: async () => ({ items: [], nextCursor: null }),
     findRun: async () => ({ id: 'run-1' }),
     listReports: async () => [],
   }
   const health = { snapshot: () => ({}) }
-  const service = new AgentService(repository as never, health as never)
+  const pool = { connect: async () => ({ release: () => undefined, query: async () => ({ rows: [] }) }) }
+  const service = new AgentService(repository as never, health as never, pool as never)
   const controller = new AgentController(service)
 
   assert.deepEqual(await controller.getThread({ id: 'user-1' }, 'stock-1'), { data: thread })
@@ -45,12 +47,14 @@ test('normalizes non-owned thread and run reads to 404', async () => {
     findThreadByStock: async () => null,
     getOrCreateThread: async () => { throw new Error('Stock not found') },
     findThread: async () => null,
+    findUserMessage: async () => null,
     listMessages: async () => ({ items: [], nextCursor: null }),
     findRun: async () => null,
     listReports: async () => [],
   }
   const health = { snapshot: () => ({}) }
-  const service = new AgentService(repository as never, health as never)
+  const pool = { connect: async () => ({ release: () => undefined, query: async () => ({ rows: [] }) }) }
+  const service = new AgentService(repository as never, health as never, pool as never)
 
   await assert.rejects(service.getMessages('user-2', 'thread-1', null, 20), /资源不存在/)
   await assert.rejects(service.getRun('user-2', 'run-1'), /资源不存在/)
