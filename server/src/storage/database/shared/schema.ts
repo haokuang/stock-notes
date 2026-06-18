@@ -157,6 +157,112 @@ export const stockPrices = pgTable(
   ],
 );
 
+export const agentThreads = pgTable(
+  "agent_threads",
+  {
+    id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+    user_id: uuid("user_id").notNull(),
+    stock_id: varchar("stock_id", { length: 36 })
+      .notNull()
+      .references(() => stocks.id, { onDelete: "cascade" }),
+    title: varchar("title", { length: 200 }).notNull(),
+    created_at: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updated_at: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("agent_threads_user_stock_uq").on(table.user_id, table.stock_id),
+    index("agent_threads_user_updated_idx").on(table.user_id, table.updated_at),
+  ],
+);
+
+export const agentMessages = pgTable(
+  "agent_messages",
+  {
+    id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+    thread_id: varchar("thread_id", { length: 36 })
+      .notNull()
+      .references(() => agentThreads.id, { onDelete: "cascade" }),
+    user_id: uuid("user_id").notNull(),
+    role: varchar("role", { length: 20 }).notNull(),
+    content: text("content").notNull(),
+    provider: varchar("provider", { length: 20 }),
+    model: varchar("model", { length: 100 }),
+    run_id: varchar("run_id", { length: 36 }),
+    citations: jsonb("citations").default(sql`'[]'::jsonb`).notNull(),
+    metadata: jsonb("metadata").default(sql`'{}'::jsonb`).notNull(),
+    created_at: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("agent_messages_thread_order_idx").on(table.thread_id, table.created_at, table.id),
+    index("agent_messages_user_id_idx").on(table.user_id),
+  ],
+);
+
+export const agentRuns = pgTable(
+  "agent_runs",
+  {
+    id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+    thread_id: varchar("thread_id", { length: 36 })
+      .notNull()
+      .references(() => agentThreads.id, { onDelete: "cascade" }),
+    user_id: uuid("user_id").notNull(),
+    user_message_id: varchar("user_message_id", { length: 36 })
+      .notNull()
+      .references(() => agentMessages.id, { onDelete: "cascade" }),
+    client_request_id: varchar("client_request_id", { length: 100 }).notNull(),
+    provider: varchar("provider", { length: 20 }).notNull(),
+    model: varchar("model", { length: 100 }).notNull(),
+    credential_mode: varchar("credential_mode", { length: 20 }),
+    status: varchar("status", { length: 20 }).default("queued").notNull(),
+    stage: varchar("stage", { length: 30 }).default("queued").notNull(),
+    attempt_count: integer("attempt_count").default(0).notNull(),
+    max_attempts: integer("max_attempts").default(2).notNull(),
+    locked_at: timestamp("locked_at", { withTimezone: true }),
+    locked_by: varchar("locked_by", { length: 100 }),
+    started_at: timestamp("started_at", { withTimezone: true }),
+    completed_at: timestamp("completed_at", { withTimezone: true }),
+    error_code: varchar("error_code", { length: 100 }),
+    error_message: text("error_message"),
+    retry_after: integer("retry_after"),
+    created_at: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updated_at: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("agent_runs_user_request_uq").on(table.user_id, table.client_request_id),
+    uniqueIndex("agent_runs_one_active_per_thread_uq")
+      .on(table.thread_id)
+      .where(sql`${table.status} IN ('queued', 'running')`),
+    index("agent_runs_queue_idx").on(table.status, table.created_at, table.id),
+    index("agent_runs_user_id_idx").on(table.user_id),
+  ],
+);
+
+export const agentToolCalls = pgTable(
+  "agent_tool_calls",
+  {
+    id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+    run_id: varchar("run_id", { length: 36 })
+      .notNull()
+      .references(() => agentRuns.id, { onDelete: "cascade" }),
+    thread_id: varchar("thread_id", { length: 36 })
+      .notNull()
+      .references(() => agentThreads.id, { onDelete: "cascade" }),
+    user_id: uuid("user_id").notNull(),
+    tool_name: varchar("tool_name", { length: 100 }).notNull(),
+    arguments: jsonb("arguments").default(sql`'{}'::jsonb`).notNull(),
+    result: jsonb("result"),
+    status: varchar("status", { length: 20 }).notNull(),
+    error_code: varchar("error_code", { length: 100 }),
+    duration_ms: integer("duration_ms"),
+    created_at: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    completed_at: timestamp("completed_at", { withTimezone: true }),
+  },
+  (table) => [
+    index("agent_tool_calls_run_created_idx").on(table.run_id, table.created_at, table.id),
+    index("agent_tool_calls_user_id_idx").on(table.user_id),
+  ],
+);
+
 /**
  * AI 报告：单图解读 / 跨观点报告
  */
@@ -173,6 +279,10 @@ export const aiReports = pgTable(
     ),
     stock_code: varchar("stock_code", { length: 20 }),
     stock_name: varchar("stock_name", { length: 100 }),
+    agent_run_id: varchar("agent_run_id", { length: 36 }).references(
+      () => agentRuns.id,
+      { onDelete: "set null" },
+    ),
     type: varchar("type", { length: 20 }).notNull(), // image_understand / cross_view
     title: varchar("title", { length: 200 }).notNull(),
     content: text("content"),
@@ -187,6 +297,9 @@ export const aiReports = pgTable(
     index("ai_reports_stock_id_idx").on(table.stock_id),
     index("ai_reports_type_idx").on(table.type),
     index("ai_reports_created_at_idx").on(table.created_at),
+    uniqueIndex("ai_reports_agent_run_uq")
+      .on(table.agent_run_id)
+      .where(sql`${table.agent_run_id} IS NOT NULL`),
   ],
 );
 
@@ -198,6 +311,14 @@ export type AiReport = typeof aiReports.$inferSelect;
 export type NewAiReport = typeof aiReports.$inferInsert;
 export type StockPrice = typeof stockPrices.$inferSelect;
 export type NewStockPrice = typeof stockPrices.$inferInsert;
+export type AgentThread = typeof agentThreads.$inferSelect;
+export type NewAgentThread = typeof agentThreads.$inferInsert;
+export type AgentMessage = typeof agentMessages.$inferSelect;
+export type NewAgentMessage = typeof agentMessages.$inferInsert;
+export type AgentRun = typeof agentRuns.$inferSelect;
+export type NewAgentRun = typeof agentRuns.$inferInsert;
+export type AgentToolCall = typeof agentToolCalls.$inferSelect;
+export type NewAgentToolCall = typeof agentToolCalls.$inferInsert;
 
 /**
  * 每日简评结构化缓存(2026-06-14 改造)
