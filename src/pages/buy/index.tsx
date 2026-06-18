@@ -5,12 +5,8 @@ import { Network } from '@/network'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
-
-// 微信小程序密码输入用 boolean `password` prop;但这里是普通 TaroInput,绕开项目 UI Input 类型限制
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-import * as TaroComponents from '@tarojs/components'
-
-const TaroInput = (TaroComponents as any).Input
+import { Alert } from '@/components/ui/alert'
+import { TriangleAlert } from 'lucide-react-taro'
 
 interface BuyResponse {
   stock_id: string
@@ -118,14 +114,12 @@ export default function BuyPage() {
           <Text className="block text-xs font-medium text-on-surface-variant mb-2">
             买入价 (¥) <Text className="text-error">*</Text>
           </Text>
-          {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-          <TaroInput
+          <Input
             type="digit"
             value={entryPrice}
             onInput={(e: any) => setEntryPrice(e.detail.value)}
             placeholder="例如 35.50"
-            placeholderClass="text-muted-foreground"
-            className="w-full px-3 py-3 rounded-md bg-surface-container text-sm text-on-surface border border-input"
+            className="h-12 rounded-xl bg-surface-container px-4 py-3"
             disabled={loading}
           />
         </View>
@@ -139,6 +133,7 @@ export default function BuyPage() {
             value={lossRate}
             onInput={(e: any) => setLossRate(e.detail.value)}
             placeholder="例如 10 表示亏损 10% 止损"
+            className="h-12 rounded-xl bg-surface-container px-4 py-3"
             disabled={loading}
           />
           <Text className="block text-[11px] text-on-surface-variant mt-1">
@@ -166,14 +161,20 @@ export default function BuyPage() {
         </View>
 
         {stopLoss ? (
-          <View className="rounded-lg p-3 bg-warning bg-opacity-10">
-            <Text className="block text-xs font-semibold text-warning">
-              止损价预览:¥{stopLoss}
-            </Text>
-            <Text className="block text-[11px] text-on-surface-variant mt-1">
-              当股价跌至 ¥{stopLoss} 时,系统会提醒并建议重新评估
-            </Text>
-          </View>
+          <Alert className="rounded-xl border-red-200 bg-red-50 p-4">
+            <View className="flex items-start gap-3">
+              <View className="mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-error">
+                <TriangleAlert size={18} color="#FFFFFF" strokeWidth={2} />
+              </View>
+              <View className="min-w-0 flex-1">
+                <Text className="block text-xs font-medium text-on-surface-variant">预计止损价</Text>
+                <Text className="mt-1 block text-xl font-bold text-error">¥{stopLoss}</Text>
+                <Text className="mt-1 block text-xs leading-relaxed text-on-surface-variant">
+                  较买入价下跌 {lossRate}% 时提醒，并建议重新评估
+                </Text>
+              </View>
+            </View>
+          </Alert>
         ) : null}
 
         {error ? (
