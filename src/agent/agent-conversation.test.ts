@@ -41,17 +41,16 @@ test('useAgentConversation merges REST + event messages by id without duplicates
 
 test('useAgentConversation drops messages from other threads', () => {
   const event = makeMessage('msg-x', 'other-thread', 'leak', '2026-06-18T10:00:00.000Z')
-  const state = []
-  const accepted = event.thread_id === 'thread-1' ? event : null
-  if (accepted) state.push(accepted)
-  assert.equal(state.length, 0)
+  const accepted: AgentMessage[] = []
+  if (event.threadId === 'thread-1') accepted.push(event)
+  assert.equal(accepted.length, 0)
 })
 
 test('useAgentConversation drops messages from other users', () => {
   const event = makeMessage('msg-y', 'thread-1', 'cross tenant', '2026-06-18T10:00:00.000Z')
-  event.user_id = 'user-2'
+  const modified = { ...event, userId: 'user-2' }
   const userId = 'user-1'
-  const accepted = event.user_id === userId ? event : null
+  const accepted = modified.userId === userId ? modified : null
   assert.equal(accepted, null)
 })
 

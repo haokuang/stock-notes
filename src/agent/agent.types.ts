@@ -80,3 +80,14 @@ export interface AgentModelOption {
   unavailableReason?: string
   retryAfter?: number
 }
+
+export interface AgentReportSummary {
+  id: string
+  stockId: string | null
+  stockCode: string | null
+  stockName: string | null
+  title: string
+  status: string
+  agentRunId: string | null
+  createdAt: string
+}

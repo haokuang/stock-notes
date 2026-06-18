@@ -2,6 +2,86 @@ import { useEffect } from 'react'
 import { getSupabase } from '../lib/supabase'
 import type { AgentMessage, AgentRun } from '../agent/agent.types'
 
+interface AgentMessageRawRow {
+  id: string
+  thread_id: string
+  user_id: string
+  role: string
+  content: string
+  provider: string | null
+  model: string | null
+  run_id: string | null
+  citations: unknown
+  metadata: unknown
+  created_at: string
+}
+
+interface AgentRunRawRow {
+  id: string
+  thread_id: string
+  user_id: string
+  user_message_id: string
+  client_request_id: string
+  provider: string
+  model: string
+  credential_mode: string | null
+  status: string
+  stage: string
+  attempt_count: number
+  max_attempts: number
+  locked_at: string | null
+  locked_by: string | null
+  started_at: string | null
+  completed_at: string | null
+  error_code: string | null
+  error_message: string | null
+  retry_after: number | null
+  created_at: string
+  updated_at: string
+}
+
+function toAgentMessage(row: AgentMessageRawRow): AgentMessage {
+  return {
+    id: row.id,
+    threadId: row.thread_id,
+    userId: row.user_id,
+    role: row.role as AgentMessage['role'],
+    content: row.content,
+    provider: (row.provider ?? null) as AgentMessage['provider'],
+    model: row.model,
+    runId: row.run_id,
+    citations: Array.isArray(row.citations) ? (row.citations as AgentMessage['citations']) : [],
+    metadata: row.metadata && typeof row.metadata === 'object' && !Array.isArray(row.metadata) ? (row.metadata as Record<string, unknown>) : {},
+    createdAt: row.created_at,
+  }
+}
+
+function toAgentRun(row: AgentRunRawRow): AgentRun {
+  return {
+    id: row.id,
+    threadId: row.thread_id,
+    userId: row.user_id,
+    userMessageId: row.user_message_id,
+    clientRequestId: row.client_request_id,
+    provider: row.provider as AgentRun['provider'],
+    model: row.model,
+    credentialMode: (row.credential_mode ?? null) as AgentRun['credentialMode'],
+    status: row.status as AgentRun['status'],
+    stage: row.stage as AgentRun['stage'],
+    attemptCount: row.attempt_count,
+    maxAttempts: row.max_attempts,
+    lockedAt: row.locked_at,
+    lockedBy: row.locked_by,
+    startedAt: row.started_at,
+    completedAt: row.completed_at,
+    errorCode: row.error_code,
+    errorMessage: row.error_message,
+    retryAfter: row.retry_after,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  }
+}
+
 export interface AgentRealtimeEvent {
   kind: 'message' | 'run'
   payload: AgentMessage | AgentRun
@@ -45,12 +125,12 @@ export function useAgentRealtime({ threadId, runId, userId, onEvent, onChannelSt
           table: 'agent_messages',
           filter: `thread_id=eq.${threadId}`,
         },
-        (payload: { eventType: 'INSERT' | 'UPDATE' | 'DELETE'; new: AgentMessage; old: AgentMessage | null }) => {
+        (payload: { eventType: 'INSERT' | 'UPDATE' | 'DELETE'; new: AgentMessageRawRow; old: AgentMessageRawRow | null }) => {
           if (payload.eventType === 'DELETE') return
-          const message = payload.new
-          if (!message?.id || message.thread_id !== threadId) return
-          if (userId && message.user_id && message.user_id !== userId) return
-          onEvent({ kind: 'message', payload: message })
+          const row = payload.new
+          if (!row?.id || row.thread_id !== threadId) return
+          if (userId && row.user_id && row.user_id !== userId) return
+          onEvent({ kind: 'message', payload: toAgentMessage(row) })
         },
       )
       .on(
@@ -61,14 +141,14 @@ export function useAgentRealtime({ threadId, runId, userId, onEvent, onChannelSt
           table: 'agent_runs',
           filter: runId ? `id=eq.${runId}` : `thread_id=eq.${threadId}`,
         },
-        (payload: { eventType: 'INSERT' | 'UPDATE' | 'DELETE'; new: AgentRun; old: AgentRun | null }) => {
+        (payload: { eventType: 'INSERT' | 'UPDATE' | 'DELETE'; new: AgentRunRawRow; old: AgentRunRawRow | null }) => {
           if (payload.eventType === 'DELETE') return
-          const run = payload.new
-          if (!run?.id) return
-          if (runId && run.id !== runId) return
-          if (run.thread_id !== threadId) return
-          if (userId && run.user_id && run.user_id !== userId) return
-          onEvent({ kind: 'run', payload: run })
+          const row = payload.new
+          if (!row?.id) return
+          if (runId && row.id !== runId) return
+          if (row.thread_id !== threadId) return
+          if (userId && row.user_id && row.user_id !== userId) return
+          onEvent({ kind: 'run', payload: toAgentRun(row) })
         },
       )
       .subscribe((status) => {
