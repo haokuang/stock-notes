@@ -14,13 +14,13 @@
 
 ## 批次顺序
 
-| 批次 | 设计文档 | 主要产物 | 进入条件 | 完成条件 |
+| 批次 | 设计文档 | 实施计划 | 主要产物 | 完成条件 |
 |---|---|---|---|---|
-| 1 | `2026-06-18-stock-agent-batch-1-data-contracts-design.md` | 数据表、RLS、Realtime publication、领域类型、仓储和 API 骨架 | 当前主干可通过既有校验 | 数据与权限契约测试通过，不调用模型 |
-| 2 | `2026-06-18-stock-agent-batch-2-model-providers-design.md` | 三家 Provider、模型目录、MiniMax Coding Plan 健康治理 | 批次 1 类型与持久化契约稳定 | 三家 Provider 合约和错误映射测试通过 |
-| 3 | `2026-06-18-stock-agent-batch-3-orchestration-tools-design.md` | 只读工具、Tavily、上下文构建、AgentOrchestrator | 批次 2 Provider 合约稳定 | 同步测试入口可完成含工具调用的完整回合 |
-| 4 | `2026-06-18-stock-agent-batch-4-background-realtime-design.md` | Run Worker、互斥、领取、重试、恢复、Realtime | 批次 3 编排结果稳定 | API 提交后可异步完成并实时观察状态 |
-| 5 | `2026-06-18-stock-agent-batch-5-product-loop-design.md` | Taro 会话体验、报告闭环、兼容与上线验收 | 批次 4 异步链路稳定 | H5/微信端完整流程和回归通过 |
+| 1 | `2026-06-18-stock-agent-batch-1-data-contracts-design.md` | `../plans/2026-06-18-stock-agent-batch-1-data-contracts.md` | 数据表、RLS、Realtime publication、领域类型、仓储和 API 骨架 | 数据与权限契约测试通过，不调用模型 |
+| 2 | `2026-06-18-stock-agent-batch-2-model-providers-design.md` | `../plans/2026-06-18-stock-agent-batch-2-model-providers.md` | 三家 Provider、模型目录、MiniMax Coding Plan 健康治理 | 三家 Provider 合约和错误映射测试通过 |
+| 3 | `2026-06-18-stock-agent-batch-3-orchestration-tools-design.md` | `../plans/2026-06-18-stock-agent-batch-3-orchestration-tools.md` | 只读工具、Tavily、上下文构建、AgentOrchestrator | 同步测试入口可完成含工具调用的完整回合 |
+| 4 | `2026-06-18-stock-agent-batch-4-background-realtime-design.md` | `../plans/2026-06-18-stock-agent-batch-4-background-realtime.md` | Run Worker、互斥、领取、重试、恢复、Realtime | API 提交后可异步完成并实时观察状态 |
+| 5 | `2026-06-18-stock-agent-batch-5-product-loop-design.md` | `../plans/2026-06-18-stock-agent-batch-5-product-loop.md` | Taro 会话体验、报告闭环、兼容与上线验收 | H5/微信端完整流程和回归通过 |
 
 ## 全局不变量
 
@@ -40,4 +40,3 @@
 - RLS 验证不同用户不能读取或修改 Thread、Message、Run、Tool Call、Report。
 - DeepSeek、OpenAI、MiniMax 可逐条切换；MiniMax Coding Plan 状态可见且密钥不外泄。
 - 服务重启、临时网络错误、429、额度耗尽、工具失败和 Tavily 超时均符合对应设计。
-
