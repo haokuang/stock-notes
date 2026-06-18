@@ -27,7 +27,8 @@ test('returns one data envelope for batch-one routes', async () => {
     findRun: async () => ({ id: 'run-1' }),
     listReports: async () => [],
   }
-  const service = new AgentService(repository as never)
+  const health = { snapshot: () => ({}) }
+  const service = new AgentService(repository as never, health as never)
   const controller = new AgentController(service)
 
   assert.deepEqual(await controller.getThread({ id: 'user-1' }, 'stock-1'), { data: thread })
@@ -48,7 +49,8 @@ test('normalizes non-owned thread and run reads to 404', async () => {
     findRun: async () => null,
     listReports: async () => [],
   }
-  const service = new AgentService(repository as never)
+  const health = { snapshot: () => ({}) }
+  const service = new AgentService(repository as never, health as never)
 
   await assert.rejects(service.getMessages('user-2', 'thread-1', null, 20), /资源不存在/)
   await assert.rejects(service.getRun('user-2', 'run-1'), /资源不存在/)

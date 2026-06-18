@@ -1,9 +1,15 @@
 import { Injectable, NotFoundException } from '@nestjs/common'
+import type { AgentModelOption } from './agent.types'
 import { AgentRepository } from './agent.repository'
+import { buildModelCatalog, loadProviderConfig } from './providers/provider-config'
+import { ProviderHealthService } from './providers/provider-health.service'
 
 @Injectable()
 export class AgentService {
-  constructor(private readonly repository: AgentRepository) {}
+  constructor(
+    private readonly repository: AgentRepository,
+    private readonly health: ProviderHealthService,
+  ) {}
 
   async getThread(userId: string, stockId: string) {
     return this.repository.findThreadByStock(userId, stockId)
@@ -31,5 +37,10 @@ export class AgentService {
 
   async getReports(userId: string, stockId: string) {
     return this.repository.listReports(userId, stockId)
+  }
+
+  listModels(): AgentModelOption[] {
+    const config = loadProviderConfig(process.env)
+    return buildModelCatalog(config, this.health.snapshot())
   }
 }

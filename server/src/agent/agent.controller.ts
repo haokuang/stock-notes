@@ -39,4 +39,10 @@ export class AgentController {
   async getReports(@CurrentUser() user: { id: string }, @Query('stock_id') stockId: string) {
     return { data: await this.service.getReports(user.id, stockId?.trim()) }
   }
+
+  @Get('models')
+  @HttpCode(200)
+  async getModels() {
+    return { data: this.service.listModels() }
+  }
 }
