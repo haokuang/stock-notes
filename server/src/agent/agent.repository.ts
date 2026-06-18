@@ -133,4 +133,164 @@ export class AgentRepository {
     )
     return result.rows.map(mapAgentReportSummaryRow)
   }
+
+  async getStockProfile(
+    userId: string,
+    stockId: string,
+  ): Promise<AgentStockProfile | null> {
+    const result = await this.pool.query<AgentStockProfileRow>(
+      `SELECT code, name, industry, current_price, change_amount, change_percent,
+              price_date, open_price, high_price, low_price, pre_close, note
+       FROM stocks
+       WHERE user_id = $1 AND id = $2
+       LIMIT 1`,
+      [userId, stockId],
+    )
+    const row = result.rows[0]
+    return row ? mapAgentStockProfileRow(row) : null
+  }
+
+  async getPriceHistory(
+    userId: string,
+    stockId: string,
+    limit = 120,
+  ): Promise<AgentPriceHistoryRow[]> {
+    const safeLimit = Math.max(1, Math.min(120, Math.trunc(limit)))
+    const result = await this.pool.query<AgentPriceHistoryRow>(
+      `SELECT trade_date, open_price, high_price, low_price, close_price,
+              pre_close, change_amount, change_percent, volume, amount
+       FROM stock_prices
+       WHERE user_id = $1 AND stock_id = $2
+       ORDER BY trade_date DESC
+       LIMIT $3`,
+      [userId, stockId, safeLimit],
+    )
+    return result.rows
+  }
+
+  async getStockNotes(
+    userId: string,
+    stockId: string,
+    limit = 50,
+    maxContentLength = 4000,
+  ): Promise<AgentStockNoteRow[]> {
+    const safeLimit = Math.max(1, Math.min(50, Math.trunc(limit)))
+    const result = await this.pool.query<AgentStockNoteRow>(
+      `SELECT id, title, direction, entry_price, target_price, stop_loss,
+              tags, content, created_at
+       FROM notes
+       WHERE user_id = $1 AND stock_id = $2
+       ORDER BY created_at DESC, id DESC
+       LIMIT $3`,
+      [userId, stockId, safeLimit],
+    )
+    return result.rows.map((row) => truncateNoteContent(row, maxContentLength))
+  }
+
+  async getDailyBriefs(
+    userId: string,
+    stockId: string,
+    limit = 7,
+  ): Promise<AgentDailyBriefRow[]> {
+    const safeLimit = Math.max(1, Math.min(7, Math.trunc(limit)))
+    const result = await this.pool.query<AgentDailyBriefRow>(
+      `SELECT id, trade_date, signal, action, technical_analysis, logic_judgment,
+              price_at_brief, stop_loss_triggered, created_at
+       FROM stock_briefs
+       WHERE user_id = $1 AND stock_id = $2
+       ORDER BY trade_date DESC, created_at DESC
+       LIMIT $3`,
+      [userId, stockId, safeLimit],
+    )
+    return result.rows
+  }
+}
+
+interface AgentStockProfileRow {
+  code: string
+  name: string
+  industry: string | null
+  current_price: string | null
+  change_amount: string | null
+  change_percent: string | null
+  price_date: string | null
+  open_price: string | null
+  high_price: string | null
+  low_price: string | null
+  pre_close: string | null
+  note: string | null
+}
+
+interface AgentPriceHistoryRow {
+  trade_date: string
+  open_price: string | null
+  high_price: string | null
+  low_price: string | null
+  close_price: string | null
+  pre_close: string | null
+  change_amount: string | null
+  change_percent: string | null
+  volume: string | null
+  amount: string | null
+}
+
+interface AgentStockNoteRow {
+  id: string
+  title: string
+  direction: string | null
+  entry_price: string | null
+  target_price: string | null
+  stop_loss: string | null
+  tags: string[]
+  content: string
+  created_at: string
+}
+
+interface AgentDailyBriefRow {
+  id: string
+  trade_date: string
+  signal: string
+  action: string
+  technical_analysis: string
+  logic_judgment: string
+  price_at_brief: string | null
+  stop_loss_triggered: boolean
+  created_at: string
+}
+
+interface AgentStockProfile {
+  code: string
+  name: string
+  industry: string | null
+  currentPrice: string | null
+  changeAmount: string | null
+  changePercent: string | null
+  priceDate: string | null
+  openPrice: string | null
+  highPrice: string | null
+  lowPrice: string | null
+  preClose: string | null
+  note: string | null
+}
+
+function mapAgentStockProfileRow(row: AgentStockProfileRow): AgentStockProfile {
+  return {
+    code: row.code,
+    name: row.name,
+    industry: row.industry,
+    currentPrice: row.current_price,
+    changeAmount: row.change_amount,
+    changePercent: row.change_percent,
+    priceDate: row.price_date,
+    openPrice: row.open_price,
+    highPrice: row.high_price,
+    lowPrice: row.low_price,
+    preClose: row.pre_close,
+    note: row.note,
+  }
+}
+
+function truncateNoteContent(row: AgentStockNoteRow, maxLength: number): AgentStockNoteRow {
+  if (row.content.length <= maxLength) return row
+  return { ...row, content: row.content.slice(0, maxLength) }
 }

@@ -9,16 +9,26 @@ import {
 } from './tool.types'
 
 interface ZodFieldLike {
-  def?: { type?: string; innerType?: ZodFieldLike; values?: unknown[]; description?: string }
+  def?: {
+    type?: string
+    innerType?: ZodFieldLike
+    values?: unknown[]
+    description?: string
+    shape?: Record<string, ZodFieldLike>
+  }
   type?: string
 }
 
+function fieldDef(value: ZodFieldLike): NonNullable<ZodFieldLike['def']> {
+  return (value.def ?? {}) as NonNullable<ZodFieldLike['def']>
+}
+
 function fieldType(value: ZodFieldLike): string {
-  return value.def?.type ?? value.type ?? 'unknown'
+  return fieldDef(value).type ?? value.type ?? 'unknown'
 }
 
 function innerField(value: ZodFieldLike): ZodFieldLike {
-  return value.def?.innerType ?? value
+  return fieldDef(value).innerType ?? value
 }
 
 function assertSafeSchema(name: string, schema: z.ZodType<unknown>): void {
@@ -48,16 +58,14 @@ function toJsonField(value: ZodFieldLike): Record<string, unknown> {
     case 'boolean':
       return { type: 'boolean' }
     case 'enum':
-      return { type: 'string', enum: value.def?.values ?? [] }
+      return { type: 'string', enum: fieldDef(value).values ?? [] }
     case 'optional':
     case 'default': {
       const inner = innerField(value)
       return toJsonField(inner)
     }
     case 'object': {
-      const innerShape = (value.def?.shape ?? (innerField(value).def?.shape)) as
-        | Record<string, ZodFieldLike>
-        | undefined
+      const innerShape = fieldDef(value).shape
       if (!innerShape) return { type: 'object', additionalProperties: false }
       const properties: Record<string, unknown> = {}
       for (const [k, v] of Object.entries(innerShape)) {
@@ -130,8 +138,8 @@ export class AgentToolRegistry {
     if (!parsed.success) {
       throw new AgentToolValidationError(
         `Tool "${name}" arguments failed validation: ${parsed.error.issues
-          .map((i: { path: (string | number)[]; message: string }) =>
-            `${i.path.join('.')}: ${i.message}`,
+          .map((i: { path: PropertyKey[]; message: string }) =>
+            `${i.path.map(String).join('.')}: ${i.message}`,
           )
           .join('; ')}`,
       )
