@@ -8,6 +8,7 @@ import { AgentToolRegistry } from './tools/tool-registry'
 import { AgentToolOwnershipError } from './tools/tool.types'
 import { buildAgentContext } from './context/agent-context.builder'
 import type { AgentRepository } from './agent.repository'
+import type { ProviderRegistry } from './providers/provider-registry'
 
 export class AgentTimeoutError extends Error {
   constructor() {
@@ -39,7 +40,8 @@ export interface AgentOrchestratorResult {
 }
 
 export interface AgentOrchestratorOptions {
-  provider: AgentModelProvider
+  provider?: AgentModelProvider
+  providerRegistry?: Pick<ProviderRegistry, 'get'>
   registry: AgentToolRegistry
   repository: Pick<
     AgentRepository,
@@ -57,7 +59,8 @@ const DEFAULT_DEADLINE_MS = 90_000
 const MAX_TOOL_RESULT_LENGTH = 4000
 
 export class AgentOrchestrator {
-  private readonly provider: AgentModelProvider
+  private readonly provider?: AgentModelProvider
+  private readonly providerRegistry?: Pick<ProviderRegistry, 'get'>
   private readonly registry: AgentToolRegistry
   private readonly repository: AgentOrchestratorOptions['repository']
   private readonly stockIdentity: AgentOrchestratorOptions['stockIdentity']
@@ -66,6 +69,8 @@ export class AgentOrchestrator {
 
   constructor(options: AgentOrchestratorOptions) {
     this.provider = options.provider
+    this.providerRegistry = options.providerRegistry
+    if (!this.provider && !this.providerRegistry) throw new Error('Agent provider is required')
     this.registry = options.registry
     this.repository = options.repository
     this.stockIdentity = options.stockIdentity
@@ -103,11 +108,13 @@ export class AgentOrchestrator {
       })
 
       const transcript: AgentStandardMessage[] = [...context.messages]
+      const provider = this.providerRegistry?.get(input.run.provider) ?? this.provider!
       let toolBearingCycles = 0
       let finalContent = ''
 
       for (let cycle = 1; cycle <= this.maxCycles; cycle += 1) {
-        const turn = await this.provider.generate({
+        await this.repository.updateRunStage(input.run.id, 'generating')
+        const turn = await provider.generate({
           model: input.run.model,
           messages: transcript,
           tools: this.toProviderToolDefinitions(this.registry.definitions()),

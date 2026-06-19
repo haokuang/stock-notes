@@ -12,6 +12,7 @@ function makeWorker(options: {
   throwOnOrchestrate?: Error
 } = {}) {
   const calls: { method: string; runId?: string }[] = []
+  let orchestratorInput: { stockId?: string } | null = null
   let heartbeatCount = 0
   const claimed = options.claimed ?? []
   const queue = {
@@ -37,6 +38,7 @@ function makeWorker(options: {
   }
   const orchestrator = {
     run: async (_input: unknown) => {
+      orchestratorInput = _input as { stockId?: string }
       if (options.throwOnOrchestrate) throw options.throwOnOrchestrate
       return {
         content: options.finalizeContent ?? 'ok',
@@ -53,23 +55,24 @@ function makeWorker(options: {
     leaseMs: 45_000,
     queue: queue as unknown as AgentRunQueueRepository,
     orchestrator: orchestrator as unknown as AgentOrchestrator,
-    onStage: (runId, stage) => stages.push({ runId, stage }),
+    onStage: (runId, stage) => { stages.push({ runId, stage }) },
   })
-  return { worker, calls, stages, getHeartbeatCount: () => heartbeatCount }
+  return { worker, calls, stages, getHeartbeatCount: () => heartbeatCount, getOrchestratorInput: () => orchestratorInput }
 }
 
 test('worker claims and finalizes a successful run', async () => {
-  const { worker, calls, stages } = makeWorker({
-    claimed: [{ id: 'run-1', userId: 'user-1', threadId: 'thread-1', userMessageId: 'msg-1', provider: 'deepseek', model: 'm', attemptCount: 1, maxAttempts: 2 }],
+  const { worker, calls, stages, getOrchestratorInput } = makeWorker({
+    claimed: [{ id: 'run-1', userId: 'user-1', threadId: 'thread-1', stockId: 'stock-1', userMessageId: 'msg-1', provider: 'deepseek', model: 'm', attemptCount: 1, maxAttempts: 2 }],
   })
   await worker.tick()
   assert.deepEqual(calls.map((c) => c.method), ['claim', 'finalizeSuccess'])
   assert.ok(stages.some((s) => s.stage === 'completed'))
+  assert.equal(getOrchestratorInput()?.stockId, 'stock-1')
 })
 
 test('worker concurrency is bounded by claim limit', async () => {
   const { worker, calls } = makeWorker({
-    claimed: [{ id: 'run-1', userId: 'user-1', threadId: 'thread-1', userMessageId: 'msg-1', provider: 'deepseek', model: 'm', attemptCount: 1, maxAttempts: 2 }],
+    claimed: [{ id: 'run-1', userId: 'user-1', threadId: 'thread-1', stockId: 'stock-1', userMessageId: 'msg-1', provider: 'deepseek', model: 'm', attemptCount: 1, maxAttempts: 2 }],
   })
   await worker.tick()
   const claim = calls.find((c) => c.method === 'claim')
@@ -78,7 +81,7 @@ test('worker concurrency is bounded by claim limit', async () => {
 
 test('worker markRetryable on retryable failure when attempts remain', async () => {
   const { worker, calls } = makeWorker({
-    claimed: [{ id: 'run-1', userId: 'user-1', threadId: 'thread-1', userMessageId: 'msg-1', provider: 'deepseek', model: 'm', attemptCount: 1, maxAttempts: 2 }],
+    claimed: [{ id: 'run-1', userId: 'user-1', threadId: 'thread-1', stockId: 'stock-1', userMessageId: 'msg-1', provider: 'deepseek', model: 'm', attemptCount: 1, maxAttempts: 2 }],
     throwOnOrchestrate: new Error('UPSTREAM_TIMEOUT'),
   })
   await worker.tick()
@@ -88,7 +91,7 @@ test('worker markRetryable on retryable failure when attempts remain', async () 
 
 test('worker markFailed when attemptCount >= maxAttempts', async () => {
   const { worker, calls } = makeWorker({
-    claimed: [{ id: 'run-1', userId: 'user-1', threadId: 'thread-1', userMessageId: 'msg-1', provider: 'deepseek', model: 'm', attemptCount: 2, maxAttempts: 2 }],
+    claimed: [{ id: 'run-1', userId: 'user-1', threadId: 'thread-1', stockId: 'stock-1', userMessageId: 'msg-1', provider: 'deepseek', model: 'm', attemptCount: 2, maxAttempts: 2 }],
     throwOnOrchestrate: new Error('UPSTREAM_TIMEOUT'),
   })
   await worker.tick()
@@ -97,9 +100,9 @@ test('worker markFailed when attemptCount >= maxAttempts', async () => {
 })
 
 test('worker never retries auth/quota/429/parameter errors', async () => {
-  for (const code of ['PROVIDER_AUTH_FAILED', 'PROVIDER_QUOTA_EXCEEDED', 'PROVIDER_RATE_LIMITED', 'INVALID_PARAMETER']) {
+  for (const code of ['PROVIDER_AUTH_FAILED', 'PROVIDER_QUOTA_EXHAUSTED', 'PROVIDER_RATE_LIMITED', 'PROVIDER_INVALID_REQUEST']) {
     const { worker, calls } = makeWorker({
-      claimed: [{ id: 'run-1', userId: 'user-1', threadId: 'thread-1', userMessageId: 'msg-1', provider: 'deepseek', model: 'm', attemptCount: 1, maxAttempts: 2 }],
+      claimed: [{ id: 'run-1', userId: 'user-1', threadId: 'thread-1', stockId: 'stock-1', userMessageId: 'msg-1', provider: 'deepseek', model: 'm', attemptCount: 1, maxAttempts: 2 }],
       throwOnOrchestrate: new Error(code),
     })
     await worker.tick()
@@ -111,7 +114,7 @@ test('worker never retries auth/quota/429/parameter errors', async () => {
 test('worker preserves retryAfter on 429 even when failing', async () => {
   const retryAfterValues: Array<number | null> = []
   const queue = {
-    claim: async () => [{ id: 'run-1', userId: 'user-1', threadId: 'thread-1', userMessageId: 'msg-1', provider: 'deepseek', model: 'm', attemptCount: 2, maxAttempts: 2 }],
+    claim: async () => [{ id: 'run-1', userId: 'user-1', threadId: 'thread-1', stockId: 'stock-1', userMessageId: 'msg-1', provider: 'deepseek', model: 'm', attemptCount: 2, maxAttempts: 2 }],
     heartbeat: async () => undefined,
     markFailed: async (args: { retryAfter?: number | null }) => {
       retryAfterValues.push(args.retryAfter ?? null)
@@ -136,7 +139,7 @@ test('worker preserves retryAfter on 429 even when failing', async () => {
 
 test('worker stop() prevents further ticks', async () => {
   const { worker } = makeWorker({
-    claimed: [{ id: 'run-1', userId: 'user-1', threadId: 'thread-1', userMessageId: 'msg-1', provider: 'deepseek', model: 'm', attemptCount: 1, maxAttempts: 2 }],
+    claimed: [{ id: 'run-1', userId: 'user-1', threadId: 'thread-1', stockId: 'stock-1', userMessageId: 'msg-1', provider: 'deepseek', model: 'm', attemptCount: 1, maxAttempts: 2 }],
   })
   worker.stop()
   await worker.tick()

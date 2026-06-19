@@ -23,6 +23,12 @@ export class RunRecoveryService {
     const requeued: string[] = []
     const failed: string[] = []
     for (const runId of expired) {
+      if (!this.classifyRun) {
+        const status = await this.queue.recoverExpiredRun({ runId, leaseMs: this.leaseMs })
+        if (status === 'queued') requeued.push(runId)
+        if (status === 'failed') failed.push(runId)
+        continue
+      }
       const info = this.classifyRun ? await this.classifyRun(runId) : null
       if (info && info.exhausted) {
         await this.queue.markFailed({

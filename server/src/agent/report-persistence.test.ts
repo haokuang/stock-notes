@@ -4,13 +4,15 @@ import { createAgentReportService, buildReportTitle } from './report.service'
 
 function makeClient(handler: (text: string, values?: unknown[]) => Promise<{ rows: unknown[] }>) {
   const calls: Array<{ text: string; values: unknown[] }> = []
+  let releases = 0
   const client = {
     query: async (text: string, values: unknown[] = []) => {
       calls.push({ text, values })
       return handler(text, values)
     },
+    release: () => { releases += 1 },
   }
-  return { client, calls }
+  return { client, calls, getReleaseCount: () => releases }
 }
 
 const runRow = {
@@ -83,9 +85,9 @@ test('saveReport rejects when no assistant message exists', async () => {
 })
 
 test('saveReport inserts an immutable snapshot from the final assistant message', async () => {
-  const { client, calls } = makeClient(async (text, values) => {
+  const { client, calls, getReleaseCount } = makeClient(async (text, values) => {
     if (text.includes('FROM agent_runs')) {
-      return { rows: [runRow] }
+      return { rows: [{ ...runRow, stock_id: 'stock-1', stock_code: '600519', stock_name: '贵州茅台' }] }
     }
     if (text.includes('FROM agent_messages')) {
       return { rows: [assistantRow] }
@@ -123,8 +125,13 @@ test('saveReport inserts an immutable snapshot from the final assistant message'
   assert.equal(report.provider, 'deepseek')
   assert.equal(report.model, 'deepseek-chat')
   assert.equal(report.agentRunId, 'run-1')
+  assert.match(calls.find((c) => c.text.includes('FROM agent_runs'))!.text, /JOIN agent_threads/)
   assert.match(calls.find((c) => c.text.startsWith('INSERT INTO ai_reports'))!.text, /'agent_report'/)
   assert.match(calls.find((c) => c.text.startsWith('INSERT INTO ai_reports'))!.text, /ON CONFLICT \(agent_run_id\)/)
+  assert.doesNotMatch(calls.find((c) => c.text.startsWith('INSERT INTO ai_reports'))!.text, /updated_at/)
+  const metadata = JSON.parse(calls.find((c) => c.text.startsWith('INSERT INTO ai_reports'))!.values[7] as string)
+  assert.deepEqual(metadata.citations, assistantRow.citations)
+  assert.equal(getReleaseCount(), 1)
 })
 
 test('saveReport returns the existing report on a second concurrent call', async () => {

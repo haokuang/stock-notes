@@ -60,3 +60,29 @@ test('normalizes non-owned thread and run reads to 404', async () => {
   await assert.rejects(service.getRun('user-2', 'run-1'), /资源不存在/)
   await assert.rejects(service.createThread('user-2', 'stock-1'), /资源不存在/)
 })
+
+test('rejects an unavailable or unlisted model before creating a run', async () => {
+  const previous = { key: process.env.DEEPSEEK_API_KEY, model: process.env.AGENT_DEEPSEEK_MODEL }
+  process.env.DEEPSEEK_API_KEY = 'test-key'
+  process.env.AGENT_DEEPSEEK_MODEL = 'deepseek-chat'
+  let connections = 0
+  const service = new AgentService({} as never, {
+    snapshot: () => ({ deepseek: { status: 'unavailable', reason: '限流', retryAfter: 30, checkedAt: '' } }),
+  } as never, {
+    connect: async () => { connections += 1; throw new Error('must not connect') },
+  } as never)
+  try {
+    await assert.rejects(service.submitMessage({
+      userId: 'user-1', threadId: 'thread-1',
+      dto: Object.assign(new (await import('./agent.dto')).SubmitAgentMessageDto(), {
+        content: '分析', provider: 'deepseek', model: 'unknown-model', clientRequestId: 'request-12345678',
+      }),
+    }), /模型不可用|模型未开放/)
+    assert.equal(connections, 0)
+  } finally {
+    if (previous.key === undefined) delete process.env.DEEPSEEK_API_KEY
+    else process.env.DEEPSEEK_API_KEY = previous.key
+    if (previous.model === undefined) delete process.env.AGENT_DEEPSEEK_MODEL
+    else process.env.AGENT_DEEPSEEK_MODEL = previous.model
+  }
+})

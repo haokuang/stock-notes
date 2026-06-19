@@ -22,21 +22,27 @@ function makeRepo(options: AgentRunQueueRepositoryOptions = {}) {
 }
 
 test('claim selects queued runs in FIFO order with FOR UPDATE SKIP LOCKED', async () => {
+  const calls: string[] = []
   const repository = new AgentRunQueueRepository({
     clientFactory: () => ({
       query: async (text: string, values: unknown[] = []) => {
+        calls.push(text)
+        if (text === 'BEGIN' || text === 'COMMIT' || text === 'ROLLBACK') return { rows: [] }
         if (text.includes('FOR UPDATE SKIP LOCKED')) {
-          assert.match(text, /ORDER BY created_at, id/)
+          assert.match(text, /ORDER BY r\.created_at, r\.id/)
           assert.match(text, /LIMIT \$1/)
           return {
             rows: [
-              { id: 'run-1', user_id: 'user-1', thread_id: 'thread-1', user_message_id: 'msg-1', provider: 'deepseek', model: 'm', attempt_count: 0, max_attempts: 2 },
-              { id: 'run-2', user_id: 'user-1', thread_id: 'thread-1', user_message_id: 'msg-2', provider: 'openai', model: 'gpt', attempt_count: 0, max_attempts: 2 },
+              { id: 'run-1', user_id: 'user-1', thread_id: 'thread-1', stock_id: 'stock-1', user_message_id: 'msg-1', provider: 'deepseek', model: 'm', attempt_count: 0, max_attempts: 2 },
+              { id: 'run-2', user_id: 'user-1', thread_id: 'thread-1', stock_id: 'stock-1', user_message_id: 'msg-2', provider: 'openai', model: 'gpt', attempt_count: 0, max_attempts: 2 },
             ],
           }
         }
         if (text.startsWith('UPDATE agent_runs')) {
-          return { rows: [] }
+          return { rows: [
+            { id: 'run-1', user_id: 'user-1', thread_id: 'thread-1', stock_id: 'stock-1', user_message_id: 'msg-1', provider: 'deepseek', model: 'm', attempt_count: 1, max_attempts: 2 },
+            { id: 'run-2', user_id: 'user-1', thread_id: 'thread-1', stock_id: 'stock-1', user_message_id: 'msg-2', provider: 'openai', model: 'gpt', attempt_count: 1, max_attempts: 2 },
+          ] }
         }
         throw new Error(`Unexpected: ${text.slice(0, 80)}`)
       },
@@ -46,16 +52,24 @@ test('claim selects queued runs in FIFO order with FOR UPDATE SKIP LOCKED', asyn
   const runs = await repository.claim({ workerId: 'worker-1', limit: 5 })
   assert.equal(runs.length, 2)
   assert.equal(runs[0].id, 'run-1')
+  assert.equal(runs[0].userId, 'user-1')
+  assert.equal(runs[0].threadId, 'thread-1')
+  assert.equal(runs[0].stockId, 'stock-1')
+  assert.equal(runs[0].attemptCount, 1)
+  assert.equal(calls[0], 'BEGIN')
+  assert.equal(calls.at(-1), 'COMMIT')
 })
 
 test('heartbeat updates only matching locked_by', async () => {
   const calls: Array<{ text: string; values: unknown[] }> = []
+  let released = false
   const repository = new AgentRunQueueRepository({
     clientFactory: () => ({
       query: async (text: string, values: unknown[] = []) => {
         calls.push({ text, values })
         return { rows: [{ id: 'run-1' }] }
       },
+      release: () => { released = true },
     }),
   })
 
@@ -63,6 +77,8 @@ test('heartbeat updates only matching locked_by', async () => {
   const update = calls.find((c) => c.text.startsWith('UPDATE agent_runs'))
   assert.ok(update)
   assert.deepEqual(update.values, ['run-1', 'worker-1'])
+  assert.match(update.text, /locked_at = NOW\(\)/)
+  assert.equal(released, true)
 })
 
 test('markRetryable returns the run to queued and clears the lock', async () => {
@@ -85,6 +101,7 @@ test('markRetryable returns the run to queued and clears the lock', async () => 
   assert.match(update.text, /locked_by = NULL/)
   assert.match(update.text, /error_code = NULL/)
   assert.match(update.text, /WHERE id = \$1 AND status = 'running' AND locked_by = \$2/)
+  assert.deepEqual(update.values, ['run-1', 'worker-1'])
 })
 
 test('markFailed records the safe error and clears the lock', async () => {
@@ -121,25 +138,44 @@ test('scanExpiredLeases returns rows whose lock has elapsed past DB now()', asyn
   assert.deepEqual(ids, ['run-1', 'run-2'])
 })
 
-test('two concurrent claim requests never return the same run id', async () => {
-  let callCount = 0
-  const sharedRuns = [
-    { id: 'run-1', user_id: 'user-1', thread_id: 'thread-1', user_message_id: 'msg-1', provider: 'deepseek', model: 'm', attempt_count: 0, max_attempts: 2 },
-    { id: 'run-2', user_id: 'user-1', thread_id: 'thread-1', user_message_id: 'msg-2', provider: 'deepseek', model: 'm', attempt_count: 0, max_attempts: 2 },
-  ]
+test('recovery can reclaim an expired run without knowing the previous worker id', async () => {
+  let query = ''
   const repository = new AgentRunQueueRepository({
     clientFactory: () => ({
       query: async (text: string) => {
-        if (text.includes('FOR UPDATE SKIP LOCKED')) {
-          callCount += 1
-          if (callCount % 2 === 0) {
-            return { rows: [sharedRuns[1]] }
-          }
-          return { rows: [sharedRuns[0]] }
-        }
-        return { rows: [] }
+        query = text
+        return { rows: [{ status: 'queued' }] }
       },
     }),
+  })
+  const status = await repository.recoverExpiredRun({ runId: 'run-1', leaseMs: 45_000 })
+  assert.equal(status, 'queued')
+  assert.match(query, /locked_at < NOW\(\) - \(\$2 \* INTERVAL '1 millisecond'\)/)
+  assert.doesNotMatch(query, /locked_by = \$3/)
+})
+
+test('two concurrent claim requests never return the same run id', async () => {
+  let callCount = 0
+  const sharedRuns = [
+    { id: 'run-1', user_id: 'user-1', thread_id: 'thread-1', stock_id: 'stock-1', user_message_id: 'msg-1', provider: 'deepseek', model: 'm', attempt_count: 0, max_attempts: 2 },
+    { id: 'run-2', user_id: 'user-1', thread_id: 'thread-1', stock_id: 'stock-1', user_message_id: 'msg-2', provider: 'deepseek', model: 'm', attempt_count: 0, max_attempts: 2 },
+  ]
+  const repository = new AgentRunQueueRepository({
+    clientFactory: () => {
+      let selected: typeof sharedRuns[number] | null = null
+      return { query: async (text: string) => {
+        if (text === 'BEGIN' || text === 'COMMIT' || text === 'ROLLBACK') return { rows: [] }
+        if (text.includes('FOR UPDATE SKIP LOCKED')) {
+          callCount += 1
+          selected = callCount % 2 === 0 ? sharedRuns[1] : sharedRuns[0]
+          return { rows: [selected] }
+        }
+        if (text.startsWith('UPDATE agent_runs') && selected) {
+          return { rows: [{ ...selected, attempt_count: selected.attempt_count + 1 }] }
+        }
+        return { rows: [] }
+      } }
+    },
   })
 
   const [a, b] = await Promise.all([

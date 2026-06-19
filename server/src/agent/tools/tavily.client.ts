@@ -49,7 +49,6 @@ export class TavilyClient {
   private readonly maxResults: number
 
   constructor(options: TavilyClientOptions) {
-    if (!options.apiKey) throw new Error('Tavily api key is required')
     this.apiKey = options.apiKey
     this.baseURL = (options.baseURL ?? 'https://api.tavily.com').replace(/\/$/, '')
     this.fetchImpl = options.fetchImpl ?? fetch
@@ -58,6 +57,7 @@ export class TavilyClient {
   }
 
   async search(input: TavilySearchInput): Promise<TavilySearchOutput> {
+    if (!this.apiKey) throw new TavilyUnavailableError('Tavily 未配置')
     const maxResults = Math.max(1, Math.min(8, Math.trunc(input.maxResults ?? this.maxResults)))
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(new Error('TAVILY_TIMEOUT')), this.timeoutMs)
@@ -72,7 +72,6 @@ export class TavilyClient {
           Authorization: `Bearer ${this.apiKey}`,
         },
         body: JSON.stringify({
-          api_key: this.apiKey,
           query: input.query,
           max_results: maxResults,
           include_answer: false,

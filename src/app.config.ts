@@ -10,6 +10,7 @@ export default defineAppConfig({
     'pages/note-detail/index',
     'pages/image-ai/index',
     'pages/ai-report/index',
+    'pages/agent-chat/index',
     'pages/heatmap-detail/index',
     'pages/stock-search/index',
     'pages/login/index',

@@ -2,7 +2,10 @@ import { View, Text, ScrollView } from '@tarojs/components'
 import Taro, { useLoad } from '@tarojs/taro'
 import { useState } from 'react'
 import { Network } from '@/network'
-import { ArrowLeft, Sparkles, Share2, TrendingUp, TrendingDown, Activity } from 'lucide-react-taro'
+import { ArrowLeft, Sparkles, Share2, TrendingUp, TrendingDown, Activity, ExternalLink } from 'lucide-react-taro'
+import { getAgentApi } from '@/agent/agent-client'
+import type { AgentReportDetail } from '@/agent/agent-api'
+import { Button } from '@/components/ui/button'
 import {
   DailyBriefApiResult,
   normalizeDailyBrief,
@@ -25,8 +28,26 @@ export default function AiReportPage() {
   const [report, setReport] = useState('')
   const [brief, setBrief] = useState<Brief | null>(null)
   const [shareText, setShareText] = useState('')
+  const [agentReport, setAgentReport] = useState<AgentReportDetail | null>(null)
+  const [loading, setLoading] = useState(false)
 
   useLoad(async (opts) => {
+    if (opts?.report_id) {
+      setLoading(true)
+      try {
+        const data = await getAgentApi().getReport(opts.report_id)
+        setAgentReport(data)
+        setStockName(data.stockName ?? data.title)
+        setReport(data.content)
+        setShareText(`【${data.title}】\n\n${data.content}`)
+      } catch (e) {
+        console.error('[ai-report] load agent report failed', e)
+        Taro.showToast({ title: e instanceof Error ? e.message : '报告加载失败', icon: 'none' })
+      } finally {
+        setLoading(false)
+      }
+      return
+    }
     // 兼容旧的 report 模式
     if (opts?.report) {
       setStockName(opts?.stock_name ? decodeURIComponent(opts.stock_name) : 'AI 报告')
@@ -72,6 +93,14 @@ export default function AiReportPage() {
     Taro.showToast({ title: '已复制到剪贴板', icon: 'success' })
   }
 
+  const openCitation = (url: string) => {
+    if (Taro.getEnv() === Taro.ENV_TYPE.WEB && typeof window !== 'undefined') {
+      window.open(url, '_blank', 'noopener,noreferrer')
+      return
+    }
+    Taro.setClipboardData({ data: url })
+  }
+
   // 旧 report 模式分段渲染
   const sections = report
     .split(/\n\n+/)
@@ -89,7 +118,7 @@ export default function AiReportPage() {
         <View className="w-10 h-10 flex items-center justify-center rounded-full active:bg-surface-container" onClick={() => Taro.navigateBack()}>
           <ArrowLeft size={20} color="#161826" />
         </View>
-        <Text className="block text-base font-semibold text-on-surface">{brief ? '今日简评' : 'AI 投研报告'}</Text>
+        <Text className="block text-base font-semibold text-on-surface">{brief ? '今日简评' : agentReport ? '研究报告' : 'AI 投研报告'}</Text>
         <View className="w-10 h-10 flex items-center justify-center rounded-full active:bg-surface-container" onClick={onShare}>
           <Share2 size={18} color="#5B5E72" />
         </View>
@@ -97,7 +126,11 @@ export default function AiReportPage() {
 
       <ScrollView scrollY enhanced showScrollbar={false} className="w-full">
         {/* Brief 模式 */}
-        {brief ? (
+        {loading ? (
+          <View className="px-4 py-16">
+            <Text className="block text-center text-sm text-on-surface-variant">报告加载中…</Text>
+          </View>
+        ) : brief ? (
           <>
             <View className="px-4 pt-3">
               <View
@@ -211,8 +244,8 @@ export default function AiReportPage() {
                   </View>
                   <Text className="block text-base font-semibold text-white">{stockName}</Text>
                 </View>
-                <Text className="block text-xl font-bold text-white leading-tight">跨观点复盘报告</Text>
-                <Text className="block text-xs text-white text-opacity-80 mt-2">基于历史观点自动汇总 · {new Date().toLocaleDateString('zh-CN')}</Text>
+                <Text className="block text-xl font-bold text-white leading-tight">{agentReport?.title ?? '跨观点复盘报告'}</Text>
+                <Text className="block text-xs text-white text-opacity-80 mt-2">{agentReport ? 'Agent 研究结论 · 来源可追溯' : '基于历史观点自动汇总'} · {new Date(agentReport?.createdAt ?? Date.now()).toLocaleDateString('zh-CN')}</Text>
               </View>
             </View>
 
@@ -236,6 +269,22 @@ export default function AiReportPage() {
                 )}
               </View>
             </View>
+            {agentReport && agentReport.citations.length > 0 ? (
+              <View className="px-4 pt-3">
+                <View className="rounded-2xl border border-white border-opacity-85 bg-white bg-opacity-72 p-4">
+                  <Text className="mb-2 block text-sm font-semibold text-on-surface">参考来源</Text>
+                  {agentReport.citations.map((citation) => (
+                    <Button key={citation.id} variant="ghost" className="h-auto w-full justify-between px-0 py-3" onClick={() => openCitation(citation.url)}>
+                      <View className="mr-3 min-w-0 flex-1">
+                        <Text className="block truncate text-left text-xs font-semibold">{citation.title || citation.source}</Text>
+                        {citation.snippet ? <Text className="mt-1 block text-left text-xs text-on-surface-variant">{citation.snippet}</Text> : null}
+                      </View>
+                      <ExternalLink size={14} color="#6D4DFF" />
+                    </Button>
+                  ))}
+                </View>
+              </View>
+            ) : null}
           </>
         )}
         <View className="h-4" />

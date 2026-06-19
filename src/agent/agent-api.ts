@@ -108,6 +108,7 @@ export interface AgentRequestLike {
 export interface AgentApiClient {
   listModels(): Promise<AgentModelOption[]>
   getThread(stockId: string): Promise<AgentThread | null>
+  createThread(stockId: string): Promise<AgentThread>
   listMessages(threadId: string, cursor?: string | null, limit?: number): Promise<AgentMessagesResponse['data']>
   getRun(runId: string): Promise<AgentRun>
   submitMessage(threadId: string, body: { content: string; provider: AgentProvider; model: string; clientRequestId: string }): Promise<AgentSubmitMessageResponse['data']>
@@ -126,6 +127,10 @@ export function createAgentApi(request: (option: AgentRequestLike) => Promise<{ 
     async getThread(stockId: string) {
       const response = await request({ url: `/api/agent/threads?stock_id=${encodeURIComponent(stockId)}`, method: 'GET' })
       return unwrapApiResponse<AgentThread | null>(response)
+    },
+    async createThread(stockId: string) {
+      const response = await request({ url: '/api/agent/threads', method: 'POST', data: { stock_id: stockId } })
+      return unwrapApiResponse<AgentThread>(response)
     },
     async listMessages(threadId, cursor, limit = 20) {
       const params = new URLSearchParams()

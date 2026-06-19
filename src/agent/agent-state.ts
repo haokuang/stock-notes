@@ -27,9 +27,9 @@ const STAGE_LABELS: Record<AgentStage, string> = {
 
 const ERROR_PRESENTATIONS: Record<string, { label: string; retryable: boolean }> = {
   PROVIDER_AUTH_FAILED: { label: '模型鉴权失败，请联系管理员', retryable: false },
-  PROVIDER_QUOTA_EXCEEDED: { label: '模型配额已用完', retryable: false },
+  PROVIDER_QUOTA_EXHAUSTED: { label: '模型配额已用完', retryable: false },
   PROVIDER_RATE_LIMITED: { label: '模型请求过于频繁，请稍后重试', retryable: false },
-  INVALID_PARAMETER: { label: '请求参数无效', retryable: false },
+  PROVIDER_INVALID_REQUEST: { label: '请求参数无效', retryable: false },
   AGENT_TOOL_LIMIT: { label: '工具调用超过 6 轮上限', retryable: false },
   AGENT_TIMEOUT: { label: '生成超时，请稍后重试', retryable: true },
   AGENT_WORKER_LOST: { label: '后台任务被回收，请重试', retryable: true },

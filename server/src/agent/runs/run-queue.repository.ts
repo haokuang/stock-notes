@@ -4,6 +4,7 @@ export interface ClaimedRun {
   id: string
   userId: string
   threadId: string
+  stockId: string
   userMessageId: string
   provider: AgentProvider
   model: string
@@ -13,10 +14,11 @@ export interface ClaimedRun {
 
 interface QueueClient {
   query(text: string, values?: unknown[]): Promise<{ rows: unknown[] }>
+  release?(): void
 }
 
 export interface AgentRunQueueRepositoryOptions {
-  clientFactory?: () => QueueClient
+  clientFactory?: () => QueueClient | Promise<QueueClient>
   now?: () => Date
   leaseMs?: number
 }
@@ -24,7 +26,7 @@ export interface AgentRunQueueRepositoryOptions {
 const DEFAULT_LEASE_MS = 45_000
 
 export class AgentRunQueueRepository {
-  private readonly clientFactory: () => QueueClient
+  private readonly clientFactory: () => QueueClient | Promise<QueueClient>
   private readonly leaseMs: number
 
   constructor(options: AgentRunQueueRepositoryOptions = {}) {
@@ -34,57 +36,89 @@ export class AgentRunQueueRepository {
 
   async claim({ workerId, limit }: { workerId: string; limit: number }): Promise<ClaimedRun[]> {
     const safeLimit = Math.max(1, Math.min(50, Math.trunc(limit)))
-    const client = this.clientFactory()
-    const result = await client.query(
-      `SELECT id, user_id, thread_id, user_message_id, provider, model, attempt_count, max_attempts
-       FROM agent_runs
-       WHERE status = 'queued'
-       ORDER BY created_at, id
-       FOR UPDATE SKIP LOCKED
-       LIMIT $1`,
-      [safeLimit],
-    )
-    const rows = result.rows as ClaimedRun[]
-    if (rows.length === 0) return []
-    const ids = rows.map((row) => row.id)
-    await client.query(
-      `UPDATE agent_runs
-       SET status = 'running',
-           stage = 'loading_context',
-           locked_at = NOW(),
-           locked_by = $2,
-           attempt_count = attempt_count + 1,
-           started_at = COALESCE(started_at, NOW()),
-           updated_at = NOW()
-       WHERE id = ANY($1::text[])`,
-      [ids, workerId],
-    )
-    return rows
+    const client = await this.clientFactory()
+    await client.query('BEGIN')
+    let committed = false
+    try {
+      const result = await client.query(
+        `SELECT r.id, r.user_id, r.thread_id, t.stock_id, r.user_message_id,
+                r.provider, r.model, r.attempt_count, r.max_attempts
+         FROM agent_runs r
+         JOIN agent_threads t ON t.id = r.thread_id AND t.user_id = r.user_id
+         WHERE r.status = 'queued'
+         ORDER BY r.created_at, r.id
+         FOR UPDATE SKIP LOCKED
+         LIMIT $1`,
+        [safeLimit],
+      )
+      const selected = result.rows as Array<Record<string, unknown>>
+      if (selected.length === 0) {
+        await client.query('COMMIT')
+        committed = true
+        return []
+      }
+      const ids = selected.map((row) => String(row.id))
+      const updated = await client.query(
+        `UPDATE agent_runs
+         SET status = 'running',
+             stage = 'loading_context',
+             locked_at = NOW(),
+             locked_by = $2,
+             attempt_count = attempt_count + 1,
+             started_at = COALESCE(started_at, NOW()),
+             updated_at = NOW()
+         WHERE id = ANY($1::text[])
+         RETURNING id, user_id, thread_id, user_message_id, provider, model,
+                   attempt_count, max_attempts`,
+        [ids, workerId],
+      )
+      const stockByRun = new Map(selected.map((row) => [String(row.id), String(row.stock_id)]))
+      const runs = (updated.rows as Array<Record<string, unknown>>).map((row) => ({
+        id: String(row.id),
+        userId: String(row.user_id),
+        threadId: String(row.thread_id),
+        stockId: stockByRun.get(String(row.id)) ?? '',
+        userMessageId: String(row.user_message_id),
+        provider: row.provider as AgentProvider,
+        model: String(row.model),
+        attemptCount: Number(row.attempt_count),
+        maxAttempts: Number(row.max_attempts),
+      }))
+      await client.query('COMMIT')
+      committed = true
+      return runs
+    } finally {
+      if (!committed) await client.query('ROLLBACK')
+      client.release?.()
+    }
   }
 
   async heartbeat({ runId, workerId }: { runId: string; workerId: string }): Promise<void> {
-    const client = this.clientFactory()
-    await client.query(
-      `UPDATE agent_runs
-       SET updated_at = NOW()
-       WHERE id = $1 AND status = 'running' AND locked_by = $2`,
-      [runId, workerId],
-    )
+    const client = await this.clientFactory()
+    try {
+      await client.query(
+        `UPDATE agent_runs
+         SET locked_at = NOW(), updated_at = NOW()
+         WHERE id = $1 AND status = 'running' AND locked_by = $2`,
+        [runId, workerId],
+      )
+    } finally {
+      client.release?.()
+    }
   }
 
   async markRetryable({
     runId,
     workerId,
-    errorCode,
-    errorMessage,
   }: {
     runId: string
     workerId: string
     errorCode: string
     errorMessage: string | null
   }): Promise<void> {
-    const client = this.clientFactory()
-    await client.query(
+    const client = await this.clientFactory()
+    try {
+      await client.query(
       `UPDATE agent_runs
        SET status = 'queued',
            stage = 'queued',
@@ -95,8 +129,11 @@ export class AgentRunQueueRepository {
            retry_after = NULL,
            updated_at = NOW()
        WHERE id = $1 AND status = 'running' AND locked_by = $2`,
-      [runId, workerId, errorCode, errorMessage],
-    )
+        [runId, workerId],
+      )
+    } finally {
+      client.release?.()
+    }
   }
 
   async markFailed({
@@ -112,8 +149,9 @@ export class AgentRunQueueRepository {
     errorMessage: string | null
     retryAfter?: number | null
   }): Promise<void> {
-    const client = this.clientFactory()
-    await client.query(
+    const client = await this.clientFactory()
+    try {
+      await client.query(
       `UPDATE agent_runs
        SET status = 'failed',
            stage = 'failed',
@@ -125,21 +163,61 @@ export class AgentRunQueueRepository {
            completed_at = NOW(),
            updated_at = NOW()
        WHERE id = $1 AND status = 'running' AND locked_by = $2`,
-      [runId, workerId, errorCode, errorMessage, retryAfter ?? null],
-    )
+        [runId, workerId, errorCode, errorMessage, retryAfter ?? null],
+      )
+    } finally {
+      client.release?.()
+    }
   }
 
   async scanExpiredLeases({ leaseMs }: { leaseMs?: number } = {}): Promise<string[]> {
     const ms = leaseMs ?? this.leaseMs
-    const client = this.clientFactory()
-    const result = await client.query(
+    const client = await this.clientFactory()
+    try {
+      const result = await client.query(
       `SELECT id FROM agent_runs
        WHERE status = 'running'
          AND locked_by IS NOT NULL
          AND NOW() - locked_at > INTERVAL '${ms} milliseconds'`,
       [],
     )
-    return (result.rows as Array<{ id: string }>).map((row) => row.id)
+      return (result.rows as Array<{ id: string }>).map((row) => row.id)
+    } finally {
+      client.release?.()
+    }
+  }
+
+  async recoverExpiredRun({
+    runId,
+    leaseMs,
+  }: {
+    runId: string
+    leaseMs?: number
+  }): Promise<'queued' | 'failed' | null> {
+    const client = await this.clientFactory()
+    const ms = leaseMs ?? this.leaseMs
+    try {
+      const result = await client.query(
+        `UPDATE agent_runs
+         SET status = CASE WHEN attempt_count >= max_attempts THEN 'failed' ELSE 'queued' END,
+             stage = CASE WHEN attempt_count >= max_attempts THEN 'failed' ELSE 'queued' END,
+             locked_at = NULL,
+             locked_by = NULL,
+             error_code = CASE WHEN attempt_count >= max_attempts THEN 'AGENT_WORKER_LOST' ELSE NULL END,
+             error_message = CASE WHEN attempt_count >= max_attempts THEN '任务执行中断，请重试' ELSE NULL END,
+             completed_at = CASE WHEN attempt_count >= max_attempts THEN NOW() ELSE NULL END,
+             updated_at = NOW()
+         WHERE id = $1
+           AND status = 'running'
+           AND locked_at < NOW() - ($2 * INTERVAL '1 millisecond')
+         RETURNING status`,
+        [runId, ms],
+      )
+      const status = (result.rows[0] as { status?: string } | undefined)?.status
+      return status === 'queued' || status === 'failed' ? status : null
+    } finally {
+      client.release?.()
+    }
   }
 
   async finalizeSuccess(input: {
@@ -153,7 +231,7 @@ export class AgentRunQueueRepository {
     citations: AgentCitation[]
     providerMetadata: Record<string, unknown>
   }): Promise<{ messageId: string }> {
-    const client = this.clientFactory()
+    const client = await this.clientFactory()
     await client.query('BEGIN')
     let committed = false
     try {
@@ -207,6 +285,7 @@ export class AgentRunQueueRepository {
           // already rolled back
         }
       }
+      client.release?.()
     }
   }
 }

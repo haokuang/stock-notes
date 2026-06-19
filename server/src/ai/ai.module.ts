@@ -100,6 +100,7 @@ export class AiController {
 
     return {
       data: {
+        deprecated: true,
         stockCode: dto.stockCode,
         stockName: dto.stockName,
         totalNotes: dto.notes.length,

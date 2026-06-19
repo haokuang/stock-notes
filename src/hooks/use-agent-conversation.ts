@@ -39,6 +39,8 @@ export function useAgentConversation({ threadId, runId, userId, pollIntervalMs =
     error: null,
   })
   const pollingRef = useRef<{ timer: ReturnType<typeof setTimeout> | null; interval: number }>({ timer: null, interval: pollIntervalMs })
+  const runIdRef = useRef<string | null>(runId)
+  const runRef = useRef<AgentRun | null>(null)
   const needsPollRef = useRef<boolean>(false)
   const channelErrorCountRef = useRef<number>(0)
 
@@ -53,10 +55,13 @@ export function useAgentConversation({ threadId, runId, userId, pollIntervalMs =
     if (!threadId) return
     if (pollingRef.current.timer) return
     const tick = async () => {
+      let latestRun = runRef.current
       try {
         const api = getAgentApi()
-        if (state.runId) {
-          const run = await api.getRun(state.runId)
+        if (runIdRef.current) {
+          const run = await api.getRun(runIdRef.current)
+          latestRun = run
+          runRef.current = run
           setState((prev) => ({ ...prev, run: mergeRun(prev.run, run) }))
           if (isTerminal(run)) {
             stopPolling()
@@ -70,12 +75,12 @@ export function useAgentConversation({ threadId, runId, userId, pollIntervalMs =
         setState((prev) => ({ ...prev, error: cause instanceof Error ? cause.message : '加载失败' }))
         pollingRef.current.interval = Math.min(MAX_POLL_INTERVAL, pollingRef.current.interval + 1000)
       }
-      if (needsPollRef.current || shouldPoll(state.run)) {
+      if (needsPollRef.current || shouldPoll(latestRun)) {
         pollingRef.current.timer = setTimeout(tick, pollingRef.current.interval)
       }
     }
     pollingRef.current.timer = setTimeout(tick, pollingRef.current.interval)
-  }, [state.run, state.runId, stopPolling, threadId])
+  }, [stopPolling, threadId])
 
   const handleChannelState = useCallback(
     (next: 'SUBSCRIBED' | 'CHANNEL_ERROR' | 'TIMED_OUT' | 'CLOSED') => {
@@ -103,21 +108,24 @@ export function useAgentConversation({ threadId, runId, userId, pollIntervalMs =
         return
       }
       setState((prev) => ({ ...prev, run: mergeRun(prev.run, event.payload as AgentRun) }))
+      runRef.current = event.payload as AgentRun
     },
     onChannelState: handleChannelState,
   })
 
   useEffect(() => {
     if (!threadId) return
-    setState((prev) => ({ ...prev, loading: true, error: null }))
+    runIdRef.current = runId
+    setState((prev) => ({ ...prev, threadId, runId, loading: true, error: null }))
     const api = getAgentApi()
     Promise.all([
-      state.runId ? api.getRun(state.runId).catch(() => null) : Promise.resolve(null),
+      runId ? api.getRun(runId).catch(() => null) : Promise.resolve(null),
       api.listMessages(threadId, null, 50),
     ])
       .then(([run, page]) => {
         const runs = run ? [run] : []
         const activeRun = pickActiveRun(runs)
+        runRef.current = activeRun
         setState((prev) => ({
           ...prev,
           loading: false,
@@ -135,7 +143,7 @@ export function useAgentConversation({ threadId, runId, userId, pollIntervalMs =
     return () => {
       stopPolling()
     }
-  }, [threadId, state.runId, startPolling, stopPolling])
+  }, [runId, startPolling, stopPolling, threadId])
 
   return {
     state,

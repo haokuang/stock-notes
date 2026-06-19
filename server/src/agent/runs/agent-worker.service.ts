@@ -1,5 +1,5 @@
 import type { AgentOrchestrator, AgentOrchestratorResult } from '../agent-orchestrator'
-import type { AgentCitation } from '../agent.types'
+import type { AgentCitation, AgentRun } from '../agent.types'
 import type { AgentRunQueueRepository, ClaimedRun } from './run-queue.repository'
 
 export interface AgentWorkerOptions {
@@ -9,7 +9,7 @@ export interface AgentWorkerOptions {
   leaseMs?: number
   queue: AgentRunQueueRepository
   orchestrator: AgentOrchestrator
-  onStage?: (runId: string, stage: string) => void
+  onStage?: (runId: string, stage: AgentRun['stage']) => void | Promise<void>
   classifyError?: (error: Error) => WorkerClassification
 }
 
@@ -19,9 +19,9 @@ const DEFAULT_LEASE_MS = 45_000
 
 const NON_RETRYABLE_CODES = new Set([
   'PROVIDER_AUTH_FAILED',
-  'PROVIDER_QUOTA_EXCEEDED',
+  'PROVIDER_QUOTA_EXHAUSTED',
   'PROVIDER_RATE_LIMITED',
-  'INVALID_PARAMETER',
+  'PROVIDER_INVALID_REQUEST',
 ])
 
 export interface WorkerClassification {
@@ -47,7 +47,7 @@ export class AgentWorker {
   private readonly leaseMs: number
   private readonly queue: AgentRunQueueRepository
   private readonly orchestrator: AgentOrchestrator
-  private readonly onStage?: (runId: string, stage: string) => void
+  private readonly onStage?: (runId: string, stage: AgentRun['stage']) => void | Promise<void>
   private readonly classifyError: (error: Error) => WorkerClassification
   private running = true
 
@@ -81,12 +81,12 @@ export class AgentWorker {
     const heartbeat = setInterval(() => {
       void this.queue.heartbeat({ runId: run.id, workerId: this.workerId })
     }, this.heartbeatIntervalMs).unref?.()
-    this.onStage?.(run.id, 'generating')
+    await this.onStage?.(run.id, 'generating')
     try {
       const result = await this.orchestrator.run({
         run: this.toRunShape(run),
         userId: run.userId,
-        stockId: '',
+        stockId: run.stockId,
         threadId: run.threadId,
       })
       await this.queue.finalizeSuccess({
@@ -100,7 +100,7 @@ export class AgentWorker {
         citations: result.citations,
         providerMetadata: {},
       })
-      this.onStage?.(run.id, 'completed')
+      await this.onStage?.(run.id, 'completed')
     } catch (cause) {
       const error = cause instanceof Error ? cause : new Error(String(cause))
       const classification = this.classifyError(error)
@@ -111,7 +111,7 @@ export class AgentWorker {
           errorCode: error.message.slice(0, 100),
           errorMessage: error.message.slice(0, 500),
         })
-        this.onStage?.(run.id, 'queued')
+        await this.onStage?.(run.id, 'queued')
         return
       }
       await this.queue.markFailed({
@@ -121,7 +121,7 @@ export class AgentWorker {
         errorMessage: error.message.slice(0, 500),
         retryAfter: classification.retryAfter ?? null,
       })
-      this.onStage?.(run.id, 'failed')
+      await this.onStage?.(run.id, 'failed')
     } finally {
       clearInterval(heartbeat)
     }

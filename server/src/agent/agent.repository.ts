@@ -6,6 +6,7 @@ import {
   mapAgentReportSummaryRow,
   mapAgentRunRow,
   mapAgentThreadRow,
+  mapAgentToolCallRow,
 } from './agent.mapper'
 import type {
   AgentMessage,
@@ -16,6 +17,8 @@ import type {
   AgentRunRow,
   AgentThread,
   AgentThreadRow,
+  AgentToolCall,
+  AgentToolCallRow,
   MessagePage,
 } from './agent.types'
 
@@ -134,6 +137,32 @@ export class AgentRepository {
       [userId, runId],
     )
     return result.rows[0] ? mapAgentRunRow(result.rows[0]) : null
+  }
+
+  async updateRunStage(runId: string, stage: AgentRun['stage']): Promise<void> {
+    await this.pool.query(
+      `UPDATE agent_runs SET stage = $2, updated_at = NOW()
+       WHERE id = $1 AND status = 'running'`,
+      [runId, stage],
+    )
+  }
+
+  async persistToolCall(call: AgentToolCall): Promise<AgentToolCall> {
+    const result = await this.pool.query<AgentToolCallRow>(
+      `INSERT INTO agent_tool_calls
+        (run_id, thread_id, user_id, tool_name, arguments, result, status,
+         error_code, duration_ms, created_at, completed_at)
+       VALUES ($1, $2, $3, $4, $5::jsonb, $6::jsonb, $7, $8, $9, $10, $11)
+       RETURNING id, run_id, thread_id, user_id, tool_name, arguments, result,
+                 status, error_code, duration_ms, created_at, completed_at`,
+      [
+        call.runId, call.threadId, call.userId, call.toolName,
+        JSON.stringify(call.arguments), call.result == null ? null : JSON.stringify(call.result),
+        call.status, call.errorCode, call.durationMs, call.createdAt, call.completedAt,
+      ],
+    )
+    if (!result.rows[0]) throw new Error('Failed to persist tool call')
+    return mapAgentToolCallRow(result.rows[0])
   }
 
   async listReports(userId: string, stockId: string): Promise<AgentReportSummary[]> {

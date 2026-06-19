@@ -1,4 +1,4 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common'
+import { BadRequestException, Inject, Injectable, NotFoundException, ServiceUnavailableException } from '@nestjs/common'
 import type { PoolClient } from 'pg'
 import type { AgentModelOption } from './agent.types'
 import { AgentRepository } from './agent.repository'
@@ -85,6 +85,7 @@ export class AgentService {
   }
 
   async submitMessage(input: SubmitMessageInput): Promise<SubmitMessageResult> {
+    this.assertModelAvailable(input.dto.provider, input.dto.model)
     const client = await this.pool.connect()
     try {
       const outcome = await submitAgentMessage({
@@ -123,9 +124,7 @@ export class AgentService {
       model: input.dto.model ?? originalRun.model,
       clientRequestId: input.dto.clientRequestId,
     })
-    if (!isProviderAllowed(dto.provider) || !isModelAllowed(dto.model)) {
-      throw new NotFoundException('资源不存在')
-    }
+    this.assertModelAvailable(dto.provider, dto.model)
     const submit = await this.submitMessage({
       userId: input.userId,
       threadId: originalRun.threadId,
@@ -167,17 +166,12 @@ export class AgentService {
     const service = createAgentReportService({ clientFactory: () => this.pool.connect() })
     return service.listReports(input)
   }
-}
 
-function isProviderAllowed(provider: string): boolean {
-  return ['deepseek', 'openai', 'minimax'].includes(provider)
-}
-
-function isModelAllowed(model: string): boolean {
-  const config = loadProviderConfig(process.env)
-  const allowed: string[] = []
-  if (config.deepseek.model) allowed.push(config.deepseek.model)
-  if (config.openai.model) allowed.push(config.openai.model)
-  if (config.minimax.model) allowed.push(config.minimax.model)
-  return allowed.includes(model)
+  private assertModelAvailable(provider: string, model: string): void {
+    const option = this.listModels().find((item) => item.provider === provider && item.model === model)
+    if (!option) throw new BadRequestException('模型未开放')
+    if (!option.available) {
+      throw new ServiceUnavailableException(option.unavailableReason || '模型不可用')
+    }
+  }
 }

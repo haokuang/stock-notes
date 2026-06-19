@@ -2,9 +2,13 @@ import { View, Text, ScrollView } from '@tarojs/components'
 import Taro, { useLoad, usePullDownRefresh, useDidShow } from '@tarojs/taro'
 import { useState } from 'react'
 import { Network } from '@/network'
-import { ArrowLeft, EllipsisVertical, TrendingUp, Target, Shield, CirclePlus, Clock, RefreshCw, Sparkles } from 'lucide-react-taro'
+import { ArrowLeft, EllipsisVertical, TrendingUp, Target, Shield, CirclePlus, Clock, RefreshCw, Sparkles, BookOpenCheck } from 'lucide-react-taro'
 import { useBriefRealtime, type BriefEvent } from '@/hooks/useBriefRealtime'
 import { useStockRefresh } from '@/hooks/useStockRefresh'
+import { getAgentApi } from '@/agent/agent-client'
+import type { AgentReportSummary } from '@/agent/agent-api'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent } from '@/components/ui/card'
 
 interface Stock {
   id: string
@@ -92,6 +96,7 @@ export default function StockDetailPage() {
   const [distribution, setDistribution] = useState<Distribution>({ bull: 0, bear: 0, neutral: 0 })
   const [stockId, setStockId] = useState('')
   const [briefing, setBriefing] = useState(false)
+  const [agentReports, setAgentReports] = useState<AgentReportSummary[]>([])
 
   const load = async (sid: string) => {
     if (!sid) return
@@ -111,6 +116,9 @@ export default function StockDetailPage() {
       setDistribution(distRes.data?.data ?? { bull: 0, bear: 0, neutral: 0 })
       setStopLoss(stopRes.data?.data ?? null)
       setBriefs(briefRes.data?.data ?? [])
+      getAgentApi().listReports(sid)
+        .then(setAgentReports)
+        .catch((cause) => console.error('[stock] agent reports failed', cause))
     } catch (e) {
       console.error('[stock] load failed', e)
     }
@@ -159,6 +167,16 @@ export default function StockDetailPage() {
 
   const goAdd = (asDoc: 'note' | 'doc' = 'note') => Taro.navigateTo({ url: `/pages/note-edit/index?stock_id=${stockId}&type=${asDoc}` })
   const goNote = (id: string) => Taro.navigateTo({ url: `/pages/note-detail/index?note_id=${id}` })
+  const openAgent = async () => {
+    if (!stockId) return
+    try {
+      const api = getAgentApi()
+      const thread = await api.getThread(stockId) ?? await api.createThread(stockId)
+      Taro.navigateTo({ url: `/pages/agent-chat/index?thread_id=${encodeURIComponent(thread.id)}&stock_id=${encodeURIComponent(stockId)}&stock_name=${encodeURIComponent(stock?.name ?? '')}` })
+    } catch (cause) {
+      Taro.showToast({ title: cause instanceof Error ? cause.message : '研究助手暂不可用', icon: 'none' })
+    }
+  }
 
   // 实时价格刷新(含 1 分钟限频 + 倒计时)
   const refresh = useStockRefresh(stockId || null)
@@ -623,6 +641,40 @@ export default function StockDetailPage() {
             </View>
           </View>
         )}
+
+        {/* Agent 研究报告 */}
+        <View className="mt-4 px-4">
+          <View className="mb-3 flex items-center justify-between gap-3">
+            <Text className="block text-base font-semibold text-on-surface">Agent 研究报告</Text>
+            <Button size="sm" variant="outline" onClick={openAgent}>
+              <Sparkles size={14} color="#6D4DFF" />
+              <Text>继续研究</Text>
+            </Button>
+          </View>
+          {agentReports.length === 0 ? (
+            <Card>
+              <CardContent className="p-5 text-center">
+                <Text className="block text-sm text-on-surface-variant">还没有沉淀报告，可先与研究 Agent 对话</Text>
+              </CardContent>
+            </Card>
+          ) : (
+            <View className="space-y-3">
+              {agentReports.map((reportItem) => (
+                <Card key={reportItem.id} onClick={() => Taro.navigateTo({ url: `/pages/ai-report/index?report_id=${encodeURIComponent(reportItem.id)}` })}>
+                  <CardContent className="flex items-center gap-3 p-4">
+                    <View className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary-container">
+                      <BookOpenCheck size={19} color="#6D4DFF" />
+                    </View>
+                    <View className="min-w-0 flex-1">
+                      <Text className="block truncate text-sm font-semibold text-on-surface">{reportItem.title}</Text>
+                      <Text className="mt-1 block text-xs text-on-surface-variant">{new Date(reportItem.createdAt).toLocaleDateString('zh-CN')}</Text>
+                    </View>
+                  </CardContent>
+                </Card>
+              ))}
+            </View>
+          )}
+        </View>
 
         {/* 观点 + 文档列表 */}
         <View className="px-4 mt-4">

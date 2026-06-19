@@ -83,3 +83,24 @@ test('filters runs and reports by owner and stock', async () => {
   assert.match(pool.calls[0].text, /user_id = \$1 AND id = \$2/)
   assert.match(pool.calls[1].text, /user_id = \$1 AND stock_id = \$2/)
 })
+
+test('persists tool calls and updates run stages for the orchestrator', async () => {
+  const toolRow = {
+    id: 'tool-1', run_id: 'run-1', thread_id: 'thread-1', user_id: 'user-1',
+    tool_name: 'get_stock_profile', arguments: {}, result: { code: '600519' },
+    status: 'completed', error_code: null, duration_ms: 2,
+    created_at: '2026-06-18T10:00:00.000Z', completed_at: '2026-06-18T10:00:00.002Z',
+  }
+  const pool = makePool([[toolRow], []])
+  const repository = new AgentRepository(pool as never)
+  const persisted = await repository.persistToolCall({
+    id: 'pending', runId: 'run-1', threadId: 'thread-1', userId: 'user-1',
+    toolName: 'get_stock_profile', arguments: {}, result: { code: '600519' },
+    status: 'completed', errorCode: null, durationMs: 2,
+    createdAt: '2026-06-18T10:00:00.000Z', completedAt: '2026-06-18T10:00:00.002Z',
+  })
+  await repository.updateRunStage('run-1', 'searching')
+  assert.equal(persisted.id, 'tool-1')
+  assert.match(pool.calls[0].text, /INSERT INTO agent_tool_calls/)
+  assert.match(pool.calls[1].text, /SET stage = \$2/)
+})

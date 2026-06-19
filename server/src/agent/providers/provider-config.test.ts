@@ -43,3 +43,8 @@ test('rejects an unknown MiniMax credential mode without exposing its value', ()
     /MINIMAX_CREDENTIAL_MODE 配置无效/,
   )
 })
+
+test('uses the OpenAI API base URL for health checks', () => {
+  const config = loadProviderConfig({ OPENAI_API_KEY: 'key', AGENT_OPENAI_MODEL: 'gpt-4.1-mini' })
+  assert.equal(config.openai.baseURL, 'https://api.openai.com/v1')
+})

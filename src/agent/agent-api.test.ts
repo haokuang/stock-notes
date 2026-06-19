@@ -58,6 +58,7 @@ test('agent API uses Network.request with relative URLs only', async () => {
   const api = createAgentApi(fakeRequest as never)
   await api.listModels()
   await api.getThread('stock-1')
+  await api.createThread('stock-1')
   await api.listMessages('thread-1')
   await api.getRun('run-1')
   await api.submitMessage('thread-1', { content: 'hi', provider: 'deepseek', model: 'm', clientRequestId: 'req-1234567890abcde' })
@@ -72,6 +73,7 @@ test('agent API uses Network.request with relative URLs only', async () => {
   }
   assert.ok(urls.some((u) => u === '/api/agent/models'))
   assert.ok(urls.some((u) => u.startsWith('/api/agent/threads?stock_id=')))
+  assert.ok(calls.some((c) => c.url === '/api/agent/threads' && c.method === 'POST' && (c.data as { stock_id: string }).stock_id === 'stock-1'))
   assert.ok(urls.some((u) => u.startsWith('/api/agent/threads/thread-1/messages')))
   assert.ok(urls.some((u) => u === '/api/agent/runs/run-1'))
   assert.ok(urls.some((u) => u === '/api/agent/runs/run-1/retry'))
@@ -118,6 +120,8 @@ test('stageLabel covers all seven stages', () => {
 test('errorPresentation maps standardized codes', () => {
   assert.equal(errorPresentation('PROVIDER_AUTH_FAILED').retryable, false)
   assert.equal(errorPresentation('PROVIDER_RATE_LIMITED').retryable, false)
+  assert.equal(errorPresentation('PROVIDER_QUOTA_EXHAUSTED').retryable, false)
+  assert.equal(errorPresentation('PROVIDER_INVALID_REQUEST').retryable, false)
   assert.equal(errorPresentation('AGENT_TIMEOUT').retryable, true)
   assert.equal(errorPresentation('AGENT_WORKER_LOST').retryable, true)
   assert.equal(errorPresentation(null).label, '未知错误')

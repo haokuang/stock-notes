@@ -49,6 +49,7 @@ export function loadProviderConfig(env: NodeJS.ProcessEnv): ProviderConfig {
     openai: {
       enabled: Boolean(openaiKey && openaiModel),
       apiKey: openaiKey,
+      baseURL: 'https://api.openai.com/v1',
       model: openaiModel,
       unavailableReason: openaiKey && openaiModel ? undefined : 'OpenAI 未配置',
     },

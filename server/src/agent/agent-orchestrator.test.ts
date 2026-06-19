@@ -249,3 +249,24 @@ test('orchestrator propagates ownership error on unknown thread', async () => {
     /资源不存在/,
   )
 })
+
+test('orchestrator selects the provider recorded on each run', async () => {
+  const deepseek = makeProvider([{ content: 'deepseek answer' }]).provider
+  const openai = { ...makeProvider([{ content: 'openai answer' }]).provider, provider: 'openai' as const }
+  const providers = new Map([['deepseek', deepseek], ['openai', openai]])
+  const repository = makeRepo()
+  const orchestrator = new AgentOrchestrator({
+    providerRegistry: { get: (name) => providers.get(name) as AgentModelProvider },
+    registry: new AgentToolRegistry({ tools: [] }),
+    repository: repository as never,
+    stockIdentity: makeStockIdentity(),
+  })
+
+  const result = await orchestrator.run({
+    run: { ...run, provider: 'openai' },
+    userId: 'user-1',
+    stockId: 'stock-1',
+    threadId: 'thread-1',
+  })
+  assert.equal(result.content, 'openai answer')
+})

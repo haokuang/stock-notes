@@ -75,6 +75,7 @@ test('TavilyClient sends API key in Authorization header only', async () => {
   const headers = fetchStub.calls[0].init?.headers as Record<string, string>
   assert.equal(headers.Authorization, 'Bearer secret-key')
   assert.equal(headers['Content-Type'], 'application/json')
+  assert.doesNotMatch(String(fetchStub.calls[0].init?.body), /secret-key|api_key/)
 })
 
 test('TavilyClient throws on timeout', async () => {
@@ -155,4 +156,9 @@ test('TavilyClient returns empty array on empty response', async () => {
   const client = new TavilyClient({ apiKey: 'k', fetchImpl: fetchStub.fn })
   const result = await client.search({ query: 'q' })
   assert.deepEqual(result.results, [])
+})
+
+test('missing Tavily credentials fail at tool use instead of service startup', async () => {
+  const client = new TavilyClient({ apiKey: '' })
+  await assert.rejects(client.search({ query: 'q' }), /未配置/)
 })
