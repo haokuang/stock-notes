@@ -62,6 +62,8 @@ interface Summary {
   bull: number
 }
 
+const DEFAULT_HEATMAP: HeatmapData = { data: {}, total: 0, activeDays: 0, fromDays: 90 }
+
 /* === 热力图常量(近 3 个月 = 约 13 周) === */
 const WEEKS = 13
 const DAYS = 7
@@ -107,6 +109,15 @@ const heatmapBg = (count: number): string => {
   return 'bg-primary'
 }
 
+/* === 数字缩写: 1234 → 1.23K, 1234567 → 1.23M, 1234567890 → 1.23B === */
+const formatBigNumber = (n: number): string => {
+  if (!Number.isFinite(n) || n <= 0) return '0'
+  if (n < 1_000) return String(Math.round(n))
+  if (n < 1_000_000) return `${(n / 1_000).toFixed(n < 10_000 ? 2 : 1)}K`
+  if (n < 1_000_000_000) return `${(n / 1_000_000).toFixed(n < 10_000_000 ? 2 : 1)}M`
+  return `${(n / 1_000_000_000).toFixed(2)}B`
+}
+
 /* === HTML/图片语法脱敏（用于 doc 类型的纯文本预览） === */
 const stripHtml = (html: string): string => {
   if (!html) return ''
@@ -133,7 +144,7 @@ export default function IndexPage() {
   const [summary, setSummary] = useState<Summary>({ stocks: 0, notes: 0, bull: 0 })
   const [stocks, setStocks] = useState<Stock[]>([])
   const [notes, setNotes] = useState<Note[]>([])
-  const [heatmap, setHeatmap] = useState<HeatmapData>({ data: {}, total: 0, activeDays: 0, fromDays: 90 })
+  const [heatmap, setHeatmap] = useState<HeatmapData>(DEFAULT_HEATMAP)
 
   const loadAll = async () => {
     try {
@@ -150,7 +161,7 @@ export default function IndexPage() {
       setSummary(sumRes.data?.data ?? { stocks: 0, notes: 0, bull: 0 })
       setStocks(stockRes.data?.data ?? [])
       setNotes(noteRes.data?.data ?? [])
-      setHeatmap(hmRes.data ?? { data: {}, total: 0, activeDays: 0, fromDays: 365 })
+      setHeatmap(normalizeHeatmap(hmRes.data))
     } catch (e) {
       console.error('[home] load failed', e)
     }
@@ -196,6 +207,7 @@ export default function IndexPage() {
     }
   }
 
+  const heatmapCounts = heatmap.data ?? {}
   const cells: Array<{ date: string; count: number; visible: boolean }> = []
   for (let w = 0; w < WEEKS; w++) {
     for (let d = 0; d < DAYS; d++) {
@@ -205,11 +217,12 @@ export default function IndexPage() {
       const key = cellDate.toISOString().slice(0, 10)
       cells.push({
         date: key,
-        count: visible ? heatmap.data[key] ?? 0 : 0,
+        count: visible ? heatmapCounts[key] ?? 0 : 0,
         visible,
       })
     }
   }
+  const peakDayCount = heatmapCounts ? Math.max(0, ...Object.values(heatmapCounts)) : 0
 
   /* === 渲染 === */
   return (
@@ -329,15 +342,10 @@ export default function IndexPage() {
         <View className="rounded-2xl p-4 bg-white bg-opacity-72 border border-white border-opacity-85"
           style={{ boxShadow: '0 1px 2px rgba(20, 18, 60, 0.04), 0 6px 24px rgba(20, 18, 60, 0.06)' }}
         >
-          {/* 标题行 */}
-          <View className="flex items-start justify-between gap-3 mb-3">
-            <View className="min-w-0">
-              <Text className="block text-sm font-semibold text-on-surface">观点活跃度</Text>
-              <Text className="block text-xs text-on-surface-variant mt-1">
-                过去 {heatmap.fromDays} 天 · 共 {heatmap.total} 条观点 · 活跃 {heatmap.activeDays} 天
-              </Text>
-            </View>
-            <View className="flex items-center gap-2 text-xs text-on-surface-variant shrink-0 pt-1">
+          {/* 标题 + 图例 顶部一行 */}
+          <View className="flex items-center justify-between gap-2 mb-3">
+            <Text className="block text-sm font-semibold text-on-surface">观点活跃度</Text>
+            <View className="flex items-center gap-2 text-xs text-on-surface-variant shrink-0">
               <Text className="block text-xs">少</Text>
               <View className="flex gap-1">
                 <View className="w-3 h-3 rounded-[2px] bg-surface-container" />
@@ -350,58 +358,76 @@ export default function IndexPage() {
             </View>
           </View>
 
-          {/* 热力图主体（横向滚动） */}
-          <ScrollView scrollX enhanced showScrollbar={false} className="scrollbar-hide">
-            <View className="inline-block">
-              {/* 月份标签行(14px 高 + zIndex 防被格子覆盖) */}
-              <View className="flex ml-[18px] mb-1 relative z-10" style={{ height: '14px' }}>
-                {Array.from({ length: WEEKS }).map((_, w) => {
-                  const m = months.find((x) => x.w === w)
-                  return (
-                    <View
-                      key={w}
-                      style={{ width: `${COL_TOTAL}px`, height: '14px' }}
-                      className="shrink-0"
-                    >
-                      {m ? (
-                        <Text className="block text-on-surface-variant text-opacity-70" style={{ fontSize: '11px', lineHeight: '14px' }}>{m.label}</Text>
-                      ) : null}
-                    </View>
-                  )
-                })}
-              </View>
-              {/* 主网格：左星期 + 53 列方格 */}
-              <View className="flex">
-                <View className="flex flex-col shrink-0 text-on-surface-variant text-opacity-70" style={{ width: '15px', marginRight: '3px' }}>
-                  {['一', '', '三', '', '五', '', '日'].map((t, i) => (
-                    <Text key={i} className="block" style={{ fontSize: '11px', lineHeight: '14px', height: `${ROW_H}px`, marginBottom: `${GAP}px` }}>
-                      {t}
-                    </Text>
-                  ))}
+          {/* 左侧热力图 + 右侧三块数字 */}
+          <View className="flex items-stretch gap-3">
+            <ScrollView scrollX enhanced showScrollbar={false} className="scrollbar-hide flex-1 min-w-0">
+              <View className="inline-block">
+                {/* 月份标签行(14px 高 + zIndex 防被格子覆盖) */}
+                <View className="flex ml-[18px] mb-1 relative z-10" style={{ height: '14px' }}>
+                  {Array.from({ length: WEEKS }).map((_, w) => {
+                    const m = months.find((x) => x.w === w)
+                    return (
+                      <View
+                        key={w}
+                        style={{ width: `${COL_TOTAL}px`, height: '14px' }}
+                        className="shrink-0"
+                      >
+                        {m ? (
+                          <Text className="block text-on-surface-variant text-opacity-70" style={{ fontSize: '11px', lineHeight: '14px' }}>{m.label}</Text>
+                        ) : null}
+                      </View>
+                    )
+                  })}
                 </View>
+                {/* 主网格:左星期 + 53 列方格 */}
                 <View className="flex">
-                  {Array.from({ length: WEEKS }).map((_, w) => (
-                    <View key={w} className="flex flex-col shrink-0" style={{ marginRight: `${GAP}px` }}>
-                      {Array.from({ length: DAYS }).map((_d, d) => {
-                        const cell = cells[w * DAYS + d]
-                        if (!cell.visible) {
-                          return <View key={d} style={{ width: `${COL_W}px`, height: `${ROW_H}px`, marginBottom: `${GAP}px` }} className="rounded-[2px]" />
-                        }
-                        return (
-                          <View
-                            key={d}
-                            className={`rounded-[2px] ${heatmapBg(cell.count)}`}
-                            style={{ width: `${COL_W}px`, height: `${ROW_H}px`, marginBottom: `${GAP}px` }}
-                            onClick={() => Taro.navigateTo({ url: `/pages/heatmap-detail/index?date=${cell.date}` })}
-                          />
-                        )
-                      })}
-                    </View>
-                  ))}
+                  <View className="flex flex-col shrink-0 text-on-surface-variant text-opacity-70" style={{ width: '15px', marginRight: '3px' }}>
+                    {['一', '', '三', '', '五', '', '日'].map((t, i) => (
+                      <Text key={i} className="block" style={{ fontSize: '11px', lineHeight: '14px', height: `${ROW_H}px`, marginBottom: `${GAP}px` }}>
+                        {t}
+                      </Text>
+                    ))}
+                  </View>
+                  <View className="flex">
+                    {Array.from({ length: WEEKS }).map((_, w) => (
+                      <View key={w} className="flex flex-col shrink-0" style={{ marginRight: `${GAP}px` }}>
+                        {Array.from({ length: DAYS }).map((_d, d) => {
+                          const cell = cells[w * DAYS + d]
+                          if (!cell.visible) {
+                            return <View key={d} style={{ width: `${COL_W}px`, height: `${ROW_H}px`, marginBottom: `${GAP}px` }} className="rounded-[2px]" />
+                          }
+                          return (
+                            <View
+                              key={d}
+                              className={`rounded-[2px] ${heatmapBg(cell.count)}`}
+                              style={{ width: `${COL_W}px`, height: `${ROW_H}px`, marginBottom: `${GAP}px` }}
+                              onClick={() => Taro.navigateTo({ url: `/pages/heatmap-detail/index?date=${cell.date}` })}
+                            />
+                          )
+                        })}
+                      </View>
+                    ))}
+                  </View>
                 </View>
+              </View>
+            </ScrollView>
+
+            {/* 右侧三块大数字(累计 / 单日峰值 / 活跃天数) */}
+            <View className="shrink-0 flex flex-col justify-center gap-3" style={{ minWidth: '92px' }}>
+              <View>
+                <Text className="block text-2xl font-semibold text-on-surface" style={{ fontVariantNumeric: 'tabular-nums', lineHeight: '1.1' }}>{formatBigNumber(heatmap.total)}</Text>
+                <Text className="block text-[11px] text-on-surface-variant mt-1">累计观点</Text>
+              </View>
+              <View>
+                <Text className="block text-2xl font-semibold text-on-surface" style={{ fontVariantNumeric: 'tabular-nums', lineHeight: '1.1' }}>{peakDayCount}</Text>
+                <Text className="block text-[11px] text-on-surface-variant mt-1">单日峰值</Text>
+              </View>
+              <View>
+                <Text className="block text-2xl font-semibold text-on-surface" style={{ fontVariantNumeric: 'tabular-nums', lineHeight: '1.1' }}>{heatmap.activeDays}</Text>
+                <Text className="block text-[11px] text-on-surface-variant mt-1">活跃天数</Text>
               </View>
             </View>
-          </ScrollView>
+          </View>
         </View>
       </View>
 
@@ -464,7 +490,7 @@ export default function IndexPage() {
                     </View>
                     <View className="mt-3">
                       <View className="flex items-end justify-between">
-                        <Text className="block text-[22px] font-bold text-on-surface tabular-nums leading-none">
+                        <Text className="block text-xl font-bold text-on-surface tabular-nums leading-none">
                           {formatPrice(s.current_price)}
                         </Text>
                         {s.change_percent != null ? (
@@ -584,4 +610,14 @@ export default function IndexPage() {
       </View>
     </View>
   )
+}
+
+function normalizeHeatmap(input: unknown): HeatmapData {
+  const value = input as Partial<HeatmapData> | null | undefined
+  return {
+    data: value?.data && typeof value.data === 'object' ? value.data : {},
+    total: Number(value?.total ?? 0),
+    activeDays: Number(value?.activeDays ?? 0),
+    fromDays: Number(value?.fromDays ?? DEFAULT_HEATMAP.fromDays),
+  }
 }

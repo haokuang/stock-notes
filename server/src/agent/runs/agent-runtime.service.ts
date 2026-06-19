@@ -53,7 +53,11 @@ export class AgentRuntimeService implements OnModuleInit, OnModuleDestroy {
       await this.options.recovery.recoverOnce()
       await this.options.worker.tick()
     } catch (cause) {
-      this.logger.error(`Agent worker tick failed: ${cause instanceof Error ? cause.name : 'unknown'}`)
+      if (cause instanceof Error) {
+        this.logger.error(`Agent worker tick failed: ${cause.name}: ${cause.message}`, cause.stack)
+      } else {
+        this.logger.error(`Agent worker tick failed: ${String(cause)}`)
+      }
     } finally {
       this.ticking = false
     }
