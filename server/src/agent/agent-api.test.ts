@@ -1,10 +1,19 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import test from 'node:test'
 import { plainToInstance } from 'class-transformer'
 import { validate } from 'class-validator'
 import { AgentController } from './agent.controller'
 import { CreateAgentThreadDto, ListAgentMessagesQuery, StockIdQuery } from './agent.dto'
 import { AgentService } from './agent.service'
+
+test('server bootstrap explicitly loads the repository .env.local file', () => {
+  const source = readFileSync(resolve(process.cwd(), 'server/src/main.ts'), 'utf8')
+  assert.match(source, /import \{ config as loadEnv \} from 'dotenv'/)
+  assert.match(source, /import \{ resolve as resolvePath \} from 'node:path'/)
+  assert.match(source, /loadEnv\([^)]*\.env\.local/)
+})
 
 test('validates required stock id and clamps message limit', async () => {
   const invalid = Object.assign(new CreateAgentThreadDto(), { stock_id: '' })

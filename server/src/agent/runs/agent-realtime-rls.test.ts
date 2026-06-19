@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict'
+import { resolve } from 'node:path'
 import test from 'node:test'
+
+const projectPath = (...parts: string[]) => resolve(process.cwd(), ...parts)
 
 /**
  * 验证 RLS 策略 + REST 重建逻辑（不需要真实 Supabase 凭证）：
@@ -13,7 +16,7 @@ import test from 'node:test'
 test('migration 0009 enables RLS on agent_runs and agent_messages with owner policies', async () => {
   const fs = await import('node:fs/promises')
   const sql = await fs.readFile(
-    '/Users/bytedance/.config/superpowers/worktrees/stock_notes/codex-stock-agent-inline/server/migrations/0009_agent_core.sql',
+    projectPath('server/migrations/0009_agent_core.sql'),
     'utf8',
   )
   assert.match(sql, /ALTER TABLE agent_runs ENABLE ROW LEVEL SECURITY/)
@@ -26,7 +29,7 @@ test('migration 0009 enables RLS on agent_runs and agent_messages with owner pol
 test('migration 0009 publishes agent_runs and agent_messages on supabase_realtime', async () => {
   const fs = await import('node:fs/promises')
   const sql = await fs.readFile(
-    '/Users/bytedance/.config/superpowers/worktrees/stock_notes/codex-stock-agent-inline/server/migrations/0009_agent_core.sql',
+    projectPath('server/migrations/0009_agent_core.sql'),
     'utf8',
   )
   assert.match(sql, /ALTER PUBLICATION supabase_realtime ADD TABLE agent_runs/)
@@ -36,7 +39,7 @@ test('migration 0009 publishes agent_runs and agent_messages on supabase_realtim
 test('migration 0010 enforces one assistant message per run via partial unique index', async () => {
   const fs = await import('node:fs/promises')
   const sql = await fs.readFile(
-    '/Users/bytedance/.config/superpowers/worktrees/stock_notes/codex-stock-agent-inline/server/migrations/0010_agent_run_finalization.sql',
+    projectPath('server/migrations/0010_agent_run_finalization.sql'),
     'utf8',
   )
   assert.match(sql, /CREATE UNIQUE INDEX IF NOT EXISTS agent_messages_assistant_run_uq/)
@@ -47,7 +50,7 @@ test('migration 0010 enforces one assistant message per run via partial unique i
 test('repository read statements all filter by user_id ownership', async () => {
   const fs = await import('node:fs/promises')
   const src = await fs.readFile(
-    '/Users/bytedance/.config/superpowers/worktrees/stock_notes/codex-stock-agent-inline/server/src/agent/agent.repository.ts',
+    projectPath('server/src/agent/agent.repository.ts'),
     'utf8',
   )
   const selectStatements = src.match(/SELECT[\s\S]*?FROM\s+\w+[\s\S]*?(?=async\s+\w+|`\s*\n\s*async)/g) ?? []
@@ -60,7 +63,7 @@ test('repository read statements all filter by user_id ownership', async () => {
 test('repository provides REST recovery without Realtime (findRun + listMessages are sufficient)', async () => {
   const fs = await import('node:fs/promises')
   const src = await fs.readFile(
-    '/Users/bytedance/.config/superpowers/worktrees/stock_notes/codex-stock-agent-inline/server/src/agent/agent.repository.ts',
+    projectPath('server/src/agent/agent.repository.ts'),
     'utf8',
   )
   assert.match(src, /async findRun\(userId: string, runId: string\)/)
@@ -69,7 +72,7 @@ test('repository provides REST recovery without Realtime (findRun + listMessages
 
 test('realtime auth reset is observable in the shared auth helper', async () => {
   const fs = await import('node:fs/promises')
-  const path = '/Users/bytedance/.config/superpowers/worktrees/stock_notes/codex-stock-agent-inline/src/lib/realtime-auth.ts'
+  const path = projectPath('src/lib/realtime-auth.ts')
   let exists = false
   try {
     await fs.stat(path)
@@ -78,7 +81,7 @@ test('realtime auth reset is observable in the shared auth helper', async () => 
     exists = false
   }
   if (!exists) {
-    const candidates = await fs.readdir('/Users/bytedance/.config/superpowers/worktrees/stock_notes/codex-stock-agent-inline/src/lib')
+    const candidates = await fs.readdir(projectPath('src/lib'))
     const authFile = candidates.find((name) => name.startsWith('realtime-auth'))
     assert.ok(authFile, 'expected realtime-auth helper in src/lib')
   }

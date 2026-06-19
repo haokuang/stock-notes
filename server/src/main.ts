@@ -1,4 +1,5 @@
-import 'dotenv/config'
+import { config as loadEnv } from 'dotenv';
+import { resolve as resolvePath } from 'node:path';
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from '@/app.module';
@@ -6,6 +7,8 @@ import * as express from 'express';
 import { HttpStatusInterceptor } from '@/interceptors/http-status.interceptor';
 import { GlobalExceptionFilter } from '@/monitoring/global-exception.filter';
 import { AlertService } from '@/monitoring/alert.service';
+
+loadEnv({ path: resolvePath(__dirname, '../../.env.local') });
 
 function parsePort(): number {
   const args = process.argv.slice(2);
