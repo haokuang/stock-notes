@@ -55,7 +55,9 @@ function MessageBody({ message }: { message: AgentMessage }) {
   if (!html) {
     return <Text className="block text-sm leading-relaxed opacity-60">（模型未返回内容）</Text>
   }
-  return <RichText nodes={html} className="block text-sm leading-relaxed" />
+  // md-content className 复用笔记页 .md-content CSS 作用域
+  // (h1/h2/p/blockquote/table/th/td/ul/ol 等都已配好样式)
+  return <RichText nodes={html} className="md-content block text-sm text-on-surface leading-relaxed" />
 }
 
 /**
