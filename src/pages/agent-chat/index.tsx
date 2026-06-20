@@ -1,10 +1,10 @@
-import { ScrollView, Text, View } from '@tarojs/components'
+import { RichText, ScrollView, Text, View } from '@tarojs/components'
 import Taro, { useLoad } from '@tarojs/taro'
 import { BookOpenCheck, ExternalLink, RotateCcw, Send, Sparkles } from 'lucide-react-taro'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { getAgentApi } from '@/agent/agent-client'
 import { errorPresentation, providerDescription, stageLabel } from '@/agent/agent-state'
-import type { AgentModelOption } from '@/agent/agent.types'
+import type { AgentMessage, AgentModelOption } from '@/agent/agent.types'
 import { sessionStore } from '@/auth/session'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -13,9 +13,81 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Skeleton } from '@/components/ui/skeleton'
 import { Textarea } from '@/components/ui/textarea'
 import { useAgentConversation } from '@/hooks/use-agent-conversation'
+import { Network } from '@/network'
 
 const makeRequestId = () => `agent-${Date.now()}-${Math.random().toString(36).slice(2, 12)}`
 const modelKey = (option: AgentModelOption) => `${option.provider}:${option.model}`
+
+/**
+ * 单条消息体:user 走纯文本,assistant 走 strip-think + markdown
+ * 富文本渲染走 Taro.RichText(nodes=HTML 字符串),H5 端会被翻译为 dangerouslySetInnerHTML
+ */
+function MessageBody({ message }: { message: AgentMessage }) {
+  const isUser = message.role === 'user'
+  const [html, setHtml] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    if (isUser) {
+      setHtml(null) // user 走 fallback 的纯文本
+      return
+    }
+    if (!message.content) {
+      setHtml('')
+      return
+    }
+    renderAssistantContent(message.content).then((rendered) => {
+      if (!cancelled) setHtml(rendered)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [message.content, message.id, isUser])
+
+  if (isUser) {
+    return (
+      <Text className="block whitespace-pre-wrap text-sm leading-relaxed">{renderUserContent(message.content)}</Text>
+    )
+  }
+  if (html === null) {
+    return <Text className="block text-sm leading-relaxed opacity-60">…</Text>
+  }
+  if (!html) {
+    return <Text className="block text-sm leading-relaxed opacity-60">（模型未返回内容）</Text>
+  }
+  return <RichText nodes={html} className="block text-sm leading-relaxed" />
+}
+
+/**
+ * 剥离 deepseek-r1 / kimi 等推理模型的 <think>...</think> 块
+ * 保留块外正文,块内多行 / 含换行 / 含 markdown 都安全处理
+ */
+const stripThinkTags = (raw: string): string => {
+  if (!raw) return ''
+  // 非贪婪,跨行匹配,支持大小写不敏感(部分模型输出 <Think>)
+  return raw.replace(/<think>[\s\S]*?<\/think>/gi, '').trim()
+}
+
+/** user 输入的 message 直接当纯文本(避免任何 HTML 注入) */
+const renderUserContent = (raw: string): string => raw
+
+/** assistant 消息:strip think → 服务端 marked+DOMPurify 渲染 */
+const renderAssistantContent = async (raw: string): Promise<string> => {
+  const cleaned = stripThinkTags(raw)
+  if (!cleaned) return ''
+  try {
+    const res = await Network.request({
+      url: '/api/notes/render-md',
+      method: 'POST',
+      data: { md: cleaned },
+    })
+    const body = (res.data ?? {}) as { html?: string }
+    return body?.html ?? ''
+  } catch (cause) {
+    console.error('[agent-chat] render md failed', cause)
+    return cleaned
+  }
+}
 
 export default function AgentChatPage() {
   const [threadId, setThreadId] = useState<string | null>(null)
@@ -160,7 +232,7 @@ export default function AgentChatPage() {
               <View key={message.id} className={message.role === 'user' ? 'ml-10' : 'mr-6'}>
                 <Card className={message.role === 'user' ? 'bg-primary text-primary-foreground' : ''}>
                   <CardContent className="p-4">
-                    <Text className="block whitespace-pre-wrap text-sm leading-relaxed">{message.content}</Text>
+                    <MessageBody message={message} />
                     {message.citations.length > 0 ? (
                       <View className="mt-4 space-y-2 border-t border-border pt-3">
                         <Text className="block text-xs font-semibold">参考来源</Text>
