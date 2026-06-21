@@ -3,6 +3,11 @@
 FROM node:22-bookworm-slim AS base
 ENV PNPM_HOME=/pnpm
 ENV PATH=$PNPM_HOME:$PATH
+# nest start --watch 触发增量编译后,nest CLI / ts-node-dev 会 spawn ps 检查进程树;
+# node:22-bookworm-slim 默认不带 procps,会导致后端 HMR 报 spawn ps ENOENT。
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends procps \
+  && rm -rf /var/lib/apt/lists/*
 RUN corepack enable && corepack prepare pnpm@9.0.0 --activate
 WORKDIR /app
 

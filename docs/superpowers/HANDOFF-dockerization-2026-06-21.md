@@ -109,6 +109,10 @@
 - 开发 API 健康检查：http://localhost:3000/api/health → HTTP 200（45ms，返回 `{status:"success",data:{status:"ok",...}}`）
 - 前端热更新：✅ 验证通过。在 `src/app.css` 末尾追加测试标记 → 日志出现 `[vite] hmr update /app.css`。
 - 后端热更新：✅ 验证通过（增量编译阶段）。在 `server/src/main.ts` 末尾追加测试标记 → 日志出现 `File change detected. Starting incremental compilation...` → `Found 0 errors. Watching for file changes.`。Nest watch worker 后续因 `spawn ps ENOENT` 退出，是因为 `node:22-bookworm-slim` 基础镜像未带 procps；该问题属于镜像优化范畴，留给批次 3 在 base 阶段 `apt-get install -y --no-install-recommends procps` 解决。
+- **批 2 修复（post-handoff）**：
+  - **procps 缺失**：`Dockerfile` base 阶段增加 `apt-get install -y --no-install-recommends procps`，使 `nest start --watch` 在增量编译后 spawn ps 不再 ENOENT。验证：两次触发 HMR（修改 `server/src/main.ts`），日志两次出现 `Found 0 errors. Watching for file changes.`，无 `ps ENOENT`，后端进程持续存活。
+  - **trap + exec 不可靠**：原方案在容器入口用 `exec pnpm dev:server` 启动后端 watch，`exec` 会把原 shell 进程替换为 pnpm，原 shell 的 EXIT/INT/TERM trap 表丢失，导致 `pnpm install --no-frozen-lockfile` 改写过的 host `pnpm-lock.yaml` 在容器退出时无法回滚。修复方式是把 `pnpm dev:server` / `pnpm dev:web` 作为 shell 子进程启动（不 exec），trap 保留在原 shell。验证：`docker compose -f docker-compose.dev.yml down` 后，host `pnpm-lock.yaml` md5 与启动前完全一致。
+  - **已知限制**：bind mount 模式下硬 kill 场景（`docker kill -9` / `docker rm -f` / 宿主机断电）trap 不会执行，host lockfile 不会被还原。pnpm 9 的 `--lockfile-dir` 选项只影响 `pnpm install` 输出位置，不影响 `pnpm dev` 读取路径，运行时仍读 workspace 根的 `pnpm-lock.yaml`，因此这条路走不通。软退出（`docker compose down` / Ctrl+C）场景已保护。
 - 密钥文件检查：✅ 镜像内无 `.env.local` / `.env.production`
 - **Apple Silicon 关键修复（commit `5dd1bea`）**：
   - **根因**：Taro 4.1.9 / @swc/core 1.3.96 / @tarojs/plugin-doctor 等只发布 darwin-arm64/darwin-x64/linux-x64-gnu/win32-x64-msvc binding，**不发布 linux-arm64-gnu**。Docker Desktop on Apple Silicon 默认拉 arm64 镜像 → pnpm 跳过所有 platform binding → web-dev 启动报 `Bindings not found` / `Cannot find module '@tarojs/binding-linux-arm64-gnu'`。
