@@ -36,7 +36,7 @@
 | 批次 | 内容 | 状态 | 起止提交 | 执行者 |
 | --- | --- | --- | --- | --- |
 | 1 | 环境加载、健康检查、构建变量校验 | 已完成 | `82b0a7b` → `1932f06` | Codex |
-| 2 | 多阶段镜像、开发热更新 | 待执行 |  |  |
+| 2 | 多阶段镜像、开发热更新 | 已完成(镜像构建待网络恢复) | `0c7c565` → `dbe08f5` | ZCode |
 | 3 | 生产 Nginx、单入口 Compose | 待执行 |  |  |
 | 4 | 微信/抖音小程序一键构建 | 待执行 |  |  |
 | 5 | 文档、全量验证、交回 | 待执行 |  |  |
@@ -82,18 +82,37 @@
 
 ## 批次 2 记录
 
-- 执行日期：
-- 执行者：
-- 起始提交：
-- 完成提交：
-- Docker/Compose 版本：
+- 执行日期：2026-06-19
+- 执行者：ZCode
+- 起始提交：`0c7c565`
+- 完成提交：`d2c82e2`（Task 3）、`dbe08f5`（Task 4）
+- Docker/Compose 版本：29.5.3 / Compose v2
+- 新增文件：
+  - `Dockerfile`（6 阶段多阶段构建：development / web-build / web-runtime / server-build / server-runtime / mini-build）
+  - `.dockerignore`（排除 .env.local / .env.production / .git / node_modules / dist-* 等，保留 .env.example 和 .env.production.example）
+  - `docker/docker-contract.test.ts`（3 段契约：Dockerfile 阶段+关键字 / .dockerignore 排除规则 / 开发 Compose 服务声明）
+  - `docker-compose.dev.yml`（server-dev + web-dev，绑定挂载源码，独立 node_modules 命名卷，轮询监听）
+- 修改文件：
+  - `package.json`（追加 `docker:dev` / `docker:dev:down` 脚本）
+- 契约测试结果：
+  - Task 3 契约(Dockerfile + .dockerignore)：2/2 通过
+  - Task 4 契约(docker-compose.dev.yml)：1/1 通过
+  - `pnpm test:docker`（含批次 1 validate-docker-env）：6/6 通过
+  - `pnpm validate`（lint + tsc）：通过
+- `docker compose -f docker-compose.dev.yml config`：✅ 解析通过
 - 镜像构建结果：
-- 开发 H5 地址与结果：
-- 开发 API 健康检查：
-- 前端热更新：
-- 后端热更新：
-- 密钥文件检查：
+  - `docker build --target server-runtime`：❌ **被 Docker Hub 网络阻断**（`registry-1.docker.io` 连接超时，无镜像加速器，本地零缓存）
+  - `docker build --target mini-build`：未执行（同上阻塞）
+  - `docker run --rm ... secret check`：未执行
+- 开发 H5 地址与结果：未执行
+- 开发 API 健康检查：未执行
+- 前端热更新：未执行
+- 后端热更新：未执行
+- 密钥文件检查：未执行
 - 遗留问题：
+  - **Docker Hub 网络不可达**：`registry-1.docker.io` 连接超时 15 秒无响应，未配置镜像加速器。需在 Docker Desktop → Settings → Docker Engine 中添加 `"registry-mirrors"` 配置（国内常用 `docker.m.daocloud.io` 等），然后重跑 `docker build --target server-runtime` 和 `docker build --target mini-build`。
+  - `.env.local` 已从主工作区拷入 worktree 并确认被 git 忽略；`compose config` 解析需此文件存在，后续执行者也需自行拷贝。
+  - `Dockerfile` 第一行 `# syntax=docker/dockerfile:1.7` 依赖 BuildKit frontend 镜像，如网络恢复后仍超时，可安全删除此行（当前 Dockerfile 未使用 1.7 独有语法）。
 
 ## 批次 3 记录
 
