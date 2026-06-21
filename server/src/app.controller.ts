@@ -17,10 +17,16 @@ export class AppController {
 
   @Public()
   @Get('health')
-  getHealth(): { status: string; data: string } {
+  getHealth(): {
+    status: string;
+    data: { status: string; timestamp: string };
+  } {
     return {
       status: 'success',
-      data: new Date().toISOString(),
+      data: {
+        status: 'ok',
+        timestamp: new Date().toISOString(),
+      },
     };
   }
 }

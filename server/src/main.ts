@@ -1,5 +1,3 @@
-import { config as loadEnv } from 'dotenv';
-import { resolve as resolvePath } from 'node:path';
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from '@/app.module';
@@ -7,8 +5,13 @@ import * as express from 'express';
 import { HttpStatusInterceptor } from '@/interceptors/http-status.interceptor';
 import { GlobalExceptionFilter } from '@/monitoring/global-exception.filter';
 import { AlertService } from '@/monitoring/alert.service';
+import {
+  loadRuntimeEnvironment,
+  validateProductionServerEnvironment,
+} from '@/bootstrap/runtime-environment';
 
-loadEnv({ path: resolvePath(__dirname, '../../.env.local') });
+loadRuntimeEnvironment();
+validateProductionServerEnvironment();
 
 function parsePort(): number {
   const args = process.argv.slice(2);
@@ -53,8 +56,8 @@ async function bootstrap() {
   // 2. 解析端口
   const port = parsePort();
   try {
-    await app.listen(port);
-    console.log(`Server running on http://localhost:${port}`);
+    await app.listen(port, '0.0.0.0');
+    console.log(`Server running on http://0.0.0.0:${port}`);
   } catch (err) {
     if (err.code === 'EADDRINUSE') {
       console.error(`❌ 端口 \({port} 被占用! 请运行 'npx kill-port \){port}' 然后重试。`);
@@ -63,6 +66,5 @@ async function bootstrap() {
       throw err;
     }
   }
-  console.log(`Application is running on: http://localhost:3000`);
 }
 bootstrap();
