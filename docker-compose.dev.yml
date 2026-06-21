@@ -1,9 +1,21 @@
 services:
   server-dev:
+    platform: linux/amd64
     build:
       context: .
       target: development
-    command: sh -c "pnpm install --frozen-lockfile && pnpm dev:server"
+    # 必须在 pnpm install 之后重新安装当前架构的 native binding(swc/core、taro 等),
+    # 因为宿主机 lockfile 是 darwin-arm64 生成的,容器内 amd64 用 --frozen-lockfile 会跳过所有 platform binding。
+    # 退出时通过 trap 把原始 lockfile 还原回 bind mount(即宿主机),避免污染开发者工作区。
+    command:
+      - sh
+      - -c
+      - |
+        set -e
+        cp pnpm-lock.yaml /tmp/pnpm-lock.yaml.host.bak
+        trap 'cp /tmp/pnpm-lock.yaml.host.bak /app/pnpm-lock.yaml' EXIT
+        pnpm install --no-frozen-lockfile
+        exec pnpm dev:server
     env_file:
       - .env.local
     environment:
@@ -19,11 +31,23 @@ services:
     init: true
     stop_grace_period: 15s
 
+  # 注意:Taro 4.1.9 不发布 linux-arm64-gnu binding(Docker Desktop on Apple Silicon 默认拉 arm64 镜像)。
+  # 因此 web-dev 必须强制 platform: linux/amd64,并在容器内重新生成 lockfile 才能装到正确的 native binding
+  # (@tarojs/binding-linux-x64-gnu、@swc/core-linux-x64-gnu、@tarojs/plugin-doctor-linux-x64-gnu 等)。
   web-dev:
+    platform: linux/amd64
     build:
       context: .
       target: development
-    command: sh -c "pnpm install --frozen-lockfile && pnpm dev:web"
+    command:
+      - sh
+      - -c
+      - |
+        set -e
+        cp pnpm-lock.yaml /tmp/pnpm-lock.yaml.host.bak
+        trap 'cp /tmp/pnpm-lock.yaml.host.bak /app/pnpm-lock.yaml' EXIT
+        pnpm install --no-frozen-lockfile
+        exec pnpm dev:web
     env_file:
       - .env.local
     environment:
