@@ -1,782 +1,197 @@
-# Coze Mini Program
+# Stock Notes · 投研笔记
 
-这是一个基于 [Taro 4](https://docs.taro.zone/docs/) + [Nest.js](https://nestjs.com/) 的前后端分离项目，由扣子编程 CLI 创建。
+面向 A 股个人研究流程的投研笔记与 AI Agent。项目把自选股、持仓纪律、研究笔记、每日简评和多模型对话放在同一套数据与权限体系中，支持 H5 和微信小程序。
 
-## 技术栈
+> 项目不会替用户做投资判断。AI 输出仅用于整理信息、复盘观点和辅助研究，不构成投资建议。
 
-- **整体框架**: Taro 4.1.9
-- **语言**: TypeScript 5.4.5
-- **渲染**: React 18.0.0
-- **样式**: TailwindCSS 4.1.18
-- **Tailwind 适配层**: weapp-tailwindcss 4.9.2
-- **状态管理**: Zustand 5.0.9
-- **图标库**: lucide-react-taro latest
-- **工程化**: Vite 4.2.0
-- **包管理**: pnpm
-- **运行时**: Node.js >= 18
-- **服务端**: NestJS 10.4.15
-- **数据库 ORM**: Drizzle ORM 0.45.1
-- **类型校验**: Zod 4.3.5
+## 核心能力
 
-## 项目结构
+- **股票研究工作台**：搜索并添加沪深北普通 A 股，管理自选与持仓状态，展示价格时间和涨跌信息。
+- **交易纪律**：记录买入理由、入场价和止损比例；买入、卖出与对应笔记在同一数据库事务中完成。
+- **观点与笔记**：支持普通笔记、文档笔记、Markdown 渲染、永久高亮、编辑后锚点重定位和观点筛选。
+- **每日简评**：结合行情、历史价格和已有笔记生成单段简评及红黄绿信号，并通过 Supabase Realtime 同步。
+- **股票研究 Agent**：围绕单只股票连续对话，可读取股票资料、价格历史、笔记和每日简评，支持 DeepSeek、OpenAI、MiniMax 与 Tavily 联网检索。
+- **跨端运行**：同一套 Taro 前端支持 H5、微信小程序及现有非 Docker 抖音构建；NestJS 提供统一 `/api`。
 
+图片上传与视觉模型协议已经具备，但需要额外配置 TOS 和视觉模型凭据；跨观点 AI 报告等仍在后续迭代中，实际进度以 [Roadmap](docs/ROADMAP.md) 为准。
+
+## 技术架构
+
+```mermaid
+flowchart LR
+    Client["H5 / 微信小程序"] -->|"JWT + /api"| API["NestJS API"]
+    Client -->|"Auth / Realtime"| Supabase["Supabase"]
+    API -->|"Postgres"| Supabase
+    API --> Market["腾讯行情 / Tushare"]
+    API --> Models["DeepSeek / OpenAI / MiniMax"]
+    API --> Search["Tavily"]
+    API --> Storage["TOS 对象存储"]
 ```
-├── .cozeproj/                # Coze 平台配置
-│   └── scripts/              # 构建和运行脚本
-├── config/                   # Taro 构建配置
-│   ├── index.ts              # 主配置文件
-│   ├── dev.ts                # 开发环境配置
-│   └── prod.ts               # 生产环境配置
-├── server/                   # NestJS 后端服务
-│   └── src/
-│       ├── main.ts           # 服务入口
-│       ├── app.module.ts     # 根模块
-│       ├── app.controller.ts # 应用控制器
-│       └── app.service.ts    # 应用服务
-├── src/                      # 前端源码
-│   ├── pages/                # 页面组件
-│   ├── presets/              # 框架预置逻辑（无需读取，如无必要不改动）
-│   ├── utils/                # 工具函数
-│   ├── network.ts            # 封装好的网络请求工具
-│   ├── app.ts                # 应用入口
-│   ├── app.config.ts         # 应用配置
-│   └── app.css               # 全局样式
-├── types/                    # TypeScript 类型定义
-├── key/                      # 小程序密钥（CI 上传用）
-├── .env.local                # 环境变量
-└── project.config.json       # 微信小程序项目配置
-```
+
+| 层级 | 技术 |
+| --- | --- |
+| 前端 | Taro 4、React 18、TypeScript、Tailwind CSS 4、Zustand、Taro shadcn/ui |
+| 后端 | NestJS 10、Node.js、Zod、Drizzle ORM、`pg` |
+| 数据与认证 | Supabase Auth、Postgres、RLS、Realtime |
+| 外部能力 | 腾讯行情、Tushare、DeepSeek、OpenAI、MiniMax、Tavily、TOS |
+| 工程化 | pnpm、Vite、Docker Compose、Nginx |
 
 ## 快速开始
 
-### 安装依赖
+### 环境要求
+
+- Node.js 22（推荐）
+- pnpm 9+
+- 可访问的 Supabase 项目
+- Docker Desktop / Docker Compose v2（仅 Docker 工作流需要）
+
+项目只使用 pnpm，禁止使用 npm 或 yarn 安装依赖。
+
+### 最低环境变量
+
+```bash
+cp .env.example .env.local
+```
+
+本地启动的基础配置如下：
+
+```dotenv
+SUPABASE_URL=
+SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
+
+# 数据库凭据二选一，推荐使用密码 + 默认 pooler profile
+SUPABASE_DB_PASSWORD=
+# 或：SUPABASE_DB_URL=
+```
+
+Tushare、模型、Tavily、TOS、邮件告警和测试账号均为按功能启用项，完整说明见 [.env.example](.env.example)。首次使用前还需按 [Supabase 接入指南](docs/SUPABASE.md) 应用数据库迁移与 RLS。
+
+### 安装与启动
 
 ```bash
 pnpm install
-```
-
-### 本地开发
-
-同时启动 H5 前端和 NestJS 后端：
-
-```bash
 pnpm dev
 ```
 
-- 前端地址：http://localhost:5001
-- 后端地址：http://localhost:3000
+- H5：http://localhost:5001
+- API 健康检查：http://localhost:3000/api/health
 
-单独启动：
-
-```bash
-pnpm dev:web      # 仅 H5 前端
-pnpm dev:weapp    # 仅微信小程序
-pnpm dev:server   # 仅后端服务
-```
-
-### 构建
+单独启动某一端：
 
 ```bash
-pnpm build        # 构建所有（H5 + 小程序 + 后端）
-pnpm build:web    # 仅构建 H5，输出到 dist-web
-pnpm build:weapp  # 仅构建微信小程序，输出到 dist
-pnpm build:server # 仅构建后端
+pnpm dev:web
+pnpm dev:server
+pnpm dev:weapp
 ```
 
-### 预览小程序
+## Docker 运行
+
+### 开发环境
+
+使用 `.env.local` 启动带热更新的 H5 与 NestJS：
 
 ```bash
-pnpm preview:weapp # 构建并生成预览小程序二维码
+pnpm docker:dev
+pnpm docker:dev:down
 ```
 
-### Docker
-
-开发、生产部署与微信小程序一键构建的完整说明见
-[Docker 运行指南](docs/DOCKER.md)。
-
-## 前端核心开发规范
-
-### 新建页面流程
-
-1. 在 \`src/pages/\` 下创建页面目录
-2. 创建 \`index.tsx\`（页面组件）
-3. 创建 \`index.config.ts\`（页面配置）
-4. 创建 \`index.css\`（页面样式，可选）
-5. 在 \`src/app.config.ts\` 的 \`pages\` 数组中注册页面路径
-
-或使用 Taro 脚手架命令：
+### 生产环境
 
 ```bash
-pnpm new      # 交互式创建页面/组件
+cp .env.production.example .env.production
+# 填写真实生产配置后：
+pnpm docker:prod:build
+pnpm docker:prod
 ```
 
-### 组件库
-
-#### UI 组件
-
-UI 组件位于 `@/components/ui`，推荐按需引入：
-
-```typescript
-import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
-```
-
-UI 组件列表:
-
-Accordion,Alert,AlertDialog,AspectRatio,Avatar,Badge,Breadcrumb,Button,ButtonGroup,Calendar,Card,Carousel,Checkbox,CodeBlock,Collapsible,Command,ContextMenu,Dialog,Drawer,DropdownMenu,Field,HoverCard,Input,InputGroup,InputOTP,Label,Menubar,NavigationMenu,Pagination,Popover,Portal,Progress,RadioGroup,Resizable,ScrollArea,Select,Separator,Sheet,Skeleton,Slider,Sonner,Switch,Table,Tabs,Textarea,Toast,Toggle,ToggleGroup,Tooltip
-
-#### Taro 原生组件
-
-可以使用的 Taro 组件（UI 未覆盖）
-
-```typescript
-import { View, Text, Icon, Image } from '@tarojs/components'
-```
-
-Taro 原生组件列表：
-
-Text,Icon,RichText,CheckboxGroup,Editor,Form,Picker,PickerView,PickerViewColumn,Radio,FunctionalPageNavigator,NavigationBar,Navigator,TabItem,Camera,Image,Video,ScrollView,Swiper,SwiperItem,View
-
-### 路径别名
-
-项目配置了 `@/*` 路径别名指向 `src/*`：
-
-```typescript
-import { SomeComponent } from '@/components/some-component'
-import { useUserStore } from '@/stores/user'
-```
-
-### 代码模板
-
-#### 页面组件 (TypeScript + React)
-
-```tsx
-// src/pages/example/index.tsx
-import { View } from '@tarojs/components'
-import { useLoad, useDidShow } from '@tarojs/taro'
-import type { FC } from 'react'
-import { Button } from '@/components/ui/button'
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card'
-import './index.css'
-
-const ExamplePage: FC = () => {
-  useLoad(() => {
-    console.log('Page loaded.')
-  })
-
-  useDidShow(() => {
-    console.log('Page showed.')
-  })
-
-  return (
-    <View className="p-4">
-      <Card>
-        <CardHeader>
-          <CardTitle>Hello Taro!</CardTitle>
-          <CardDescription>
-            页面布局用 Taro 基础组件，交互与视觉优先用项目内置 UI 组件。
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <View className="text-sm text-muted-foreground">
-            组件位于 src/components/ui，推荐按需从 @/components/ui/* 引入。
-          </View>
-        </CardContent>
-        <CardFooter className="justify-end">
-          <Button size="sm" onClick={() => console.log('clicked')}>
-            点击
-          </Button>
-        </CardFooter>
-      </Card>
-    </View>
-  )
-}
-
-export default ExamplePage
-```
-
-#### 页面配置
-
-```typescript
-// src/pages/example/index.config.ts
-import { definePageConfig } from '@tarojs/taro'
-
-export default definePageConfig({
-  navigationBarTitleText: '示例页面',
-  enablePullDownRefresh: true,
-  backgroundTextStyle: 'dark',
-})
-```
-
-#### 应用配置
-
-```typescript
-// src/app.config.ts
-import { defineAppConfig } from '@tarojs/taro'
-
-export default defineAppConfig({
-  pages: [
-    'pages/index/index',
-    'pages/example/index',
-  ],
-  window: {
-    backgroundTextStyle: 'light',
-    navigationBarBackgroundColor: '#fff',
-    navigationBarTitleText: 'App',
-    navigationBarTextStyle: 'black',
-  },
-  // TabBar 配置 (可选)
-  // tabBar: {
-  //   list: [
-  //     { pagePath: 'pages/index/index', text: '首页' },
-  //   ],
-  // },
-})
-```
-
-### 发送请求
-
-**IMPORTANT: 禁止直接使用 Taro.request、Taro.uploadFile、Taro.downloadFile，使用 Network.request、Network.uploadFile、Network.downloadFile 替代。**
-
-Network 是对 Taro.request、Taro.uploadFile、Taro.downloadFile 的封装，自动添加项目域名前缀，参数与 Taro 一致。
-
-✅ 正确使用方式
-
-```typescript
-import { Network } from '@/network'
-
-// GET 请求
-const data = await Network.request({
-  url: '/api/hello'
-})
-
-// POST 请求
-const result = await Network.request({
-  url: '/api/user/login',
-  method: 'POST',
-  data: { username, password }
-})
-
-// 文件上传
-await Network.uploadFile({
-  url: '/api/upload',
-  filePath: tempFilePath,
-  name: 'file'
-})
-
-// 文件下载
-await Network.downloadFile({
-  url: '/api/download/file.pdf'
-})
-```
-
-❌ 错误用法
-
-```typescript
-import Taro from '@tarojs/taro'
-
-// ❌ 会导致自动域名拼接无法生效，除非是特殊指定域名
-const data = await Network.request({
-  url: 'http://localhost/api/hello'
-})
-
-// ❌ 不要直接使用 Taro.request
-await Taro.request({ url: '/api/hello' })
-
-// ❌ 不要直接使用 Taro.uploadFile
-await Taro.uploadFile({ url: '/api/upload', filePath, name: 'file' })
-```
-
-### Zustand 状态管理
-
-```typescript
-// src/stores/user.ts
-import { create } from 'zustand'
-
-interface UserState {
-  userInfo: UserInfo | null
-  token: string
-  setUserInfo: (info: UserInfo) => void
-  setToken: (token: string) => void
-  logout: () => void
-}
-
-interface UserInfo {
-  id: string
-  name: string
-  avatar: string
-}
-
-export const useUserStore = create<UserState>((set) => ({
-  userInfo: null,
-  token: '',
-  setUserInfo: (info) => set({ userInfo: info }),
-  setToken: (token) => set({ token }),
-  logout: () => set({ userInfo: null, token: '' }),
-}))
-```
-
-### Taro 生命周期 Hooks
-
-```typescript
-import {
-  useLoad,             // 页面加载 (onLoad)
-  useReady,            // 页面初次渲染完成 (onReady)
-  useDidShow,          // 页面显示 (onShow)
-  useDidHide,          // 页面隐藏 (onHide)
-  usePullDownRefresh,  // 下拉刷新 (onPullDownRefresh)
-  useReachBottom,      // 触底加载 (onReachBottom)
-  useShareAppMessage,  // 分享 (onShareAppMessage)
-  useRouter,           // 获取路由参数
-} from '@tarojs/taro'
-```
-
-### 路由导航
-
-```typescript
-import Taro from '@tarojs/taro'
-
-// 保留当前页面，跳转到新页面
-Taro.navigateTo({ url: '/pages/detail/index?id=1' })
-
-// 关闭当前页面，跳转到新页面
-Taro.redirectTo({ url: '/pages/detail/index' })
-
-// 跳转到 tabBar 页面
-Taro.switchTab({ url: '/pages/index/index' })
-
-// 返回上一页
-Taro.navigateBack({ delta: 1 })
-
-// 获取路由参数
-const router = useRouter()
-const { id } = router.params
-```
-
-### 图标使用 (lucide-react-taro)
-
-**IMPORTANT: 禁止使用 lucide-react，必须使用 lucide-react-taro 替代。**
-
-lucide-react-taro 是 Lucide 图标库的 Taro 适配版本，专为小程序环境优化，API 与 lucide-react 一致：
-
-```tsx
-import { View } from '@tarojs/components'
-import { House, Settings, User, Search, Camera, Zap } from 'lucide-react-taro'
-
-const IconDemo = () => {
-  return (
-    <View className="flex gap-4">
-      {/* 基本用法 */}
-      <House />
-      {/* 自定义尺寸和颜色 */}
-      <Settings size={32} color="#1890ff" />
-      {/* 自定义描边宽度 */}
-      <User size={24} strokeWidth={1.5} />
-      {/* 绝对描边宽度（描边不随 size 缩放） */}
-      <Camera size={48} strokeWidth={2} absoluteStrokeWidth />
-      {/* 组合使用 */}
-      <Zap size={32} color="#ff6b00" strokeWidth={1.5} className="my-icon" />
-    </View>
-  )
-}
-```
-
-常用属性：
-- `size` - 图标大小（默认 24）
-- `color` - 图标颜色（默认 currentColor，小程序中建议显式设置）
-- `strokeWidth` - 线条粗细（默认 2）
-- `absoluteStrokeWidth` - 绝对描边宽度，启用后描边不随 size 缩放
-- `className` / `style` - 自定义样式
-
-更多图标请访问：https://lucide.dev/icons
-
-### TabBar 图标生成 (CLI 工具)
-
-**IMPORTANT: 微信小程序的 TabBar 不支持 base64 或 SVG 图片，必须使用本地 PNG 文件。**
-
-lucide-react-taro 提供了 CLI 工具来生成 TabBar 所需的 PNG 图标：
+生产环境只暴露 Nginx 单一入口，H5 与 `/api` 使用同一域名；NestJS 不直接发布宿主机端口。
 
 ```bash
-# 生成带选中状态的图标
-npx taro-lucide-tabbar House Settings User -c "#999999" -a "#1890ff"
-
-# 指定输出目录和尺寸
-npx taro-lucide-tabbar House Settings User -c "#999999" -a "#1890ff" -o ./src/assets/tabbar -s 81
+pnpm docker:prod:down
 ```
 
-CLI 参数：
-- `--color, -c` (默认 #000000): 图标颜色
-- `--active-color, -a`: 选中状态颜色
-- `--size, -s` (默认 81): 图标尺寸
-- `--output, -o` (默认 ./tabbar-icons): 输出目录
-- `--stroke-width` (默认 2): 描边宽度
+### 微信小程序
 
-在 `app.config.ts` 中使用生成的图标：
+在 `.env.production` 中配置平台登记的 HTTPS `PROJECT_DOMAIN` 后执行：
 
-> IMPORTANT：iconPath 和 selectedIconPath 必须以 `./` 开头，否则图标无法渲染
-
-```typescript
-export default defineAppConfig({
-  tabBar: {
-    color: '#999999',
-    selectedColor: '#1890ff',
-    backgroundColor: '#ffffff',
-    borderStyle: 'black',
-    list: [
-      {
-        pagePath: 'pages/index/index',
-        text: '首页',
-        iconPath: './assets/tabbar/house.png',
-        selectedIconPath: './assets/tabbar/house-active.png',
-      },
-      {
-        pagePath: 'pages/settings/index',
-        text: '设置',
-        iconPath: './assets/tabbar/settings.png',
-        selectedIconPath: './assets/tabbar/settings-active.png',
-      },
-      {
-        pagePath: 'pages/user/index',
-        text: '用户',
-        iconPath: './assets/tabbar/user.png',
-        selectedIconPath: './assets/tabbar/user-active.png',
-      },
-    ],
-  },
-})
-
-### Tailwind CSS 样式开发
-
-IMPORTANT：必须使用 tailwindcss 实现样式，只有在必要情况下才能 fallback 到 css / less
-
-> 项目已集成 Tailwind CSS 4.x + weapp-tailwindcss，支持跨端原子化样式：
-
-```tsx
-import { View, Text } from '@tarojs/components'
-import { Button } from '@/components/ui/button'
-
-<View className="flex flex-col items-center justify-center min-h-screen bg-gray-100">
-  <Text className="text-2xl font-bold text-blue-600 mb-4">标题</Text>
-  <View className="w-full px-4">
-    <Button className="w-full" size="lg">
-      按钮
-    </Button>
-  </View>
-</View>
+```bash
+pnpm docker:build:weapp
 ```
 
-### 性能优化
+产物写入 `dist/`。抖音 Docker 支持已取消；现有非 Docker 构建仍可使用 `pnpm build:tt`。
 
-#### 图片懒加载
+完整部署、日志、健康检查和故障排查见 [Docker 运行指南](docs/DOCKER.md)。
 
-```tsx
-import { Image } from '@tarojs/components'
+## 构建与测试
 
-<Image src={imageUrl} lazyLoad mode="aspectFill" />
+常用构建命令：
+
+```bash
+pnpm build          # lint + 类型检查 + H5 + 微信 + 抖音 + 后端
+pnpm build:web
+pnpm build:weapp
+pnpm build:server
 ```
 
-#### 虚拟列表
+主要质量门禁：
 
-```tsx
-import { VirtualList } from '@tarojs/components'
-
-<VirtualList
-  height={500}
-  itemData={list}
-  itemCount={list.length}
-  itemSize={100}
-  renderItem={({ index, style, data }) => (
-    <View style={style}>{data[index].name}</View>
-  )}
-/>
+```bash
+pnpm validate             # ESLint + TypeScript
+pnpm test:prelaunch       # 上线前核心契约
+pnpm test:agent:all       # 股票研究 Agent 全批次
+pnpm test:note-highlights # Markdown 高亮与锚点
+pnpm test:docker          # Docker 静态与运行契约
 ```
 
-#### 分包加载
+数据库集成测试需要有效的 Supabase 数据库凭据：
 
-```typescript
-// src/app.config.ts
-export default defineAppConfig({
-  pages: ['pages/index/index'],
-  subPackages: [
-    {
-      root: 'packageA',
-      pages: ['pages/detail/index'],
-    },
-  ],
-})
+```bash
+pnpm test:daily-brief
+pnpm test:price-history
+pnpm test:trade
 ```
 
-### 小程序限制
+## 项目结构
 
-| 限制项   | 说明                                     |
-| -------- | ---------------------------------------- |
-| 主包体积 | ≤ 2MB                                    |
-| 总包体积 | ≤ 20MB                                   |
-| 域名配置 | 生产环境需在小程序后台配置合法域名       |
-| 本地开发 | 需在微信开发者工具开启「不校验合法域名」 |
-
-### 权限配置
-
-```typescript
-// src/app.config.ts
-export default defineAppConfig({
-  // ...其他配置
-  permission: {
-    'scope.userLocation': {
-      desc: '你的位置信息将用于小程序位置接口的效果展示'
-    }
-  },
-  requiredPrivateInfos: ['getLocation', 'chooseAddress']
-})
-```
-
-### 位置服务
-
-```typescript
-// 需先在 app.config.ts 中配置 permission
-async function getLocation(): Promise<Taro.getLocation.SuccessCallbackResult> {
-  return await Taro.getLocation({ type: 'gcj02' })
-}
-```
-
-## 后端核心开发规范
-
-本项目后端基于 NestJS + TypeScript 构建，提供高效、可扩展的服务端能力。
-
-### 项目结构
-
-```sh
-.
-├── server/                   # NestJS 后端服务
+```text
+├── src/                         # Taro / React 前端
+│   ├── pages/                   # 首页、观点库、股票、笔记、Agent 等页面
+│   ├── components/ui/           # Taro shadcn/ui 组件
+│   ├── agent/                   # Agent 前端状态与 API
+│   └── network.ts               # 跨端网络请求封装
+├── server/                      # NestJS 后端
+│   ├── migrations/              # PostgreSQL / Supabase 迁移
 │   └── src/
-│       ├── main.ts           # 服务入口
-│       ├── app.module.ts     # 根模块
-│       ├── app.controller.ts # 根控制器
-│       └── app.service.ts    # 根服务
+│       ├── agent/               # Provider、工具、队列与运行时
+│       ├── notes/               # 笔记与永久高亮
+│       ├── stocks/              # 股票、交易与价格历史
+│       ├── ai/                  # 每日简评与图片分析
+│       └── storage/              # 数据库与鉴权基础设施
+├── config/                      # Taro 多端构建配置
+├── docker/                      # Nginx 与 Docker 契约
+├── docs/                        # 架构、运行和产品文档
+├── Dockerfile
+├── docker-compose.dev.yml
+├── docker-compose.yml
+└── docker-compose.tools.yml
 ```
 
-### 开发命令
+## 开发约束
 
-```sh
-pnpm dev:server // 启动开发服务 (热重载, 默认端口 3000)
-pnpm build:server // 构建生产版本
-```
+- **依赖管理**：只使用 pnpm，并提交 `pnpm-lock.yaml`。
+- **UI**：通用组件优先复用 `@/components/ui/*`，不要在业务页面重复手搓按钮、输入框、卡片或弹窗。
+- **样式**：优先使用 Tailwind 预设类，避免业务代码硬编码 `px`。
+- **网络请求**：业务代码统一使用 `Network`，API 地址保持 `/api/...` 相对路径；不要直接调用 `Taro.request` 或硬编码域名。
+- **静态资源**：除微信 TabBar 图标外，图片和视频使用 TOS URL，不把大资源打进小程序包。
+- **服务端路由**：NestJS 已设置全局 `/api` 前缀，Controller 装饰器中不要重复写 `api`。
 
-### 新建模块流程 (CLI)
+完整开发规范见 [AGENTS.md](AGENTS.md)。
 
-快速生成样板代码：
+## 进一步阅读
 
-```bash
-cd server
-
-# 生成完整的 CRUD 资源 (包含 Module, Controller, Service, DTO, Entity)
-npx nest g resource modules/product
-
-# 仅生成特定部分
-npx nest g module modules/order
-npx nest g controller modules/order
-npx nest g service modules/order
-```
-
-### 环境变量配置
-
-在 server/ 根目录创建 .env 文件：
-
-```sh
-## 服务端口
-PORT=3000
-
-## 微信小程序配置
-WX_APP_ID=你的AppID
-WX_APP_SECRET=你的AppSecret
-
-## JWT 密钥
-JWT_SECRET=your-super-secret-key
-```
-
-## 数据库与认证
-
-本项目使用 Supabase Postgres + Supabase Auth,完整接入文档见 [docs/SUPABASE.md](docs/SUPABASE.md)。
-
-股票状态机(观察/持有)与每日简评(3 色信号)的规则、数据流、API 速查见 [docs/STATE_MACHINE.md](docs/STATE_MACHINE.md)。
-
-**功能开发总账**(哪些已做 / 哪些没做 / 优先级)见 [docs/ROADMAP.md](docs/ROADMAP.md) — 每周对一次,避免方向漂移。
-
-**调研知识库**(Tushare 频次 / 腾讯接口字段下标 / Supabase Realtime 限制 / Drizzle 坑 / A 股数据源对比等)见 [docs/KNOWLEDGE.md](docs/KNOWLEDGE.md) — 翻阅式参考,跟 ROADMAP 互补。简要:
-- 5 张用户业务表 + 20 条 RLS 策略,所有写操作强制带 `user_id`
-- `.env.local` 模板见 `docs/SUPABASE.md` § 3.5
-- 后端用 `postgres` 角色直连 5432,业务层显式 `where user_id = $1` 隔离
-- 前端 `Network.request` 自动注入 `Authorization: Bearer <jwt>`；401 时单次续期并重放请求，续期失败才跳登录页
-
-在代码中使用 @nestjs/config 读取环境变量：
-
-```typescript
-import { ConfigService } from '@nestjs/config';
-
-// 在 Service 中注入
-constructor(private configService: ConfigService) {}
-
-getWxConfig() {
-  return {
-    appId: this.configService.get<string>('WX_APP_ID'),
-    secret: this.configService.get<string>('WX_APP_SECRET'),
-  };
-}
-```
-
-### 标准响应封装
-
-建议使用拦截器 (Interceptor) 统一 API 响应格式：
-
-```typeScript
-// src/common/interceptors/transform.interceptor.ts
-import { Injectable, NestInterceptor, ExecutionContext, CallHandler } from '@nestjs/common';
-import { Observable } from 'rxjs';
-import { map } from 'rxjs/operators';
-
-export interface Response<T> {
-  code: number;
-  data: T;
-  message: string;
-}
-
-@Injectable()
-export class TransformInterceptor<T> implements NestInterceptor<T, Response<T>> {
-  intercept(context: ExecutionContext, next: CallHandler): Observable<Response<T>> {
-    return next.handle().pipe(
-      map((data) => ({
-        code: 200,
-        data,
-        message: 'success',
-      })),
-    );
-  }
-}
-```
-
-在 main.ts 中全局注册：
-
-```typescript
-app.useGlobalInterceptors(new TransformInterceptor());
-```
-
-### 微信登录后端实现
-
-```typescript
-// src/modules/auth/auth.service.ts
-import { Injectable, UnauthorizedException } from '@nestjs/common';
-import { HttpService } from '@nestjs/axios';
-import { ConfigService } from '@nestjs/config';
-import { lastValueFrom } from 'rxjs';
-
-@Injectable()
-export class AuthService {
-  constructor(
-    private httpService: HttpService,
-    private configService: ConfigService,
-  ) {}
-
-  async code2Session(code: string) {
-    const appId = this.configService.get('WX_APP_ID');
-    const secret = this.configService.get('WX_APP_SECRET');
-    const url = `https://api.weixin.qq.com/sns/jscode2session?appid=${appId}&secret=${secret}&js_code=${code}&grant_type=authorization_code`;
-
-    const { data } = await lastValueFrom(this.httpService.get(url));
-
-    if (data.errcode) {
-      throw new UnauthorizedException(`微信登录失败: ${data.errmsg}`);
-    }
-
-    return data; // 包含 openid, session_key
-  }
-}
-```
-
-### 异常处理
-
-使用全局异常过滤器 (Filter) 统一错误响应：
-
-```typescript
-// src/common/filters/http-exception.filter.ts
-import { ExceptionFilter, Catch, ArgumentsHost, HttpException } from '@nestjs/common';
-import { Response } from 'express';
-
-@Catch(HttpException)
-export class HttpExceptionFilter implements ExceptionFilter {
-  catch(exception: HttpException, host: ArgumentsHost) {
-    const ctx = host.switchToHttp();
-    const response = ctx.getResponse<Response>();
-    const status = exception.getStatus();
-    const exceptionResponse = exception.getResponse();
-
-    response.status(status).json({
-      code: status,
-      message: typeof exceptionResponse === 'string' ? exceptionResponse : (exceptionResponse as any).message,
-      data: null,
-    });
-  }
-}
-```
-
-在 main.ts 中注册：
-
-```
-app.useGlobalFilters(new HttpExceptionFilter());
-```
-
-### 数据库 (Drizzle ORM)
-
-推荐使用 [Drizzle ORM](https://orm.drizzle.team/)，已预安装。
-
-### 类型校验 (Zod)
-
-项目集成了 [Zod](https://zod.dev/) 用于运行时类型校验。
-
-#### 定义 Schema
-
-```typescript
-import { z } from 'zod';
-
-// 基础类型
-const userSchema = z.object({
-  id: z.number(),
-  name: z.string().min(1).max(50),
-  email: z.string().email(),
-  age: z.number().int().positive().optional(),
-});
-
-// 从 schema 推导 TypeScript 类型
-type User = z.infer<typeof userSchema>;
-```
-
-#### 请求校验
-
-```typescript
-// src/modules/user/dto/create-user.dto.ts
-import { z } from 'zod';
-
-export const createUserSchema = z.object({
-  nickname: z.string().min(1, '昵称不能为空').max(20, '昵称最多20个字符'),
-  avatar: z.string().url('头像必须是有效的URL').optional(),
-  phone: z.string().regex(/^1[3-9]\d{9}$/, '手机号格式不正确').optional(),
-});
-
-export type CreateUserDto = z.infer<typeof createUserSchema>;
-
-// 在 Controller 中使用
-@Post()
-create(@Body() body: unknown) {
-  const result = createUserSchema.safeParse(body);
-  if (!result.success) {
-    throw new BadRequestException(result.error.errors);
-  }
-  return this.userService.create(result.data);
-}
-```
+- [Docker 运行与部署](docs/DOCKER.md)
+- [Supabase 接入、迁移与 RLS](docs/SUPABASE.md)
+- [股票与持仓状态机](docs/STATE_MACHINE.md)
+- [产品 Roadmap](docs/ROADMAP.md)
+- [股票研究 Agent 发布说明](docs/superpowers/AGENT_RELEASE_NOTES_2026-06-19.md)
