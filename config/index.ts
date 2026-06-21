@@ -190,7 +190,7 @@ export default defineConfig<'vite'>(async (merge, _env) => {
         open: false,
         proxy: {
           '/api': {
-            target: 'http://localhost:3000',
+            target: process.env.H5_PROXY_TARGET || 'http://localhost:3000',
             changeOrigin: true,
           },
         },
