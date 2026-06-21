@@ -154,4 +154,4 @@ Docker 启动不会自动执行数据库迁移。请先按项目现有 Supabase 
 
 - H5 位于生产 Nginx 镜像内。
 - 微信小程序位于宿主机 `dist/`。
-- 抖音小程序:**本项目未实现**(按用户当前决定,canonical 计划里的 `tt-build` service / `pnpm docker:build:tt` 脚本被移除)。
+- 抖音小程序 Docker 支持已由用户明确取消；项目原有非 Docker `pnpm build:tt` 仍保留。

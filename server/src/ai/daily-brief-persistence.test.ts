@@ -2,17 +2,22 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { config } from 'dotenv'
 import { Pool } from 'pg'
+import { createDatabasePoolConfig } from '../storage/database/connection-config'
 import { persistDailyBriefArtifacts } from './daily-brief-persistence'
 
 config({ path: '.env.local' })
 
-test('upserts one brief and one auto note per user, stock and trade date', async () => {
-  assert.ok(process.env.SUPABASE_DB_URL, 'SUPABASE_DB_URL is required for the integration test')
+function createTestPool(): Pool {
+  return new Pool(
+    createDatabasePoolConfig({
+      ...process.env,
+      DB_CONNECTION_PROFILE: 'pooler-session',
+    }),
+  )
+}
 
-  const pool = new Pool({
-    connectionString: process.env.SUPABASE_DB_URL,
-    connectionTimeoutMillis: 10_000,
-  })
+test('upserts one brief and one auto note per user, stock and trade date', async () => {
+  const pool = createTestPool()
   const client = await pool.connect()
 
   try {

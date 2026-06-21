@@ -1,5 +1,3 @@
-# syntax=docker/dockerfile:1.7
-
 FROM --platform=linux/amd64 node:22-bookworm-slim AS base
 # Taro 4.1.9 / @swc/core 1.3.96 / @tarojs/plugin-doctor 不发布 linux-arm64-gnu binding。
 # 必须强制 amd64 base,否则在 Apple Silicon 等 arm64 主机上 build 会找不到

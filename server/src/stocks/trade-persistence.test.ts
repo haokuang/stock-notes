@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { config } from 'dotenv'
 import { Pool } from 'pg'
+import { createDatabasePoolConfig } from '../storage/database/connection-config'
 import {
   buyStockTransaction,
   sellStockTransaction,
@@ -9,9 +10,17 @@ import {
 
 config({ path: '.env.local' })
 
+function createTestPool(): Pool {
+  return new Pool(
+    createDatabasePoolConfig({
+      ...process.env,
+      DB_CONNECTION_PROFILE: 'pooler-session',
+    }),
+  )
+}
+
 test('rolls back the stock state when the buy note insert fails', async () => {
-  assert.ok(process.env.SUPABASE_DB_URL)
-  const pool = new Pool({ connectionString: process.env.SUPABASE_DB_URL })
+  const pool = createTestPool()
   const client = await pool.connect()
   try {
     await createTradeTables(client)
@@ -40,8 +49,7 @@ test('rolls back the stock state when the buy note insert fails', async () => {
 })
 
 test('commits buy and sell state changes together with their notes', async () => {
-  assert.ok(process.env.SUPABASE_DB_URL)
-  const pool = new Pool({ connectionString: process.env.SUPABASE_DB_URL })
+  const pool = createTestPool()
   const client = await pool.connect()
   try {
     await createTradeTables(client)

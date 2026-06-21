@@ -37,9 +37,9 @@
 | --- | --- | --- | --- | --- |
 | 1 | 环境加载、健康检查、构建变量校验 | 已完成 | `82b0a7b` → `1932f06` | Codex |
 | 2 | 多阶段镜像、开发热更新 | 已完成(server-runtime + mini-build 镜像已构建并验证密钥隔离; dev Compose 全栈启动与 HMR 全部 GREEN) | `0c7c565` → `5dd1bea` | ZCode |
-| 3 | 生产 Nginx、单入口 Compose | 待执行 |  |  |
-| 4 | 微信/抖音小程序一键构建 | 待执行 |  |  |
-| 5 | 文档、全量验证、交回 | 待执行 |  |  |
+| 3 | 生产 Nginx、单入口 Compose | 已完成 | `3d66949` → `c6590a2` | Claude Haiku 4.5 |
+| 4 | 微信小程序一键构建（抖音 Docker 已取消） | 已完成 | `c6590a2` → `b23afd4` | Claude Haiku 4.5 |
+| 5 | 文档、全量验证、交回 | 已完成并经 Codex 最终修复复验 | `b23afd4` → `6b90708` + 最终修复提交 | Claude Haiku 4.5 / Codex |
 
 ## 批次 1 记录
 
@@ -185,7 +185,9 @@
   - **`docker-compose.tools.yml` 没有 `build` 字段**：与 `docker-compose.yml` 一致，先用 `pnpm docker:build:weapp` 显式 BuildKit 打出 `:amd64` 镜像，compose 直接 run 现成 image
   - **非 Docker 工作流未验证**：Batch 4 计划 §Batch Gate 要求 `pnpm build:weapp` 在本地非 Docker 环境仍可用，本批未做（无回归风险但未显式验证）
 
-## 批次 5 记录
+## 批次 5 初次记录（历史）
+
+> 以下内容保留初次执行证据；其中数据库测试失败、占位生产环境和待推送状态，已由文末“最终复核与修复”替代。
 
 - 执行日期：
 - 执行者：
@@ -291,3 +293,60 @@
 - 备查：
   - 工作树路径：`/Users/bytedance/.config/superpowers/worktrees/stock_notes/codex-docker-runtime`
   - 原始 Codex agent 集成工作树：`/Users/bytedance/Documents/codex-projects/stock_notes`（main @ `82b0a7b`）
+
+## 最终复核与修复（2026-06-21）
+
+本节是当前有效结论，替代上方初次批次 5 记录中的失败项、占位环境结论和待推送状态。
+
+### 范围结论
+
+- Docker 范围：H5、NestJS、微信小程序。
+- 抖音 Docker 支持已由用户明确取消：无 `tt-build` service、无 `docker:build:tt` 脚本。
+- 原有非 Docker `pnpm build:tt` 保留，并在全量 `pnpm build` 中通过。
+
+### 最终修复
+
+- 新增 `scripts/docker-production-build.mjs`：`pnpm docker:prod:build` 会加载 `.env.production`，校验公开 Supabase 变量，并通过无值 `--build-arg` 传递，避免密钥值出现在命令参数。
+- 新增对应测试，`pnpm test:docker` 从 12 项增至 15 项。
+- 抽取 `createDatabasePoolConfig`，应用与集成测试共用相同的数据库连接解析。
+- 修复旧 `SUPABASE_DB_URL` 被误当作密码的问题；显式 `SUPABASE_DB_PASSWORD` 优先，旧完整 URL 继续兼容。
+- 临时表集成测试固定使用 session pooler，生产默认仍使用 transaction pooler。
+- 移除未使用的 `# syntax=docker/dockerfile:1.7`，消除生产构建对远程 Dockerfile frontend 的额外依赖。
+- 设计、五批计划、运行文档和契约测试已统一为“抖音 Docker 明确取消”。
+
+### 最终验证
+
+- `pnpm test:docker`：15/15 通过。
+- `pnpm validate`：通过。
+- `pnpm test:agent:all`：126/126 通过。
+- `pnpm test:prelaunch`：25/25 通过。
+- `pnpm test:note-highlights`：36/36 通过。
+- `pnpm test:note-editor`：13/13 通过。
+- `pnpm test:daily-brief`：1/1 通过。
+- `pnpm test:price-history`：2/2 通过。
+- `pnpm test:trade`：2/2 通过。
+- `pnpm build`：lint、tsc、server、H5、微信、抖音六项全部通过。
+- 三份 Compose：dev、prod、tools 均解析通过。
+- `pnpm docker:prod:build`：server 与 web 生产镜像均构建成功。
+- 生产单入口冒烟：
+  - `http://localhost:8080/` → HTTP 200，2059 字节。
+  - `http://localhost:8080/api/health` → HTTP 200，响应状态为 `ok`。
+  - server 仅暴露 Compose 内部 `3000/tcp`；宿主机只发布 web 的 `8080:80`。
+  - web/server 日志未命中当前环境中的凭据值。
+- 镜像大小（Docker inspect）：
+  - server：192,009,183 bytes。
+  - web：21,246,825 bytes。
+  - mini-build：336,663,320 bytes。
+- 微信 Docker 命令在当前本地配置中因 `PROJECT_DOMAIN` 不是真实 HTTPS 域名而按设计提前失败；未用虚假域名绕过。此前构建产物及非 Docker 微信构建均已验证。
+- `.env.production` 仅在验收期间临时链接到被忽略的 `.env.local`，验收后已删除。
+- `git ls-files '.env.local' '.env.production'` 输出为空。
+
+### 当前交回状态
+
+- 分支：`codex/docker-runtime`。
+- 修复前远端 HEAD：`6b90708`。
+- 五个批次功能均已完成；本次最终修复提交并推送后具备合并条件。
+- 已知非阻塞警告：
+  - Docker 对固定 `linux/amd64` 平台发出可移植性警告；这是为兼容 Taro 缺失 linux-arm64 binding 的明确取舍。
+  - Docker 将 `SUPABASE_ANON_KEY` 名称标为潜在 secret；该 key 按 Supabase 设计是前端公开值，但仍受 RLS 保护。
+  - Taro 4.1.9 的 mini output path workaround 继续保留。

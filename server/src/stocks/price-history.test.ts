@@ -3,13 +3,22 @@ import test from 'node:test'
 import { config } from 'dotenv'
 import { Pool } from 'pg'
 import type { DailyQuote } from '../tushare/tushare.service'
+import { createDatabasePoolConfig } from '../storage/database/connection-config'
 import { ensurePriceHistory } from './price-history'
 
 config({ path: '.env.local' })
 
+function createTestPool(): Pool {
+  return new Pool(
+    createDatabasePoolConfig({
+      ...process.env,
+      DB_CONNECTION_PROFILE: 'pooler-session',
+    }),
+  )
+}
+
 test('reads 60 existing trading days without calling Tushare', async () => {
-  assert.ok(process.env.SUPABASE_DB_URL)
-  const pool = new Pool({ connectionString: process.env.SUPABASE_DB_URL })
+  const pool = createTestPool()
   const client = await pool.connect()
   try {
     await createPriceTable(client)
@@ -37,8 +46,7 @@ test('reads 60 existing trading days without calling Tushare', async () => {
 })
 
 test('backfills about 120 natural days and then rereads the latest 60 database rows', async () => {
-  assert.ok(process.env.SUPABASE_DB_URL)
-  const pool = new Pool({ connectionString: process.env.SUPABASE_DB_URL })
+  const pool = createTestPool()
   const client = await pool.connect()
   try {
     await createPriceTable(client)

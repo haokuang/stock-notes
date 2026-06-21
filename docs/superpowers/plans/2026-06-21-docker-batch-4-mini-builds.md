@@ -2,11 +2,11 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this batch task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Add one-command Docker builds for WeChat and Douyin mini-programs, with separate host outputs and a complete non-secret production environment template.
+**Goal:** Add a one-command Docker build for the WeChat mini-program and a complete non-secret production environment template. Douyin Docker support is explicitly canceled.
 
-**Architecture:** One-shot Compose services reuse the `mini-build` image target, validate a real HTTPS `PROJECT_DOMAIN`, write directly to platform-specific host output directories, and exit with the underlying build status.
+**Architecture:** A one-shot Compose service reuses the `mini-build` image target, validates a real HTTPS `PROJECT_DOMAIN`, writes directly to the WeChat host output directory, and exits with the underlying build status.
 
-**Tech Stack:** Docker Compose v2, Taro WeChat/Douyin builds, pnpm.
+**Tech Stack:** Docker Compose v2, Taro WeChat build, pnpm.
 
 ---
 
@@ -37,7 +37,6 @@
 - [ ] Run them and confirm RED.
 - [ ] Create `docker-compose.tools.yml` with:
   - `weapp-build` → `/output` mounted from `./dist`;
-  - `tt-build` → `/output` mounted from `./dist-tt`;
   - `OUTPUT_ROOT=/output`;
   - production environment injection;
   - `node scripts/validate-docker-env.mjs mini` before each build.
@@ -53,8 +52,7 @@
 - [ ] Add:
 
 ```json
-"docker:build:weapp": "docker compose --env-file .env.production -f docker-compose.tools.yml run --rm weapp-build",
-"docker:build:tt": "docker compose --env-file .env.production -f docker-compose.tools.yml run --rm tt-build"
+"docker:build:weapp": "docker compose --env-file .env.production -f docker-compose.tools.yml run --rm weapp-build"
 ```
 
 - [ ] Run:
@@ -64,8 +62,6 @@ docker compose --env-file .env.production -f docker-compose.tools.yml config
 pnpm test:docker
 pnpm docker:build:weapp
 test -f dist/app.json
-pnpm docker:build:tt
-test -f dist-tt/app.json
 ```
 
 - [ ] Verify invalid domains fail:
@@ -94,8 +90,8 @@ git commit -m "feat: 增加小程序 Docker 一键构建"
 
 - [ ] Tool Compose parses.
 - [ ] WeChat build writes usable output only to `dist/`.
-- [ ] Douyin build writes usable output only to `dist-tt/`.
 - [ ] Missing or non-HTTPS `PROJECT_DOMAIN` fails before Taro build.
+- [ ] No `tt-build` service or `docker:build:tt` script is introduced.
 - [ ] No automatic upload or publish occurs.
 - [ ] Templates contain variable names but no real credentials.
 - [ ] Real `.env.production` remains untracked.

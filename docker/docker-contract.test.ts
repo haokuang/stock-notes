@@ -138,7 +138,7 @@ test('production compose exposes only nginx and waits for server health', () => 
 })
 
 test('tool compose writes WeChat mini-program to its own host directory', () => {
-  // 用户在 Batch 4 明确要求只做微信小程序,不实现 tt-build(Douyin)。
+  // 用户明确取消 Docker 内的抖音小程序构建,不实现 tt-build(Douyin)。
   // canonical Task 6 计划里的 tt-build service / docker:build:tt 脚本 / tt 契约断言
   // 全部按用户意图移除;只保留 weapp-build 相关断言。
   // 已知 Taro 4.1.9 bug:outputRoot 用 path.join(appPath, outputRoot) 计算输出目录,
@@ -149,7 +149,7 @@ test('tool compose writes WeChat mini-program to its own host directory', () => 
   assert.match(source, /weapp-build:/)
   assert.match(source, /pnpm build:weapp/)
   assert.match(source, /\.\/dist:\/app\/dist/)
-  // tt-build 不应出现(用户要求忽略抖音小程序)。
+  // tt-build 不应出现(用户已明确取消抖音 Docker 支持)。
   assert.doesNotMatch(source, /tt-build:/)
   assert.doesNotMatch(source, /pnpm build:tt/)
   assert.doesNotMatch(source, /\.\/dist-tt:\/output/)
@@ -172,7 +172,7 @@ test('production template contains names but no filled secrets', () => {
 })
 
 test('Docker guide covers required workflows and troubleshooting', () => {
-  // 用户在 Batch 4 明确要求只做微信小程序,文档里不实现抖音小程序相关命令。
+  // 用户已明确取消抖音 Docker 支持,文档里不提供相关命令。
   // 契约断言只要求 weapp;tt 相关字段是可选的(允许出现但不是契约要求)。
   const source = read('docs/DOCKER.md')
   for (const text of [

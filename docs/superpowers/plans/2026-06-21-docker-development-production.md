@@ -2,7 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Add reproducible Docker workflows for H5 and NestJS development/production, plus one-command WeChat and Douyin mini-program builds, while preserving the existing non-Docker pnpm workflows.
+**Goal:** Add reproducible Docker workflows for H5 and NestJS development/production, plus a one-command WeChat mini-program build, while preserving the existing non-Docker pnpm workflows.
+
+> **Scope amendment (2026-06-21):** The user explicitly canceled Douyin Docker support. Do not add a `tt-build` Compose service, a `docker:build:tt` script, or Docker-produced `dist-tt` artifacts. The existing non-Docker `pnpm build:tt` workflow remains supported.
 
 **Architecture:** Use one multi-stage `Dockerfile` with dedicated development, H5 build/runtime, server build/runtime, and mini-program build targets. Development uses bind-mounted source and isolated pnpm dependency volumes; production exposes only Nginx, which serves `dist-web` and proxies `/api` to an internal NestJS container. Supabase, TOS, model providers, Tavily, and database services remain external.
 
@@ -47,7 +49,7 @@ Update `docs/superpowers/HANDOFF-dockerization-2026-06-21.md` after every batch.
 - `.dockerignore` — keep secrets and local artifacts out of Docker build context.
 - `docker-compose.dev.yml` — H5 and NestJS hot-reload services.
 - `docker-compose.yml` — production Nginx and NestJS services.
-- `docker-compose.tools.yml` — one-shot WeChat and Douyin build services.
+- `docker-compose.tools.yml` — one-shot WeChat build service.
 - `docker/nginx.conf` — static file policy and `/api` proxy.
 - `.env.production.example` — non-secret production variable template.
 - `docs/DOCKER.md` — operating and troubleshooting guide.
@@ -1026,15 +1028,13 @@ git commit -m "feat: 增加 Docker 生产运行环境"
 Append to `docker/docker-contract.test.ts`:
 
 ```ts
-test('tool compose writes each mini-program to its own host directory', () => {
+test('tool compose builds WeChat without reintroducing Douyin Docker support', () => {
   const source = read('docker-compose.tools.yml')
   assert.match(source, /weapp-build:/)
-  assert.match(source, /tt-build:/)
   assert.match(source, /pnpm build:weapp/)
-  assert.match(source, /pnpm build:tt/)
-  assert.match(source, /\.\/dist:\/output/)
-  assert.match(source, /\.\/dist-tt:\/output/)
-  assert.match(source, /OUTPUT_ROOT: \/output/)
+  assert.match(source, /\.\/dist:\/app\/dist/)
+  assert.doesNotMatch(source, /tt-build:/)
+  assert.doesNotMatch(source, /pnpm build:tt/)
 })
 
 test('production template contains names but no filled secrets', () => {
@@ -1084,21 +1084,6 @@ services:
     volumes:
       - ./dist:/output
 
-  tt-build:
-    build:
-      context: .
-      target: mini-build
-    command:
-      - sh
-      - -c
-      - node scripts/validate-docker-env.mjs mini && pnpm build:tt
-    env_file:
-      - .env.production
-    environment:
-      NODE_ENV: production
-      OUTPUT_ROOT: /output
-    volumes:
-      - ./dist-tt:/output
 ```
 
 - [ ] **Step 4: Create the production environment template**
@@ -1168,7 +1153,6 @@ AGENT_RUN_LEASE_MS=45000
 
 # Mini-program public identifiers
 TARO_APP_WEAPP_APPID=
-TARO_APP_TT_APPID=
 ```
 
 Keep `PROJECT_DOMAIN` blank in the committed template. A real production mini-program build must supply the actual registered HTTPS domain.
@@ -1189,8 +1173,7 @@ Append to `.gitignore`:
 Merge into `package.json`:
 
 ```json
-"docker:build:weapp": "docker compose --env-file .env.production -f docker-compose.tools.yml run --rm weapp-build",
-"docker:build:tt": "docker compose --env-file .env.production -f docker-compose.tools.yml run --rm tt-build"
+"docker:build:weapp": "docker compose --env-file .env.production -f docker-compose.tools.yml run --rm weapp-build"
 ```
 
 - [ ] **Step 7: Run contract and Compose validation**
@@ -1211,15 +1194,13 @@ Run:
 ```bash
 pnpm docker:build:weapp
 test -f dist/app.json
-pnpm docker:build:tt
-test -f dist-tt/app.json
 ```
 
 Expected:
 
-- Both commands exit `0`.
-- WeChat output exists only under `dist/`.
-- Douyin output exists only under `dist-tt/`.
+- The command exits `0`.
+- WeChat output exists under `dist/`.
+- No Douyin Docker command, service, or output is introduced.
 
 - [ ] **Step 9: Verify invalid production domains fail**
 
@@ -1265,7 +1246,6 @@ test('Docker guide covers required workflows and troubleshooting', () => {
     'pnpm docker:dev',
     'pnpm docker:prod:build',
     'pnpm docker:build:weapp',
-    'pnpm docker:build:tt',
     '/api/health',
     '502',
     'PROJECT_DOMAIN',
@@ -1375,13 +1355,9 @@ pnpm docker:build:weapp
 
 产物写入 `dist/`，可导入微信开发者工具。该命令不自动上传或发布。
 
-## 抖音小程序构建
+## 抖音小程序
 
-```bash
-pnpm docker:build:tt
-```
-
-产物写入 `dist-tt/`，可导入抖音开发者工具。该命令不自动上传或发布。
+抖音 Docker 构建已明确取消。需要抖音产物时继续使用现有非 Docker 命令 `pnpm build:tt`。
 
 ## 日志与健康检查
 
@@ -1440,7 +1416,7 @@ Docker 启动不会自动执行数据库迁移。请先按项目现有 Supabase 
 
 - H5 位于生产 Nginx 镜像内。
 - 微信小程序位于宿主机 `dist/`。
-- 抖音小程序位于宿主机 `dist-tt/`。
+- 抖音 Docker 构建不在本项目范围内。
 ````
 
 - [ ] **Step 4: Link the guide from `README.md`**
@@ -1450,7 +1426,7 @@ Add a short “Docker” subsection near the existing development instructions:
 ```md
 ### Docker
 
-开发、生产部署及微信/抖音小程序的一键构建说明见
+开发、生产部署及微信小程序的一键构建说明见
 [Docker 运行指南](docs/DOCKER.md)。
 ```
 
@@ -1544,12 +1520,10 @@ Run:
 
 ```bash
 pnpm docker:build:weapp
-pnpm docker:build:tt
 test -f dist/app.json
-test -f dist-tt/app.json
 ```
 
-Expected: both build directories contain valid project output.
+Expected: the WeChat build directory contains valid project output, and no Douyin Docker command exists.
 
 - [ ] **Step 6: Stop all verification containers**
 
@@ -1598,7 +1572,7 @@ If no correction was required, do not create an empty commit.
 - [ ] `/api/health` is public, stable, and non-secret.
 - [ ] Production H5 build rejects missing public Supabase values.
 - [ ] Production mini-program build rejects a missing or non-HTTPS API domain.
-- [ ] WeChat and Douyin outputs are written to separate host directories.
+- [ ] WeChat output is written to the host `dist/` directory and Douyin Docker support remains absent.
 - [ ] Real secret files do not enter Git, image layers, or H5 bundles.
 - [ ] Existing non-Docker pnpm workflows still pass.
 - [ ] Documentation covers development, production, mini-programs, health, logs, and troubleshooting.

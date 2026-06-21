@@ -42,7 +42,7 @@
   - production build/start/stop;
   - single-origin `/api`;
   - external HTTPS gateway;
-  - WeChat and Douyin builds;
+  - WeChat builds and the explicit exclusion of Douyin Docker support;
   - logs and health;
   - no-cache rebuild;
   - dependency-volume reset;
@@ -116,9 +116,7 @@ docker compose --env-file .env.production -f docker-compose.yml logs --no-color 
 
 ```bash
 pnpm docker:build:weapp
-pnpm docker:build:tt
 test -f dist/app.json
-test -f dist-tt/app.json
 ```
 
 - [ ] Stop containers:
@@ -173,7 +171,7 @@ git commit -m "fix: 修正 Docker 运行验收问题"
 - [ ] All Compose files parse.
 - [ ] Clean production images build.
 - [ ] Production H5 and `/api/health` work through one entry point.
-- [ ] Both mini-program outputs exist and are separated.
+- [ ] The WeChat mini-program output exists and no Douyin Docker command/service is present.
 - [ ] No secrets are tracked, baked into images, printed in logs, or bundled into H5.
 - [ ] Documentation reflects actual commands and behavior.
 - [ ] Shared handoff file is complete.
