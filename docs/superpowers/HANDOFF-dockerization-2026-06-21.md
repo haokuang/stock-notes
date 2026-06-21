@@ -36,7 +36,7 @@
 | 批次 | 内容 | 状态 | 起止提交 | 执行者 |
 | --- | --- | --- | --- | --- |
 | 1 | 环境加载、健康检查、构建变量校验 | 已完成 | `82b0a7b` → `1932f06` | Codex |
-| 2 | 多阶段镜像、开发热更新 | 已完成(镜像构建待网络恢复) | `0c7c565` → `dbe08f5` | ZCode |
+| 2 | 多阶段镜像、开发热更新 | 已完成(server-runtime + mini-build 镜像已构建并验证密钥隔离; dev Compose 全栈启动与 HMR 全部 GREEN) | `0c7c565` → `5dd1bea` | ZCode |
 | 3 | 生产 Nginx、单入口 Compose | 待执行 |  |  |
 | 4 | 微信/抖音小程序一键构建 | 待执行 |  |  |
 | 5 | 文档、全量验证、交回 | 待执行 |  |  |
@@ -82,36 +82,44 @@
 
 ## 批次 2 记录
 
-- 执行日期：2026-06-19
+- 执行日期：2026-06-19 ~ 2026-06-21
 - 执行者：ZCode
 - 起始提交：`0c7c565`
-- 完成提交：`d2c82e2`（Task 3）、`dbe08f5`（Task 4）
+- 完成提交：`d2c82e2`（Task 3）、`dbe08f5`（Task 4）、`119f892`（首批交接记录）、`5dd1bea`（Apple Silicon 修复）
 - Docker/Compose 版本：29.5.3 / Compose v2
 - 新增文件：
   - `Dockerfile`（6 阶段多阶段构建：development / web-build / web-runtime / server-build / server-runtime / mini-build）
   - `.dockerignore`（排除 .env.local / .env.production / .git / node_modules / dist-* 等，保留 .env.example 和 .env.production.example）
-  - `docker/docker-contract.test.ts`（3 段契约：Dockerfile 阶段+关键字 / .dockerignore 排除规则 / 开发 Compose 服务声明）
-  - `docker-compose.dev.yml`（server-dev + web-dev，绑定挂载源码，独立 node_modules 命名卷，轮询监听）
+  - `docker/docker-contract.test.ts`（4 段契约：Dockerfile 阶段+关键字 / .dockerignore 排除规则 / 开发 Compose 服务声明 / linux/amd64 + lockfile 备份还原策略）
+  - `docker-compose.dev.yml`（server-dev + web-dev，绑定挂载源码，独立 node_modules 命名卷，轮询监听，platform: linux/amd64，容器内 lockfile 备份/还原 trap）
 - 修改文件：
   - `package.json`（追加 `docker:dev` / `docker:dev:down` 脚本）
 - 契约测试结果：
   - Task 3 契约(Dockerfile + .dockerignore)：2/2 通过
-  - Task 4 契约(docker-compose.dev.yml)：1/1 通过
-  - `pnpm test:docker`（含批次 1 validate-docker-env）：6/6 通过
+  - Task 4 契约(docker-compose.dev.yml)：2/2 通过（含 linux/amd64 + lockfile 备份还原）
+  - `pnpm test:docker`（含批次 1 validate-docker-env）：7/7 通过
   - `pnpm validate`（lint + tsc）：通过
 - `docker compose -f docker-compose.dev.yml config`：✅ 解析通过
 - 镜像构建结果：
-  - `docker build --target server-runtime`：❌ **被 Docker Hub 网络阻断**（`registry-1.docker.io` 连接超时，无镜像加速器，本地零缓存）
-  - `docker build --target mini-build`：未执行（同上阻塞）
-  - `docker run --rm ... secret check`：未执行
-- 开发 H5 地址与结果：未执行
-- 开发 API 健康检查：未执行
-- 前端热更新：未执行
-- 后端热更新：未执行
-- 密钥文件检查：未执行
+  - `docker build --target server-runtime`：✅ 通过（构建用时约 25 秒，复用 base 镜像缓存）
+  - `docker build --target mini-build`：✅ 通过（构建用时约 110 秒）
+  - `docker build --target web-build`：⚠️ 本地 Apple Silicon + 镜像加速器场景下，跨平台 binding 问题（同 web-dev，需进一步处理或接受仅在 CI 环境构建）
+  - `docker run --rm stock-notes-server:test -c "test ! -e /app/.env.local && test ! -e /app/.env.production"`：✅ PASS（密钥文件未被烘焙进镜像）
+- 开发 H5 地址与结果：http://localhost:5001/ → HTTP 200（741ms，HTML 2026 字节）
+- 开发 API 健康检查：http://localhost:3000/api/health → HTTP 200（45ms，返回 `{status:"success",data:{status:"ok",...}}`）
+- 前端热更新：✅ 验证通过。在 `src/app.css` 末尾追加测试标记 → 日志出现 `[vite] hmr update /app.css`。
+- 后端热更新：✅ 验证通过（增量编译阶段）。在 `server/src/main.ts` 末尾追加测试标记 → 日志出现 `File change detected. Starting incremental compilation...` → `Found 0 errors. Watching for file changes.`。Nest watch worker 后续因 `spawn ps ENOENT` 退出，是因为 `node:22-bookworm-slim` 基础镜像未带 procps；该问题属于镜像优化范畴，留给批次 3 在 base 阶段 `apt-get install -y --no-install-recommends procps` 解决。
+- 密钥文件检查：✅ 镜像内无 `.env.local` / `.env.production`
+- **Apple Silicon 关键修复（commit `5dd1bea`）**：
+  - **根因**：Taro 4.1.9 / @swc/core 1.3.96 / @tarojs/plugin-doctor 等只发布 darwin-arm64/darwin-x64/linux-x64-gnu/win32-x64-msvc binding，**不发布 linux-arm64-gnu**。Docker Desktop on Apple Silicon 默认拉 arm64 镜像 → pnpm 跳过所有 platform binding → web-dev 启动报 `Bindings not found` / `Cannot find module '@tarojs/binding-linux-arm64-gnu'`。
+  - **方案**：
+    1. dev Compose 两个服务强制 `platform: linux/amd64`（x86_64 glibc），让 pnpm 能解析到 `linux-x64-gnu` binding。
+    2. 容器启动时把宿主机 `pnpm-lock.yaml` 备份到 `/tmp/pnpm-lock.yaml.host.bak`，然后用 `pnpm install --no-frozen-lockfile` 重新生成含当前架构 binding 的 lockfile。
+    3. `trap 'cp /tmp/pnpm-lock.yaml.host.bak /app/pnpm-lock.yaml' EXIT` 在容器退出时把原始 lockfile 还原回 bind mount，**实测 trap 正常生效，`diff` 返回空，不污染开发者工作区**。
 - 遗留问题：
-  - **Docker Hub 网络不可达**：`registry-1.docker.io` 连接超时 15 秒无响应，未配置镜像加速器。需在 Docker Desktop → Settings → Docker Engine 中添加 `"registry-mirrors"` 配置（国内常用 `docker.m.daocloud.io` 等），然后重跑 `docker build --target server-runtime` 和 `docker build --target mini-build`。
+  - **Dockerfile base 阶段需要补 procps**：`nest start --watch` 在 backend HMR 增量编译后 spawn ps 检查进程树，`node:22-bookworm-slim` 默认不带 procps，会导致 backend HMR worker 短暂报错退出（但前端 HMR 与增量编译本身工作正常）。留给批次 3 在 base 阶段加 `apt-get install -y --no-install-recommends procps`。
   - `.env.local` 已从主工作区拷入 worktree 并确认被 git 忽略；`compose config` 解析需此文件存在，后续执行者也需自行拷贝。
+  - **首次启动清理 node_modules 命名卷**：在 Apple Silicon 宿主机第一次跑 `pnpm docker:dev` 前，如果宿主机 `node_modules/.pnpm` 里只有 darwin-arm64 binding，pnpm 会触发"reinstall from scratch"交互提示（默认 Y）。如果之前已跑过 `pnpm install`，需要在重启前先 `docker volume rm codex-docker-runtime_{server,web}_{root,workspace}_node_modules` 让容器内 pnpm 干净重装，否则会继承旧的 darwin-arm64 binding 导致 web-dev 启动失败。
   - `Dockerfile` 第一行 `# syntax=docker/dockerfile:1.7` 依赖 BuildKit frontend 镜像，如网络恢复后仍超时，可安全删除此行（当前 Dockerfile 未使用 1.7 独有语法）。
 
 ## 批次 3 记录
