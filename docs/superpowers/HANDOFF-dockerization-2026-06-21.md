@@ -128,19 +128,33 @@
 
 ## 批次 3 记录
 
-- 执行日期：
-- 执行者：
-- 起始提交：
-- 完成提交：
-- Nginx 配置检查：
-- Compose 配置检查：
+- 执行日期：2026-06-21
+- 执行者：Claude Haiku 4.5
+- 起始提交：`3d66949`（批次 2 修复）
+- 完成提交：本批次（待提交）
+- 新增文件：
+  - `docker/nginx.conf`（H5 静态服务 + `/api` 反代到 `server:3000`，gzip / 50MB 上传 / hashed 1y + unhashed 1h + HTML no-cache / 502 由 nginx 默认 upstream 失败返回）
+  - `docker-compose.yml`（内部 `server` + 公开 `web`，`APP_PORT:-8080`:80，`restart: unless-stopped`，`service_healthy` 启动依赖）
+- 修改文件：
+  - `Dockerfile`：`base` 阶段 `FROM --platform=linux/amd64`（修复 web-build 在 Apple Silicon 上找不到 `linux-arm64-gnu` Taro binding），`server-runtime` 阶段同样 `FROM --platform=linux/amd64`
+  - `docker/docker-contract.test.ts`：新增 2 条契约（nginx + production compose），其中 production compose 断言两个 service 都 `platform: linux/amd64`
+  - `package.json`：`docker:prod:build` 改为显式 `DOCKER_BUILDKIT=1 docker build --platform=linux/amd64`，避免 `docker compose build` 不知道目标架构时在 arm64 host 上产出 arm64 镜像
+- 契约测试结果：9/9 通过（含批次 1 + 2 + 3 全部契约）
+- `docker run --rm --add-host=server:127.0.0.1 nginx:1.27-alpine nginx -t` → `syntax is ok`（孤立容器无 `server` DNS 时 nginx -t 报 `host not found in upstream`，加 `--add-host=server:127.0.0.1` 后通过；这是 nginx 上游解析行为，与配置无关）
+- `docker compose --env-file .env.production -f docker-compose.yml config` → 解析通过；server 段无 `ports:`，web 仅暴露 `8080:80`
 - 生产镜像构建：
-- H5 入口：
-- `/api/health`：
-- Server 是否无公开端口：
-- 502 故障测试：
-- 重启恢复：
+  - `DOCKER_BUILDKIT=1 docker build --platform=linux/amd64 --target server-runtime -t codex-docker-runtime-server:amd64` ✅
+  - `DOCKER_BUILDKIT=1 docker build --platform=linux/amd64 --target web-runtime -t codex-docker-runtime-web:amd64` ✅（需传入真实 `SUPABASE_URL` / `SUPABASE_ANON_KEY` build-arg，本地验证用占位值，但 `scripts/validate-docker-env.mjs web` 接受非空字符串占位）
+- H5 入口：`curl http://localhost:8080/` → HTTP 200，2059 字节
+- `/api/health`（server 不在时）：`curl http://localhost:8080/api/health` → HTTP **502** ✅
+- Server 公开端口：✅ server 容器无 host port，仅 web 暴露 8080
+- 502 故障测试：用 `docker compose --env-file .env.production -f docker-compose.yml up -d --no-deps web` 跳过 server 启动 web，单独 curl `/api/health` 返回 502，确认 nginx 在后端不可达时正确返回标准 502
+- 重启恢复：`docker compose up -d server` 容器正常起；`restart: unless-stopped` 行为在位（生产占位 env 缺真实 DB 时 server 进程因 Nest 注入失败持续循环重启，符合设计）
 - 遗留问题：
+  - **生产 web build 强制 amd64 的副作用**：在 amd64 host 上 `DOCKER_BUILDKIT=1 docker build --platform=linux/amd64` 走 emulation 略慢；如未来有 amd64 生产构建机，可改回 `docker compose build` 走原生 build
+  - **canonical Task 5 nginx 配置 regex bug**：`location ~* \.[0-9a-f]{8,}\.(?:...)$` 在 nginx 1.27 中报 `unknown directive`，原因是 nginx config parser 把 `{8,}` 当成未闭合的 `{ ... }` block；本批用引号包整段 regex (`location ~* "..."`) 修复
+  - **本地端到端冒烟受限**：Batch 3 完整冒烟（H5 + /api/health + 业务 API）需要真实 `SUPABASE_DB_URL` 与 `SUPABASE_SERVICE_ROLE_KEY` 等，agent 在 Apple Silicon 宿主上无法独立完成；留给用户在真实部署环境跑
+  - **本批构建命令改 `DOCKER_BUILDKIT=1` + 双 build**：`docker:prod:build` 不再走 `docker compose build`（compose 不会用 `--platform=linux/amd64`），改为显式两次 `docker build`，两个镜像分别 tag 为 `:amd64`，compose 启动时直接 pull 已存在的 image；新增 target 时需要同步改 pnpm 脚本
 
 ## 批次 4 记录
 

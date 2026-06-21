@@ -39,6 +39,9 @@
     "test:docker": "tsx --test scripts/validate-docker-env.test.ts docker/docker-contract.test.ts",
     "docker:dev": "docker compose -f docker-compose.dev.yml up --build",
     "docker:dev:down": "docker compose -f docker-compose.dev.yml down",
+    "docker:prod:build": "DOCKER_BUILDKIT=1 docker build --platform=linux/amd64 --target server-runtime -t codex-docker-runtime-server:amd64 -f Dockerfile . && DOCKER_BUILDKIT=1 docker build --platform=linux/amd64 --target web-runtime -t codex-docker-runtime-web:amd64 -f Dockerfile --build-arg SUPABASE_URL=$SUPABASE_URL --build-arg SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY .",
+    "docker:prod": "docker compose --env-file .env.production -f docker-compose.yml up -d",
+    "docker:prod:down": "docker compose --env-file .env.production -f docker-compose.yml down",
     "tsc": "npx tsc --noEmit --skipLibCheck",
     "validate": "pnpm exec concurrently --kill-others-on-fail --kill-signal SIGKILL -n lint,tsc -c red,blue \"pnpm lint:build\" \"pnpm tsc\""
   },

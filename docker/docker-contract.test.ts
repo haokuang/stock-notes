@@ -106,3 +106,33 @@ test('development compose pins linux/amd64 and restores host lockfile on soft ex
     )
   }
 })
+
+test('nginx serves H5 and preserves the api prefix', () => {
+  const source = read('docker/nginx.conf')
+  assert.match(source, /root \/usr\/share\/nginx\/html;/)
+  assert.match(source, /location \/api\//)
+  assert.match(source, /proxy_pass http:\/\/server:3000;/)
+  assert.doesNotMatch(source, /proxy_pass http:\/\/server:3000\//)
+  assert.match(source, /client_max_body_size 50m;/)
+  assert.match(source, /Cache-Control "no-cache"/)
+  assert.match(source, /max-age=31536000, immutable/)
+})
+
+test('production compose exposes only nginx and waits for server health', () => {
+  const source = read('docker-compose.yml')
+  assert.match(source, /web:/)
+  assert.match(source, /server:/)
+  assert.match(source, /\$\{APP_PORT:-8080\}:80/)
+  assert.match(source, /condition: service_healthy/)
+  assert.match(source, /restart: unless-stopped/)
+  // Taro 4.1.9 / @swc/core 不发布 linux-arm64-gnu binding,两个 service 都必须
+  // 强制 linux/amd64,否则在 Apple Silicon 等 arm64 主机上启动会失败。
+  const platformMatches = source.match(/platform: linux\/amd64/g) ?? []
+  assert.ok(
+    platformMatches.length >= 2,
+    `expected platform: linux/amd64 for both server and web, found ${platformMatches.length}`,
+  )
+
+  const serverSection = source.split(/\n  web:/)[0]
+  assert.doesNotMatch(serverSection, /\n    ports:/)
+})

@@ -1,6 +1,10 @@
 # syntax=docker/dockerfile:1.7
 
-FROM node:22-bookworm-slim AS base
+FROM --platform=linux/amd64 node:22-bookworm-slim AS base
+# Taro 4.1.9 / @swc/core 1.3.96 / @tarojs/plugin-doctor 不发布 linux-arm64-gnu binding。
+# 必须强制 amd64 base,否则在 Apple Silicon 等 arm64 主机上 build 会找不到
+# @tarojs/binding-linux-arm64-gnu 而失败(参考 docker-compose.dev.yml 的同样修复)。
+# web-runtime 阶段使用多架构 nginx:alpine,不受此约束。
 ENV PNPM_HOME=/pnpm
 ENV PATH=$PNPM_HOME:$PATH
 # nest start --watch 触发增量编译后,nest CLI / ts-node-dev 会 spawn ps 检查进程树;
@@ -20,6 +24,8 @@ FROM base AS development
 COPY . .
 
 FROM development AS web-build
+# Taro 4.1.9 / @swc/core 1.3.96 / @tarojs/plugin-doctor 不发布 linux-arm64-gnu binding。
+# development 阶段已强制 amd64 base,本阶段继承;web-runtime 阶段使用多架构 nginx:alpine。
 ARG SUPABASE_URL
 ARG SUPABASE_ANON_KEY
 ENV NODE_ENV=production
@@ -35,11 +41,12 @@ COPY --from=web-build /app/dist-web /usr/share/nginx/html
 EXPOSE 80
 
 FROM development AS server-build
+# 继承 development 的 amd64 base,避免在 arm64 主机上 build 触发 Taro/native binding 找不到的问题。
 RUN pnpm build:server
 RUN pnpm --filter server deploy --prod /opt/server
 RUN cp -R server/dist /opt/server/dist
 
-FROM node:22-bookworm-slim AS server-runtime
+FROM --platform=linux/amd64 node:22-bookworm-slim AS server-runtime
 ENV NODE_ENV=production
 ENV PORT=3000
 WORKDIR /app
