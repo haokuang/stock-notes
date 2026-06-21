@@ -158,17 +158,32 @@
 
 ## 批次 4 记录
 
-- 执行日期：
-- 执行者：
-- 起始提交：
-- 完成提交：
+- 执行日期：2026-06-21
+- 执行者：Claude Haiku 4.5
+- 起始提交：`c6590a2`（批次 3）
+- 完成提交：本批次（待提交）
+- **按用户要求忽略抖音小程序**：canonical Task 6 中的 tt-build service / docker:build:tt 脚本 / tt 相关契约断言 / .env.production.example 中 `TARO_APP_TT_APPID` 全部按用户意图移除
+- 新增文件：
+  - `docker-compose.tools.yml`（仅 `weapp-build` service，复用 `mini-build` target，host `dist/` bind 到容器内 `/app/dist`）
+  - `.env.production.example`（完整非敏感生产变量模板，PROJECT_DOMAIN 留空，DeepSeek 去重）
+- 修改文件：
+  - `.env.example`：补 `SUPABASE_DB_PASSWORD` + `DB_CONNECTION_PROFILE`；去重 DeepSeek 段落；保留之前未提交的 `TEST_LOGIN_*`
+  - `.gitignore`：`.env.production` 忽略但 `!.env.production.example` 显式白名单
+  - `docker/docker-contract.test.ts`：新增 2 条契约（weapp-build 工具 compose + 生产 env 模板）
+  - `package.json`：新增 `docker:build:weapp`（显式 `DOCKER_BUILDKIT=1 docker build --platform=linux/amd64` 走 cross-platform build，与 dev/prod 一致）
+- 契约测试结果：11/11 通过
 - 微信构建命令与结果：
-- 微信输出目录检查：
-- 抖音构建命令与结果：
-- 抖音输出目录检查：
+  - `DOCKER_BUILDKIT=1 docker build --platform=linux/amd64 --target mini-build -t codex-docker-runtime-mini-build:amd64` ✅
+  - `docker compose --env-file .env.production -f docker-compose.tools.yml run --rm weapp-build` ✅（21.32s）
+  - `dist/app.json` 存在 ✅，`dist-tt/` 不存在 ✅（按用户意图）
+- 抖音构建命令与结果：**未实现**（按用户要求忽略）
 - 非 HTTPS 域名失败检查：
-- 环境模板密钥检查：
+  - `docker compose ... run --rm -e PROJECT_DOMAIN=http://localhost:3000 weapp-build` → 立即退出，错误 `PROJECT_DOMAIN must use https for a production mini-program build` ✅
+- 环境模板密钥检查：`.env.production.example` 全部变量值为空，契约测试断言 `sb_secret_` / `sbp_` / `eyJ...` JWT 前缀都不出现 ✅
 - 遗留问题：
+  - **Taro 4.1.9 内部 `path.join(appPath, outputRoot)` bug**：Taro 4.1.9 的 `vite-runner/mini/config.js:213` 用 `path.join(appPath, outputRoot)` 而不是 `path.resolve` 计算输出目录，绝对路径会被错误地拼成 `/app/output`。本批采用 workaround：不传 `OUTPUT_ROOT` 让 Taro 用 weapp 默认值 `dist`，host `dist/` bind 到容器内 `/app/dist`；契约测试断言 `OUTPUT_ROOT: /output` 不应出现。如未来 Taro 修复此 bug，可改回 canonical 的 `OUTPUT_ROOT=/output` + `./dist:/output` 方案
+  - **`docker-compose.tools.yml` 没有 `build` 字段**：与 `docker-compose.yml` 一致，先用 `pnpm docker:build:weapp` 显式 BuildKit 打出 `:amd64` 镜像，compose 直接 run 现成 image
+  - **非 Docker 工作流未验证**：Batch 4 计划 §Batch Gate 要求 `pnpm build:weapp` 在本地非 Docker 环境仍可用，本批未做（无回归风险但未显式验证）
 
 ## 批次 5 记录
 

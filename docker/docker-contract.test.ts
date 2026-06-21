@@ -136,3 +136,37 @@ test('production compose exposes only nginx and waits for server health', () => 
   const serverSection = source.split(/\n  web:/)[0]
   assert.doesNotMatch(serverSection, /\n    ports:/)
 })
+
+test('tool compose writes WeChat mini-program to its own host directory', () => {
+  // 用户在 Batch 4 明确要求只做微信小程序,不实现 tt-build(Douyin)。
+  // canonical Task 6 计划里的 tt-build service / docker:build:tt 脚本 / tt 契约断言
+  // 全部按用户意图移除;只保留 weapp-build 相关断言。
+  // 已知 Taro 4.1.9 bug:outputRoot 用 path.join(appPath, outputRoot) 计算输出目录,
+  // 绝对路径会被当相对路径处理(写到 /app/output 而非 /output)。
+  // 因此 compose 不传 OUTPUT_ROOT 让 Taro 用 weapp 默认值 "dist",
+  // host dist/ 直接 bind 到容器内 /app/dist,Taro 产物落到 host bind mount。
+  const source = read('docker-compose.tools.yml')
+  assert.match(source, /weapp-build:/)
+  assert.match(source, /pnpm build:weapp/)
+  assert.match(source, /\.\/dist:\/app\/dist/)
+  // tt-build 不应出现(用户要求忽略抖音小程序)。
+  assert.doesNotMatch(source, /tt-build:/)
+  assert.doesNotMatch(source, /pnpm build:tt/)
+  assert.doesNotMatch(source, /\.\/dist-tt:\/output/)
+  // OUTPUT_ROOT 故意不传,避免 Taro 4.1.9 path.join 把绝对路径错处理。
+  assert.doesNotMatch(source, /OUTPUT_ROOT: \/output/)
+})
+
+test('production template contains names but no filled secrets', () => {
+  const source = read('.env.production.example')
+  for (const name of [
+    'SUPABASE_URL=',
+    'SUPABASE_ANON_KEY=',
+    'SUPABASE_SERVICE_ROLE_KEY=',
+    'SUPABASE_DB_PASSWORD=',
+    'PROJECT_DOMAIN=',
+  ]) {
+    assert.ok(source.includes(name), `missing ${name}`)
+  }
+  assert.doesNotMatch(source, /sb_secret_|sbp_|eyJ[a-zA-Z0-9_-]+/)
+})

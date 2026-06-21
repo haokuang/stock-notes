@@ -1,0 +1,19 @@
+services:
+  weapp-build:
+    platform: linux/amd64
+    image: codex-docker-runtime-mini-build:amd64
+    # Taro 4.1.9 内部用 path.join(appPath, outputRoot) 计算输出目录,绝对路径会被
+    # 当成相对路径拼到 /app 后(实际写到 /app/output 而非 /output)。
+    # 因此不传 OUTPUT_ROOT 让 Taro 用 weapp 默认值 "dist",直接把 host dist/ bind
+    # 挂到容器内 /app/dist,Taro 的产物直接落到 host bind mount 上。
+    command:
+      - sh
+      - -c
+      - node scripts/validate-docker-env.mjs mini && pnpm build:weapp
+    env_file:
+      - .env.production
+    environment:
+      NODE_ENV: production
+    volumes:
+      - ./dist:/app/dist
+    init: true
