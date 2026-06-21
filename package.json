@@ -37,6 +37,8 @@
     "test:agent:batch5": "tsx --test --tsconfig=server/tsconfig.json server/src/agent/report-persistence.test.ts src/agent/agent-api.test.ts src/agent/agent-conversation.test.ts src/agent/agent-report-view.test.ts",
     "test:agent:all": "pnpm test:agent:batch1 && pnpm test:agent:batch2 && pnpm test:agent:batch3 && pnpm test:agent:batch4 && pnpm test:agent:batch5",
     "test:docker": "tsx --test scripts/validate-docker-env.test.ts docker/docker-contract.test.ts",
+    "docker:dev": "docker compose -f docker-compose.dev.yml up --build",
+    "docker:dev:down": "docker compose -f docker-compose.dev.yml down",
     "tsc": "npx tsc --noEmit --skipLibCheck",
     "validate": "pnpm exec concurrently --kill-others-on-fail --kill-signal SIGKILL -n lint,tsc -c red,blue \"pnpm lint:build\" \"pnpm tsc\""
   },
