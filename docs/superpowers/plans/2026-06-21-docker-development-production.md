@@ -10,6 +10,20 @@
 
 ---
 
+## Five-Batch Handoff Index
+
+For sequential execution by other agents, use these batch plans:
+
+1. `2026-06-21-docker-batch-1-runtime-contracts.md`
+2. `2026-06-21-docker-batch-2-images-development.md`
+3. `2026-06-21-docker-batch-3-production-runtime.md`
+4. `2026-06-21-docker-batch-4-mini-builds.md`
+5. `2026-06-21-docker-batch-5-release-gate.md`
+
+All batches must run serially on one integration branch because `package.json`,
+Docker contract tests, and environment templates accumulate across batches.
+Update `docs/superpowers/HANDOFF-dockerization-2026-06-21.md` after every batch.
+
 ## Execution Preconditions
 
 - Execute this plan in an isolated worktree created with `superpowers:using-git-worktrees`; the current main workspace contains unrelated user changes in `package.json`, `.env.example`, `config/index.ts`, and other files.
