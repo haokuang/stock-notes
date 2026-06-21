@@ -35,7 +35,7 @@
 
 | 批次 | 内容 | 状态 | 起止提交 | 执行者 |
 | --- | --- | --- | --- | --- |
-| 1 | 环境加载、健康检查、构建变量校验 | 待执行 |  |  |
+| 1 | 环境加载、健康检查、构建变量校验 | 已完成 | `82b0a7b` → `1932f06` | Codex |
 | 2 | 多阶段镜像、开发热更新 | 待执行 |  |  |
 | 3 | 生产 Nginx、单入口 Compose | 待执行 |  |  |
 | 4 | 微信/抖音小程序一键构建 | 待执行 |  |  |
@@ -43,15 +43,42 @@
 
 ## 批次 1 记录
 
-- 执行日期：
-- 执行者：
-- 起始提交：
-- 完成提交：
-- 新增/修改文件：
-- 测试命令与结果：
-- `pnpm validate`：
-- `pnpm build:server`：
+- 执行日期：2026-06-21
+- 执行者：Codex
+- 集成分支：`codex/docker-runtime`
+- 隔离 worktree：
+  `/Users/bytedance/.config/superpowers/worktrees/stock_notes/codex-docker-runtime`
+- 起始提交：`82b0a7b`
+- 实现提交：
+  - `3ff0d52 feat: 增加容器运行环境与健康检查`
+  - `1932f06 feat: 增加 Docker 构建环境校验`
+- 新增文件：
+  - `server/src/bootstrap/runtime-environment.ts`
+  - `server/src/bootstrap/runtime-environment.test.ts`
+  - `server/src/app.controller.test.ts`
+  - `scripts/validate-docker-env.mjs`
+  - `scripts/validate-docker-env.test.ts`
+- 修改文件：
+  - `server/src/main.ts`
+  - `server/src/app.controller.ts`
+  - `server/src/agent/agent-api.test.ts`
+  - `config/index.ts`
+  - `package.json`
+- TDD RED 证据：
+  - 环境测试因 `runtime-environment` 模块不存在失败。
+  - 健康检查测试因 `response.data.status` 为 `undefined` 失败。
+  - 构建变量测试因 `validate-docker-env.mjs` 不存在失败。
+- 本批运行环境/健康/API 测试：9/9 通过。
+- 构建变量校验测试：3/3 通过。
+- `pnpm test:agent:batch1`：17/17 通过。
+- `pnpm validate`：通过；lint 与 TypeScript 均退出 0。
+- `pnpm build:server`：通过，退出 0。
+- `git diff --check`：通过。
+- Docker CLI：本批不需要；计划由批次 2 开始验证 Docker。
 - 遗留问题：
+  - `test:docker` 已加入 `package.json`，但其引用的
+    `docker/docker-contract.test.ts` 按计划在批次 2 创建；批次 1 使用聚焦测试命令验证。
+  - 主工作区存在用户未提交的 `package.json` 与 `config/index.ts` 修改；当前实现位于隔离分支，后续集成时需做内容级合并。
 
 ## 批次 2 记录
 
