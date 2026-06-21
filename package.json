@@ -40,7 +40,7 @@
     "docker:dev": "docker compose -f docker-compose.dev.yml up --build",
     "docker:dev:down": "docker compose -f docker-compose.dev.yml down",
     "docker:prod:build": "node scripts/docker-production-build.mjs",
-    "docker:prod": "docker compose --env-file .env.production -f docker-compose.yml up -d",
+    "docker:prod": "docker compose --env-file .env.production -f docker-compose.yml up -d --build",
     "docker:prod:down": "docker compose --env-file .env.production -f docker-compose.yml down",
     "docker:build:weapp": "DOCKER_BUILDKIT=1 docker build --platform=linux/amd64 --target mini-build -t codex-docker-runtime-mini-build:amd64 -f Dockerfile . && docker compose --env-file .env.production -f docker-compose.tools.yml run --rm weapp-build",
     "tsc": "npx tsc --noEmit --skipLibCheck",

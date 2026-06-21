@@ -101,9 +101,10 @@ pnpm docker:dev:down
 ```bash
 cp .env.production.example .env.production
 # 填写真实生产配置后：
-pnpm docker:prod:build
 pnpm docker:prod
 ```
+
+`docker:prod` 会在新机器上自动构建缺失或过期的生产镜像；如只想预构建而不启动，可先执行 `pnpm docker:prod:build`。
 
 生产环境只暴露 Nginx 单一入口，H5 与 `/api` 使用同一域名；NestJS 不直接发布宿主机端口。
 

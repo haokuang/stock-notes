@@ -2,6 +2,12 @@ services:
   server:
     platform: linux/amd64
     image: codex-docker-runtime-server:amd64
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: server-runtime
+      platforms:
+        - linux/amd64
     env_file:
       - .env.production
     environment:
@@ -27,6 +33,15 @@ services:
   web:
     platform: linux/amd64
     image: codex-docker-runtime-web:amd64
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: web-runtime
+      platforms:
+        - linux/amd64
+      args:
+        SUPABASE_URL: ${SUPABASE_URL}
+        SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY}
     depends_on:
       server:
         condition: service_healthy

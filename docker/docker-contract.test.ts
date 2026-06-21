@@ -137,6 +137,22 @@ test('production compose exposes only nginx and waits for server health', () => 
   assert.doesNotMatch(serverSection, /\n    ports:/)
 })
 
+test('production compose can build both runtime images on a fresh machine', () => {
+  const source = read('docker-compose.yml')
+  const packageJson = JSON.parse(read('package.json')) as {
+    scripts: Record<string, string>
+  }
+
+  const buildMatches = source.match(/\n    build:/g) ?? []
+  assert.equal(buildMatches.length, 2)
+  assert.match(source, /target: server-runtime/)
+  assert.match(source, /target: web-runtime/)
+  assert.match(source, /platforms:\n\s+- linux\/amd64/)
+  assert.match(source, /SUPABASE_URL: \$\{SUPABASE_URL\}/)
+  assert.match(source, /SUPABASE_ANON_KEY: \$\{SUPABASE_ANON_KEY\}/)
+  assert.match(packageJson.scripts['docker:prod'], /up -d --build/)
+})
+
 test('tool compose writes WeChat mini-program to its own host directory', () => {
   // 用户明确取消 Docker 内的抖音小程序构建,不实现 tt-build(Douyin)。
   // canonical Task 6 计划里的 tt-build service / docker:build:tt 脚本 / tt 契约断言

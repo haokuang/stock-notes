@@ -58,11 +58,16 @@ cp .env.production.example .env.production
 ## 生产构建与启动
 
 ```bash
-pnpm docker:prod:build
 pnpm docker:prod
 ```
 
-`docker:prod:build` 显式用 `DOCKER_BUILDKIT=1 docker build --platform=linux/amd64` 两次构建出 `codex-docker-runtime-server:amd64` 与 `codex-docker-runtime-web:amd64`,`docker:prod` 直接 run 已有 image。
+`docker:prod` 使用 Compose 的 `build` 配置自动构建 `server-runtime` 与 `web-runtime`,再启动服务。新机器只需准备源码和 `.env.production`,不需要预先拉取或手工构建本地镜像。
+
+如需只预构建而不启动:
+
+```bash
+pnpm docker:prod:build
+```
 
 访问:
 
