@@ -95,8 +95,11 @@ node - <<'NODE'
 const fs = require('node:fs')
 const scripts = require('./package.json').scripts
 const readme = fs.readFileSync('README.md', 'utf8')
+const builtins = new Set(['install'])
 for (const name of [...readme.matchAll(/pnpm ([a-z][a-z0-9:-]*)/g)].map((match) => match[1])) {
-  if (!scripts[name]) throw new Error(`README references missing script: ${name}`)
+  if (!scripts[name] && !builtins.has(name)) {
+    throw new Error(`README references missing script: ${name}`)
+  }
 }
 NODE
 ```
