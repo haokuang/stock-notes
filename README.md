@@ -89,6 +89,11 @@ pnpm build:server # 仅构建后端
 pnpm preview:weapp # 构建并生成预览小程序二维码
 ```
 
+### Docker
+
+开发、生产部署与微信小程序一键构建的完整说明见
+[Docker 运行指南](docs/DOCKER.md)。
+
 ## 前端核心开发规范
 
 ### 新建页面流程

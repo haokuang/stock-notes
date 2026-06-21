@@ -170,3 +170,20 @@ test('production template contains names but no filled secrets', () => {
   }
   assert.doesNotMatch(source, /sb_secret_|sbp_|eyJ[a-zA-Z0-9_-]+/)
 })
+
+test('Docker guide covers required workflows and troubleshooting', () => {
+  // 用户在 Batch 4 明确要求只做微信小程序,文档里不实现抖音小程序相关命令。
+  // 契约断言只要求 weapp;tt 相关字段是可选的(允许出现但不是契约要求)。
+  const source = read('docs/DOCKER.md')
+  for (const text of [
+    'pnpm docker:dev',
+    'pnpm docker:prod:build',
+    'pnpm docker:build:weapp',
+    '/api/health',
+    '502',
+    'PROJECT_DOMAIN',
+    'Docker Compose v2',
+  ]) {
+    assert.ok(source.includes(text), `missing documentation for ${text}`)
+  }
+})
