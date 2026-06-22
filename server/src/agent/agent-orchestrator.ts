@@ -1,6 +1,7 @@
 import type {
   AgentCitation,
   AgentRun,
+  AgentSubjectIdentity,
   AgentToolCall,
 } from './agent.types'
 import type { AgentModelProvider, AgentStandardMessage, AgentTurnResult, AgentToolDefinition as ProviderToolDefinition } from './providers/provider.types'
@@ -50,7 +51,7 @@ export interface AgentOrchestratorOptions {
     persistToolCall: (call: AgentToolCall) => Promise<AgentToolCall>
     updateRunStage: (runId: string, stage: AgentRun['stage']) => Promise<void>
   }
-  stockIdentity: (userId: string, stockId: string) => Promise<{ code: string; name: string }>
+  stockIdentity: (userId: string, stockId: string) => Promise<AgentSubjectIdentity>
   maxCycles?: number
 }
 
@@ -109,6 +110,7 @@ export class AgentOrchestrator {
 
       const transcript: AgentStandardMessage[] = [...context.messages]
       const provider = this.providerRegistry?.get(input.run.provider) ?? this.provider!
+      const providerTools = context.tools
       let toolBearingCycles = 0
       let finalContent = ''
 
@@ -117,7 +119,7 @@ export class AgentOrchestrator {
         const turn = await provider.generate({
           model: input.run.model,
           messages: transcript,
-          tools: this.toProviderToolDefinitions(this.registry.definitions()),
+          tools: providerTools,
           signal: controller.signal,
           traceId: input.run.id,
         })

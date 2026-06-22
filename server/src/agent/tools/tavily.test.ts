@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { TavilyClient } from './tavily.client'
 import { normalizeCitations, wrapSearchMaterial } from './citation'
+import { createStockNewsTool, type StockNewsToolResult } from './stock-news.tool'
 
 const baseResult = {
   query: 'q',
@@ -161,4 +162,37 @@ test('TavilyClient returns empty array on empty response', async () => {
 test('missing Tavily credentials fail at tool use instead of service startup', async () => {
   const client = new TavilyClient({ apiKey: '' })
   await assert.rejects(client.search({ query: 'q' }), /未配置/)
+})
+
+test('market news search uses A-share market semantics without the internal code', async () => {
+  const fetchStub = makeFetch([{
+    status: 200,
+    body: {
+      query: 'A股市场 今日资金和情绪',
+      results: [{
+        title: '市场复盘',
+        url: 'https://market.test/review',
+        content: '行业轮动',
+        published_date: '2026-06-22',
+      }],
+    },
+  }])
+  const client = new TavilyClient({ apiKey: 'k', fetchImpl: fetchStub.fn })
+  const tool = createStockNewsTool({
+    tavily: client,
+    stockIdentity: async () => ({
+      code: 'MARKET_A_SHARE',
+      name: 'A股大盘',
+      subjectType: 'market',
+    }),
+  })
+  const result = await tool.execute({
+    userId: 'user-1',
+    stockId: 'market-1',
+    threadId: 'thread-1',
+    runId: 'run-1',
+    signal: new AbortController().signal,
+  }, { query: '今日资金和情绪' }) as StockNewsToolResult
+  assert.match(result.query, /^A股市场 今日资金和情绪$/)
+  assert.doesNotMatch(result.query, /MARKET_A_SHARE/)
 })

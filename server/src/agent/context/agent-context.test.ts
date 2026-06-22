@@ -64,7 +64,7 @@ function makeDeps() {
     }),
     listMessages: async (): Promise<{ items: AgentMessage[]; nextCursor: null }> => ({ items: [], nextCursor: null }),
   }
-  const stockIdentity = async () => ({ code: '600519', name: '贵州茅台' })
+  const stockIdentity = async () => ({ code: '600519', name: '贵州茅台', subjectType: 'stock' as const })
   return { pool, repository, stockIdentity, calls }
 }
 
@@ -157,6 +157,7 @@ test('system prompt states identity, scope, citation rule and external-content d
     model: 'deepseek-chat',
     stockCode: '600519',
     stockName: '贵州茅台',
+    subjectType: 'stock',
   })
   assert.match(prompt, /600519/)
   assert.match(prompt, /贵州茅台/)
@@ -165,4 +166,39 @@ test('system prompt states identity, scope, citation rule and external-content d
   assert.match(prompt, /外部内容|不可信|不得执行/)
   assert.match(prompt, /不确定性|可能/)
   assert.match(prompt, /不执行交易|不可代为下单/)
+})
+
+test('market context uses market language and removes equity-only tools', async () => {
+  const deps = makeDeps()
+  deps.repository.listMessages = async () => ({
+    items: [makeMessage({ id: 'msg-current', role: 'user', content: '今天情绪如何' })],
+    nextCursor: null,
+  })
+  const context = await buildAgentContext({
+    run,
+    userId: 'user-1',
+    stockId: 'market-1',
+    threadId: 'thread-1',
+    repository: deps.repository as never,
+    stockIdentity: async () => ({
+      code: 'MARKET_A_SHARE',
+      name: 'A股大盘',
+      subjectType: 'market',
+    }),
+    tools: [
+      { name: 'get_stock_profile', description: '', inputSchema: {} },
+      { name: 'get_price_history', description: '', inputSchema: {} },
+      { name: 'get_daily_briefs', description: '', inputSchema: {} },
+      { name: 'get_stock_notes', description: '', inputSchema: {} },
+      { name: 'search_stock_news', description: '', inputSchema: {} },
+    ],
+  })
+  assert.match(context.systemPrompt, /整个 A 股市场/)
+  assert.match(context.systemPrompt, /市场宽度|行业轮动|成交额/)
+  assert.doesNotMatch(context.systemPrompt, /仅服务一只/)
+  assert.deepEqual(context.tools.map((tool) => tool.name), [
+    'get_stock_profile',
+    'get_stock_notes',
+    'search_stock_news',
+  ])
 })

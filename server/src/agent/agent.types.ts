@@ -17,6 +17,14 @@ export type AgentRunStage =
 
 export type AgentToolCallStatus = 'running' | 'completed' | 'failed'
 
+export type AgentSubjectType = 'stock' | 'market'
+
+export interface AgentSubjectIdentity {
+  code: string
+  name: string
+  subjectType: AgentSubjectType
+}
+
 export interface AgentCitation {
   id: string
   title: string

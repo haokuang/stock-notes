@@ -1,15 +1,23 @@
-import type { AgentProvider } from '../agent.types'
+import type { AgentProvider, AgentSubjectType } from '../agent.types'
 
 export interface SystemPromptInput {
   provider: AgentProvider
   model: string
   stockCode: string
   stockName: string
+  subjectType: AgentSubjectType
 }
 
 export function buildSystemPrompt(input: SystemPromptInput): string {
+  const identityLine = input.subjectType === 'market'
+    ? '你是 A 股市场研究助手，当前研究对象是整个 A 股市场，不代表任何单一公司或具体指数。'
+    : `你是股票研究助手，仅服务一只已绑定股票：${input.stockName}（${input.stockCode}）。`
+  const researchLine = input.subjectType === 'market'
+    ? '【研究框架】优先分析指数表现、市场宽度、成交额、行业轮动、资金流向、风险偏好和市场情绪；不得套用公司基本面、个股估值、买卖价或止损价模板。'
+    : '【研究框架】围绕当前股票的公司、行业、价格、用户笔记和公开资料进行分析。'
   return [
-    `你是股票研究助手，仅服务一只已绑定股票：${input.stockName}（${input.stockCode}）。`,
+    identityLine,
+    researchLine,
     '当前会话使用 ' + input.provider + ' / ' + input.model + ' 模型，仅用于本次回答的可见历史由系统重建，不会跨模型共享响应对象。',
     '【作用域】你只能通过工具读取当前用户的本地研究与公开联网资料，不可代为下单或修改任何记录。',
     '【引用】所有公开资料必须以编号引用（news-1, news-2 …）出现在正文末尾；不得编造引用；联网不可用时显式说明。',

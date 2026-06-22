@@ -1,12 +1,12 @@
 import { z } from 'zod'
-import type { AgentCitation } from '../agent.types'
+import type { AgentCitation, AgentSubjectIdentity } from '../agent.types'
 import type { TavilyClient, TavilyUnavailableError } from './tavily.client'
 import { normalizeCitations, wrapSearchMaterial } from './citation'
 import type { AgentTool } from './tool.types'
 
 export interface StockNewsToolDeps {
   tavily: TavilyClient
-  stockIdentity: (userId: string, stockId: string) => Promise<{ code: string; name: string }>
+  stockIdentity: (userId: string, stockId: string) => Promise<AgentSubjectIdentity>
 }
 
 export const stockNewsInput = z.object({
@@ -29,8 +29,9 @@ export function createStockNewsTool(
     description: '基于股票代码/名称 + 当前问题检索最新公开资料；返回经规范化与去重的引用，并附上被标记为"不可信"的检索原文包裹。',
     input: stockNewsInput,
     execute: async (context, input) => {
-      const { code, name } = await deps.stockIdentity(context.userId, context.stockId)
-      const composedQuery = `${code} ${name} ${input.query}`.trim()
+      const { code, name, subjectType } = await deps.stockIdentity(context.userId, context.stockId)
+      const prefix = subjectType === 'market' ? 'A股市场' : `${code} ${name}`
+      const composedQuery = `${prefix} ${input.query}`.trim()
       try {
         const search = await deps.tavily.search({ query: composedQuery, maxResults: input.maxResults ?? 8 })
         const citations = normalizeCitations(search.results)

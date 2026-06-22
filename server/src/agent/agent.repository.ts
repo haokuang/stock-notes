@@ -181,7 +181,7 @@ export class AgentRepository {
     stockId: string,
   ): Promise<AgentStockProfile | null> {
     const result = await this.pool.query<AgentStockProfileRow>(
-      `SELECT code, name, industry, current_price, change_amount, change_percent,
+      `SELECT code, name, subject_type, industry, current_price, change_amount, change_percent,
               price_date, open_price, high_price, low_price, pre_close, note
        FROM stocks
        WHERE user_id = $1 AND id = $2
@@ -251,6 +251,7 @@ export class AgentRepository {
 interface AgentStockProfileRow {
   code: string
   name: string
+  subject_type: string
   industry: string | null
   current_price: string | null
   change_amount: string | null
@@ -303,6 +304,7 @@ interface AgentDailyBriefRow {
 interface AgentStockProfile {
   code: string
   name: string
+  subjectType: 'stock' | 'market'
   industry: string | null
   currentPrice: string | null
   changeAmount: string | null
@@ -319,6 +321,7 @@ function mapAgentStockProfileRow(row: AgentStockProfileRow): AgentStockProfile {
   return {
     code: row.code,
     name: row.name,
+    subjectType: row.subject_type === 'market' ? 'market' : 'stock',
     industry: row.industry,
     currentPrice: row.current_price,
     changeAmount: row.change_amount,

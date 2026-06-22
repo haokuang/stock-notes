@@ -15,6 +15,7 @@ function makePool(rowsByCall: unknown[][]) {
 
 const stockRow = {
   id: 'stock-1', user_id: 'user-1', code: '600519', name: '贵州茅台', industry: '白酒',
+  subject_type: 'stock',
   current_price: '1700.00', change_amount: '10.00', change_percent: '0.59',
   price_date: '20260618', open_price: '1690.00', high_price: '1710.00',
   low_price: '1680.00', pre_close: '1690.00', volume: '1000', amount: '1700000.00',
@@ -55,6 +56,7 @@ test('getStockProfile returns own stock only and projects DTO fields', async () 
   assert.ok(profile)
   assert.equal(profile.code, '600519')
   assert.equal(profile.name, '贵州茅台')
+  assert.equal(profile.subjectType, 'stock')
   assert.equal('id' in profile, false)
   assert.equal('user_id' in profile, false)
   assert.match(pool.calls[0].text, /FROM stocks/)

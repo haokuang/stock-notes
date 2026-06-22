@@ -45,7 +45,7 @@ function makeRepo() {
       items: [{ id: 'msg-current', threadId: 'thread-1', userId: 'user-1', role: 'user' as const, content: '当前', provider: null, model: null, runId: null, citations: [], metadata: {}, createdAt: '2026-06-18T10:00:00.000Z' }],
       nextCursor: null,
     }),
-    getStockProfile: async () => ({ code: '600519', name: '贵州茅台', industry: '白酒', currentPrice: '1700', changeAmount: '10', changePercent: '0.59', priceDate: '20260618', openPrice: '1690', highPrice: '1710', lowPrice: '1680', preClose: '1690', note: null }),
+    getStockProfile: async () => ({ code: '600519', name: '贵州茅台', subjectType: 'stock' as const, industry: '白酒', currentPrice: '1700', changeAmount: '10', changePercent: '0.59', priceDate: '20260618', openPrice: '1690', highPrice: '1710', lowPrice: '1680', preClose: '1690', note: null }),
     getPriceHistory: async () => [],
     getStockNotes: async () => [],
     getDailyBriefs: async () => [],
@@ -55,7 +55,7 @@ function makeRepo() {
 }
 
 function makeStockIdentity() {
-  return async () => ({ code: '600519', name: '贵州茅台' })
+  return async () => ({ code: '600519', name: '贵州茅台', subjectType: 'stock' as const })
 }
 
 function makeProvider(script: Array<{
@@ -90,8 +90,10 @@ function makeProvider(script: Array<{
 function buildOrchestrator(provider: AgentModelProvider, options: {
   tavily?: { results: Array<{ title: string; url: string; content: string; published_date: string | null }>; throw?: boolean }
   persistCalls?: AgentToolCall[]
+  stockIdentity?: () => Promise<{ code: string; name: string; subjectType: 'stock' | 'market' }>
 } = {}) {
   const repository = makeRepo()
+  const stockIdentity = options.stockIdentity ?? makeStockIdentity()
   const tavily = {
     async search() {
       if (options.tavily?.throw) {
@@ -108,14 +110,14 @@ function buildOrchestrator(provider: AgentModelProvider, options: {
     createPriceHistoryTool(repository as never),
     createStockNotesTool(repository as never),
     createDailyBriefsTool(repository as never),
-    createStockNewsTool({ tavily: tavilyClient, stockIdentity: makeStockIdentity() }),
+    createStockNewsTool({ tavily: tavilyClient, stockIdentity }),
   ]
   const registry = new AgentToolRegistry({ tools })
   const orchestrator = new AgentOrchestrator({
     provider,
     registry,
     repository: repository as never,
-    stockIdentity: makeStockIdentity(),
+    stockIdentity,
   })
   return { orchestrator, calls: (provider as unknown as { calls: unknown }).calls, repository }
 }
@@ -127,6 +129,22 @@ test('orchestrator returns direct content on first cycle without tools', async (
   assert.equal(result.content, '直接回答')
   assert.deepEqual(result.citations, [])
   assert.equal(result.toolCalls.length, 0)
+})
+
+test('orchestrator only exposes market-compatible tools to the provider', async () => {
+  const { provider, calls } = makeProvider([{ content: '市场回答' }])
+  const { orchestrator } = buildOrchestrator(provider, {
+    stockIdentity: async () => ({
+      code: 'MARKET_A_SHARE',
+      name: 'A股大盘',
+      subjectType: 'market',
+    }),
+  })
+  await orchestrator.run({ run, userId: 'user-1', stockId: 'market-1', threadId: 'thread-1' })
+  assert.deepEqual(
+    (calls[0].tools as Array<{ name: string }>).map((tool) => tool.name),
+    ['get_stock_profile', 'get_stock_notes', 'search_stock_news'],
+  )
 })
 
 test('orchestrator executes one tool call, returns its result to the model and finalizes on second cycle', async () => {

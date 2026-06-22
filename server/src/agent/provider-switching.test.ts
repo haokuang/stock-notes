@@ -46,7 +46,7 @@ function makeRepo(history: ReturnType<typeof makeMessage>[]) {
       createdAt: '2026-06-18T09:00:00.000Z', updatedAt: '2026-06-18T10:00:00.000Z',
     }),
     listMessages: async () => ({ items: history.slice().reverse(), nextCursor: null }),
-    getStockProfile: async () => ({ code: '600519', name: '贵州茅台', industry: null, currentPrice: null, changeAmount: null, changePercent: null, priceDate: null, openPrice: null, highPrice: null, lowPrice: null, preClose: null, note: null }),
+    getStockProfile: async () => ({ code: '600519', name: '贵州茅台', subjectType: 'stock' as const, industry: null, currentPrice: null, changeAmount: null, changePercent: null, priceDate: null, openPrice: null, highPrice: null, lowPrice: null, preClose: null, note: null }),
     getPriceHistory: async () => [],
     getStockNotes: async () => [],
     getDailyBriefs: async () => [],
@@ -56,7 +56,7 @@ function makeRepo(history: ReturnType<typeof makeMessage>[]) {
 }
 
 function makeStockIdentity() {
-  return async () => ({ code: '600519', name: '贵州茅台' })
+  return async () => ({ code: '600519', name: '贵州茅台', subjectType: 'stock' as const })
 }
 
 function buildOrchestrator(provider: AgentModelProvider, repo: ReturnType<typeof makeRepo>) {

@@ -1,4 +1,4 @@
-import type { AgentMessage, AgentRun, AgentToolCall } from '../agent.types'
+import type { AgentMessage, AgentRun, AgentSubjectIdentity, AgentSubjectType, AgentToolCall } from '../agent.types'
 import type { AgentStandardMessage } from '../providers/provider.types'
 import type { AgentRepository } from '../agent.repository'
 import type { AgentToolDefinition } from '../providers/provider.types'
@@ -10,7 +10,7 @@ export interface BuildAgentContextInput {
   stockId: string
   threadId: string
   repository: Pick<AgentRepository, 'findThread' | 'listMessages'>
-  stockIdentity: (userId: string, stockId: string) => Promise<{ code: string; name: string }>
+  stockIdentity: (userId: string, stockId: string) => Promise<AgentSubjectIdentity>
   tools: AgentToolDefinition[]
   maxContextMessages?: number
 }
@@ -18,11 +18,21 @@ export interface BuildAgentContextInput {
 export interface BuildAgentContextOutput {
   systemPrompt: string
   messages: AgentStandardMessage[]
-  stockIdentity: { code: string; name: string }
+  stockIdentity: AgentSubjectIdentity
   tools: AgentToolDefinition[]
 }
 
 const DEFAULT_MAX_CONTEXT_MESSAGES = 40
+const MARKET_UNSUPPORTED_TOOLS = new Set(['get_price_history', 'get_daily_briefs'])
+
+function toolsForSubject(
+  tools: AgentToolDefinition[],
+  subjectType: AgentSubjectType,
+): AgentToolDefinition[] {
+  return subjectType === 'market'
+    ? tools.filter((tool) => !MARKET_UNSUPPORTED_TOOLS.has(tool.name))
+    : tools
+}
 
 interface PriorToolCall {
   id?: string
@@ -64,6 +74,7 @@ export async function buildAgentContext(
     model: input.run.model,
     stockCode: identity.code,
     stockName: identity.name,
+    subjectType: identity.subjectType,
   }
   const systemPrompt = buildSystemPrompt(promptInput)
 
@@ -82,7 +93,7 @@ export async function buildAgentContext(
     systemPrompt,
     messages: enforceContextSize(finalMessages, limit),
     stockIdentity: identity,
-    tools: input.tools,
+    tools: toolsForSubject(input.tools, identity.subjectType),
   }
 }
 

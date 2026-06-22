@@ -60,9 +60,9 @@ function resolveTavilyApiKey(): string {
         const stockIdentity = async (_userId: string, stockId: string) => {
           const profile = await repository.getStockProfile(_userId, stockId)
           if (!profile) {
-            return { code: '', name: '' }
+            return { code: '', name: '', subjectType: 'stock' as const }
           }
-          return { code: profile.code, name: profile.name }
+          return { code: profile.code, name: profile.name, subjectType: profile.subjectType }
         }
         const tools = [
           createStockProfileTool(repository),
@@ -95,7 +95,7 @@ function resolveTavilyApiKey(): string {
         stockIdentity: async (userId, stockId) => {
           const stock = await repository.getStockProfile(userId, stockId)
           if (!stock) throw new Error('资源不存在')
-          return { code: stock.code, name: stock.name }
+          return { code: stock.code, name: stock.name, subjectType: stock.subjectType }
         },
       }),
     },
