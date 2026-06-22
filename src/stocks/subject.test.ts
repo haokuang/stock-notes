@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import * as subject from './subject'
 import { MARKET_SUBJECT_META, isMarketSubject, subjectSecondaryText } from './subject'
 
 test('recognizes and labels the fixed market subject', () => {
@@ -20,4 +21,23 @@ test('keeps stock secondary information', () => {
     subject_type: 'stock',
     industry: '白酒',
   }), '600519 · 白酒')
+})
+
+test('uses market language in an A-share market Agent conversation', () => {
+  const getResearchAgentCopy = (subject as typeof subject & {
+    getResearchAgentCopy?: (subjectType: 'stock' | 'market') => {
+      navigationTitle: string
+      emptyPrompt: string
+    }
+  }).getResearchAgentCopy
+
+  assert.equal(typeof getResearchAgentCopy, 'function')
+  assert.deepEqual(getResearchAgentCopy?.('market'), {
+    navigationTitle: '市场研究 Agent',
+    emptyPrompt: '例如：结合我的历史笔记，梳理当前 A 股市场的主线、资金偏好与核心风险。',
+  })
+  assert.deepEqual(getResearchAgentCopy?.('stock'), {
+    navigationTitle: '股票研究 Agent',
+    emptyPrompt: '例如：结合我的历史笔记，梳理这只股票未来两个季度的核心催化与风险。',
+  })
 })

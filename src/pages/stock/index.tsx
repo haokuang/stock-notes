@@ -190,7 +190,7 @@ export default function StockDetailPage() {
     try {
       const api = getAgentApi()
       const thread = await api.getThread(stockId) ?? await api.createThread(stockId)
-      Taro.navigateTo({ url: `/pages/agent-chat/index?thread_id=${encodeURIComponent(thread.id)}&stock_id=${encodeURIComponent(stockId)}&stock_name=${encodeURIComponent(stock?.name ?? '')}` })
+      Taro.navigateTo({ url: `/pages/agent-chat/index?thread_id=${encodeURIComponent(thread.id)}&stock_id=${encodeURIComponent(stockId)}&stock_name=${encodeURIComponent(stock?.name ?? '')}&subject_type=${stock?.subject_type ?? 'stock'}` })
     } catch (cause) {
       Taro.showToast({ title: cause instanceof Error ? cause.message : '研究助手暂不可用', icon: 'none' })
     }

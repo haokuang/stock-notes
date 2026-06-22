@@ -7,12 +7,15 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Network } from '@/network'
+import { Badge } from '@/components/ui/badge'
+import { isMarketSubject, subjectSecondaryText, type SubjectType } from '@/stocks/subject'
 
 interface Stock {
   id: string
   code: string
   name: string
   industry: string | null
+  subject_type: SubjectType
 }
 
 interface Note {
@@ -58,7 +61,7 @@ export default function AnalysisPage() {
       const api = getAgentApi()
       const thread = await api.getThread(stock.id) ?? await api.createThread(stock.id)
       await Taro.navigateTo({
-        url: `/pages/agent-chat/index?thread_id=${encodeURIComponent(thread.id)}&stock_id=${encodeURIComponent(stock.id)}&stock_name=${encodeURIComponent(stock.name)}`,
+        url: `/pages/agent-chat/index?thread_id=${encodeURIComponent(thread.id)}&stock_id=${encodeURIComponent(stock.id)}&stock_name=${encodeURIComponent(stock.name)}&subject_type=${stock.subject_type}`,
       })
     } catch (cause) {
       console.error('[analysis] open agent failed', cause)
@@ -80,7 +83,7 @@ export default function AnalysisPage() {
             <View className="flex h-8 w-8 items-center justify-center rounded-lg bg-white bg-opacity-20">
               <Sparkles size={18} color="#ffffff" />
             </View>
-            <Text className="block text-base font-semibold text-white">股票研究 Agent</Text>
+            <Text className="block text-base font-semibold text-white">研究 Agent</Text>
           </View>
           <Text className="block text-2xl font-bold leading-tight text-white">从观点到可追溯结论</Text>
           <Text className="mt-2 block text-sm leading-relaxed text-white text-opacity-80">
@@ -113,7 +116,7 @@ export default function AnalysisPage() {
         ) : stocks.length === 0 ? (
           <Card>
             <CardContent className="p-6 text-center">
-              <Text className="block text-sm text-on-surface-variant">先在首页添加一只股票，再开始研究</Text>
+              <Text className="block text-sm text-on-surface-variant">先在首页添加研究标的，再开始研究</Text>
             </CardContent>
           </Card>
         ) : (
@@ -125,9 +128,14 @@ export default function AnalysisPage() {
                     <MessageSquareText size={20} color="#6D4DFF" />
                   </View>
                   <View className="min-w-0 flex-1">
-                    <Text className="block truncate text-sm font-semibold text-on-surface">{stock.name}</Text>
+                    <View className="flex items-center gap-2">
+                      <Text className="block truncate text-sm font-semibold text-on-surface">{stock.name}</Text>
+                      {isMarketSubject(stock) ? (
+                        <Badge variant="secondary"><Text className="block text-xs">市场研究</Text></Badge>
+                      ) : null}
+                    </View>
                     <Text className="mt-1 block text-xs text-on-surface-variant">
-                      {stock.code}{stock.industry ? ` · ${stock.industry}` : ''}
+                      {subjectSecondaryText(stock)}
                     </Text>
                   </View>
                   <Button size="sm" disabled={openingStockId !== null} onClick={() => openAgent(stock)}>

@@ -14,6 +14,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Textarea } from '@/components/ui/textarea'
 import { useAgentConversation } from '@/hooks/use-agent-conversation'
 import { Network } from '@/network'
+import { getResearchAgentCopy, resolveSubjectType, type SubjectType } from '@/stocks/subject'
 
 const makeRequestId = () => `agent-${Date.now()}-${Math.random().toString(36).slice(2, 12)}`
 const modelKey = (option: AgentModelOption) => `${option.provider}:${option.model}`
@@ -94,6 +95,7 @@ const renderAssistantContent = async (raw: string): Promise<string> => {
 export default function AgentChatPage() {
   const [threadId, setThreadId] = useState<string | null>(null)
   const [stockName, setStockName] = useState('研究标的')
+  const [subjectType, setSubjectType] = useState<SubjectType>('stock')
   const [models, setModels] = useState<AgentModelOption[]>([])
   const [selectedModelKey, setSelectedModelKey] = useState('')
   const [activeRunId, setActiveRunId] = useState<string | null>(null)
@@ -104,8 +106,12 @@ export default function AgentChatPage() {
   const { state } = useAgentConversation({ threadId, runId: activeRunId, userId })
 
   useLoad((options) => {
+    const loadedStockName = options.stock_name ? decodeURIComponent(options.stock_name) : '研究标的'
+    const loadedSubjectType = resolveSubjectType(options.subject_type, loadedStockName)
     setThreadId(options.thread_id || null)
-    setStockName(options.stock_name ? decodeURIComponent(options.stock_name) : '研究标的')
+    setStockName(loadedStockName)
+    setSubjectType(loadedSubjectType)
+    Taro.setNavigationBarTitle({ title: getResearchAgentCopy(loadedSubjectType).navigationTitle })
     getAgentApi().listModels()
       .then((items) => {
         setModels(items)
@@ -122,6 +128,7 @@ export default function AgentChatPage() {
     () => models.find((item) => modelKey(item) === selectedModelKey) ?? null,
     [models, selectedModelKey],
   )
+  const agentCopy = getResearchAgentCopy(subjectType)
   const runBusy = state.run?.status === 'queued' || state.run?.status === 'running'
 
   const submit = async () => {
@@ -224,7 +231,7 @@ export default function AgentChatPage() {
               <Sparkles className="mx-auto mb-3" size={28} color="#6D4DFF" />
               <Text className="block text-base font-semibold text-on-surface">从一个具体问题开始</Text>
               <Text className="mt-2 block text-sm leading-relaxed text-on-surface-variant">
-                例如：结合我的历史笔记，梳理这只股票未来两个季度的核心催化与风险。
+                {agentCopy.emptyPrompt}
               </Text>
             </CardContent>
           </Card>
