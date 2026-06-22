@@ -1,6 +1,6 @@
 import { View, Text, ScrollView } from '@tarojs/components'
 import Taro, { useLoad, usePullDownRefresh, useDidShow } from '@tarojs/taro'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Network } from '@/network'
 import { ArrowLeft, EllipsisVertical, TrendingUp, Target, Shield, CirclePlus, Clock, RefreshCw, Sparkles, BookOpenCheck } from 'lucide-react-taro'
 import { useBriefRealtime, type BriefEvent } from '@/hooks/useBriefRealtime'
@@ -8,12 +8,16 @@ import { useStockRefresh } from '@/hooks/useStockRefresh'
 import { getAgentApi } from '@/agent/agent-client'
 import type { AgentReportSummary } from '@/agent/agent-api'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
+import type { SubjectType } from '@/stocks/subject'
+import { detailCapabilities, detailRequestUrls } from './stock-detail-logic'
 
 interface Stock {
   id: string
   code: string
   name: string
+  subject_type: SubjectType
   industry: string | null
   current_price: number | null
   change_percent: number | null
@@ -97,30 +101,50 @@ export default function StockDetailPage() {
   const [stockId, setStockId] = useState('')
   const [briefing, setBriefing] = useState(false)
   const [agentReports, setAgentReports] = useState<AgentReportSummary[]>([])
+  const autoRefreshedStockId = useRef('')
 
-  const load = async (sid: string) => {
-    if (!sid) return
+  const load = async (sid: string): Promise<Stock | null> => {
+    if (!sid) return null
     try {
-      const [sRes, nRes, sumRes, distRes, stopRes, briefRes] = await Promise.all([
-        Network.request<{ data: Stock }>({ url: `/api/stocks/${sid}` }),
-        Network.request<{ data: Note[] }>({ url: `/api/notes?stock_id=${sid}&limit=100` }),
-        Network.request<{ data: Summary }>({ url: `/api/notes/summary/${sid}` }),
-        Network.request<{ data: Distribution }>({ url: `/api/notes/distribution/${sid}` }),
-        Network.request<{ data: StopLossAlert }>({ url: `/api/stocks/${sid}/stop-loss-alert` }),
-        Network.request<{ data: StockBriefRow[] }>({ url: `/api/stocks/${sid}/brief?days=7` }),
-      ])
-      console.log('[stock] s', sRes.data, 'n', nRes.data, 'sum', sumRes.data, 'dist', distRes.data, 'stop', stopRes.data, 'brief', briefRes.data)
-      setStock(sRes.data?.data ?? null)
-      setNotes(nRes.data?.data ?? [])
-      setSummary(sumRes.data?.data ?? { total: 0, avg_entry_price: null, avg_target_price: null, avg_stop_loss: null })
-      setDistribution(distRes.data?.data ?? { bull: 0, bear: 0, neutral: 0 })
-      setStopLoss(stopRes.data?.data ?? null)
-      setBriefs(briefRes.data?.data ?? [])
+      const sRes = await Network.request<{ data: Stock }>({ url: `/api/stocks/${sid}` })
+      const loadedStock = sRes.data?.data
+      if (!loadedStock) return null
+
+      setStock(loadedStock)
+      Taro.setNavigationBarTitle({
+        title: loadedStock.subject_type === 'market' ? '大盘研究' : '股票详情',
+      })
+
+      const urls = detailRequestUrls(loadedStock.subject_type, sid)
+      const responses = await Promise.all(
+        urls.map((url) => Network.request<{ data: unknown }>({ url })),
+      )
+      setNotes((responses[0].data?.data as Note[] | undefined) ?? [])
+      setSummary((responses[1].data?.data as Summary | undefined) ?? {
+        total: 0,
+        avg_entry_price: null,
+        avg_target_price: null,
+        avg_stop_loss: null,
+      })
+      setDistribution((responses[2].data?.data as Distribution | undefined) ?? {
+        bull: 0,
+        bear: 0,
+        neutral: 0,
+      })
+      if (loadedStock.subject_type === 'stock') {
+        setStopLoss((responses[3].data?.data as StopLossAlert | undefined) ?? null)
+        setBriefs((responses[4].data?.data as StockBriefRow[] | undefined) ?? [])
+      } else {
+        setStopLoss(null)
+        setBriefs([])
+      }
       getAgentApi().listReports(sid)
         .then(setAgentReports)
         .catch((cause) => console.error('[stock] agent reports failed', cause))
+      return loadedStock
     } catch (e) {
       console.error('[stock] load failed', e)
+      return null
     }
   }
 
@@ -129,12 +153,6 @@ export default function StockDetailPage() {
     setStockId(sid)
     Taro.setNavigationBarTitle({ title: '股票详情' })
     load(sid)
-    // 进入页面时静默拉一次最新价(冷却中会自动跳过)
-    setTimeout(() => {
-      refresh.sync({ silent: true }).then((r) => {
-        if (r) load(sid)  // 拉到新价后整页重渲染
-      })
-    }, 600)
   })
 
   // 每次页面显示都重新拉取(包括从 buy 页面回来时,状态从 watching → holding)— 2026-06-14
@@ -144,7 +162,7 @@ export default function StockDetailPage() {
 
   // Realtime 订阅:新 brief 来时合并到列表 + 滚动到顶
   useBriefRealtime({
-    stockId: stockId || null,
+    stockId: stock?.subject_type === 'stock' ? stockId : null,
     onBrief: (b: BriefEvent) => {
       setBriefs((prev) => {
         // 去重:同 id 替换,新 id 插头部
@@ -179,14 +197,28 @@ export default function StockDetailPage() {
   }
 
   // 实时价格刷新(含 1 分钟限频 + 倒计时)
-  const refresh = useStockRefresh(stockId || null)
+  const refreshStockId = stock?.subject_type === 'stock' ? stockId : null
+  const refresh = useStockRefresh(refreshStockId)
+
+  useEffect(() => {
+    if (!refreshStockId || autoRefreshedStockId.current === refreshStockId) return
+    autoRefreshedStockId.current = refreshStockId
+    const timer = setTimeout(() => {
+      refresh.sync({ silent: true }).then((result) => {
+        if (result) load(refreshStockId)
+      })
+    }, 600)
+    return () => clearTimeout(timer)
+  }, [refreshStockId]) // eslint-disable-line react-hooks/exhaustive-deps
+
   const onRefreshPrice = async () => {
+    if (stock?.subject_type !== 'stock') return
     const r = await refresh.sync()
     if (r) await load(stockId)
   }
 
   const onAiBrief = async () => {
-    if (!stockId || briefing) return
+    if (!stockId || briefing || stock?.subject_type !== 'stock') return
     setBriefing(true)
     Taro.showLoading({ title: '拉取行情中...' })
     try {
@@ -224,6 +256,8 @@ export default function StockDetailPage() {
   }
 
   const isUp = (stock?.change_percent ?? 0) >= 0
+  const capabilities = detailCapabilities(stock?.subject_type ?? 'stock')
+  const marketMode = stock?.subject_type === 'market'
 
   return (
     <View className="w-full min-h-full pb-[calc(4rem+env(safe-area-inset-bottom))]" style={{ background: '#EEF0F6' }}>
@@ -241,6 +275,33 @@ export default function StockDetailPage() {
       <ScrollView scrollY enhanced showScrollbar={false} className="w-full">
         {/* Hero 区 */}
         {stock && (
+          marketMode ? (
+            <View className="px-4 pt-3">
+              <Card>
+                <CardContent className="p-5">
+                  <View className="flex items-start justify-between gap-3">
+                    <View className="min-w-0 flex-1">
+                      <View className="flex items-center gap-2">
+                        <Text className="block text-2xl font-bold leading-tight text-on-surface">
+                          {stock.name}
+                        </Text>
+                        <Badge variant="secondary">
+                          <Text className="block text-xs font-semibold">市场研究</Text>
+                        </Badge>
+                      </View>
+                      <Text className="mt-3 block text-sm leading-relaxed text-on-surface-variant">
+                        聚焦指数表现、市场宽度、成交额、行业轮动、资金与情绪
+                      </Text>
+                    </View>
+                    <Button size="sm" onClick={openAgent}>
+                      <Sparkles size={14} color="#ffffff" />
+                      <Text className="block text-xs font-semibold text-white">问 AI</Text>
+                    </Button>
+                  </View>
+                </CardContent>
+              </Card>
+            </View>
+          ) : (
           <View className="px-4 pt-3">
             <View
               className="rounded-2xl border p-4 relative overflow-hidden"
@@ -547,31 +608,34 @@ export default function StockDetailPage() {
               )}
             </View>
           </View>
+          )
         )}
 
         {/* 操作按钮行:刷新价格 + AI 简评已在 hero 区域下方,这里放"新增观点 / 上传文档" */}
         {stock && (
           <View className="px-4 mt-2">
             <View className="grid grid-cols-2 gap-2">
-              <View
-                className="rounded-xl py-3 flex items-center justify-center gap-1 bg-white bg-opacity-72 border border-white border-opacity-85"
+              <Button
+                variant="outline"
+                className="w-full rounded-xl"
                 onClick={() => goAdd('note')}
               >
                 <CirclePlus size={14} color="#6D4DFF" />
                 <Text className="block text-xs font-semibold text-on-surface">新增观点</Text>
-              </View>
-              <View
-                className="rounded-xl py-3 flex items-center justify-center gap-1 bg-white bg-opacity-72 border border-white border-opacity-85"
+              </Button>
+              <Button
+                variant="outline"
+                className="w-full rounded-xl"
                 onClick={() => goAdd('doc')}
               >
                 <Text className="block text-xs font-semibold text-on-surface">上传文档</Text>
-              </View>
+              </Button>
             </View>
           </View>
         )}
 
         {/* 价格快照 */}
-        {stock && (
+        {stock && capabilities.price && (
           <View className="px-4 mt-4">
             <View className="rounded-2xl p-4 bg-white bg-opacity-72 border border-white border-opacity-85">
               <View className="grid grid-cols-3 gap-3">
@@ -727,7 +791,7 @@ export default function StockDetailPage() {
                         <Clock size={12} color="#5B5E72" />
                         <Text className="block">{n.created_at?.slice(0, 10)}</Text>
                       </View>
-                      {!isDoc && (n.entry_price || n.target_price || n.stop_loss) && (
+                      {!isDoc && capabilities.price && (n.entry_price || n.target_price || n.stop_loss) && (
                         <Text className="block tabular-nums">
                           {n.entry_price ? `入 ${n.entry_price}` : ''}{n.target_price ? ` 目标 ${n.target_price}` : ''}{n.stop_loss ? ` 止损 ${n.stop_loss}` : ''}
                         </Text>
