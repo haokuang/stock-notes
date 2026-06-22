@@ -32,6 +32,7 @@ export const stocks = pgTable(
     user_id: uuid("user_id").notNull(),
     code: varchar("code", { length: 20 }).notNull(),
     name: varchar("name", { length: 100 }).notNull(),
+    subject_type: varchar("subject_type", { length: 10 }).default("stock").notNull(),
     industry: varchar("industry", { length: 100 }),
     current_price: numeric("current_price", { precision: 12, scale: 2 }),
     change_amount: numeric("change_amount", { precision: 12, scale: 2 }),
@@ -61,6 +62,7 @@ export const stocks = pgTable(
   (table) => [
     index("stocks_user_id_idx").on(table.user_id),
     index("stocks_code_idx").on(table.code),
+    index("stocks_subject_type_idx").on(table.subject_type),
     index("stocks_created_at_idx").on(table.created_at),
     index("stocks_status_idx").on(table.status),
     uniqueIndex("stocks_user_code_uq").on(table.user_id, table.code),
