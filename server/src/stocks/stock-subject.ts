@@ -9,7 +9,7 @@ export const MARKET_SUBJECT = Object.freeze({
 })
 
 export interface SubjectTypeRow {
-  subject_type?: StockSubjectType | null
+  subject_type?: string | null
 }
 
 export function isMarketSubject(row: SubjectTypeRow): boolean {

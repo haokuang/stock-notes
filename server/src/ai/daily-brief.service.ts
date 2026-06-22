@@ -10,6 +10,7 @@ import {
 } from './daily-brief-persistence'
 import { TushareService } from '../tushare/tushare.service'
 import { ensurePriceHistory } from '../stocks/price-history'
+import { assertEquitySubject } from '../stocks/stock-subject'
 
 const { stocks, notes, stockBriefs } = schema
 
@@ -71,6 +72,7 @@ export class DailyBriefService {
       .where(and(eq(stocks.id, stockId), eq(stocks.user_id, uid)))
       .limit(1)
     if (!stock) throw new NotFoundException(`股票 ${stockId} 不存在`)
+    assertEquitySubject(stock)
 
     // 2. 近 60 个交易日；数据库不足时先从 Tushare 补齐再重读
     const historyClient = await this.pool.connect()
@@ -208,6 +210,14 @@ export class DailyBriefService {
    * 取最近 N 天的 brief(给股票详情页时间线)
    */
   async getRecent(uid: string, stockId: string, days = 7): Promise<StockBriefRow[]> {
+    const [stock] = await this.db
+      .select({ id: stocks.id, subject_type: stocks.subject_type })
+      .from(stocks)
+      .where(and(eq(stocks.id, stockId), eq(stocks.user_id, uid)))
+      .limit(1)
+    if (!stock) throw new NotFoundException(`股票 ${stockId} 不存在`)
+    assertEquitySubject(stock)
+
     const rows = await this.db
       .select()
       .from(stockBriefs)

@@ -36,3 +36,8 @@ test('rejects equity-only operations for a market subject', () => {
   )
   assert.doesNotThrow(() => assertEquitySubject({ subject_type: 'stock' }))
 })
+
+test('controller exposes a dedicated market endpoint with HTTP 200 semantics', () => {
+  const source = readFileSync(path.resolve(__dirname, './stocks.controller.ts'), 'utf8')
+  assert.match(source, /@Post\('market'\)[\s\S]*@HttpCode\(200\)[\s\S]*createMarket/)
+})

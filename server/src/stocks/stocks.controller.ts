@@ -44,6 +44,13 @@ export class StocksController {
     return { data };
   }
 
+  @Post('market')
+  @HttpCode(200)
+  async createMarket(@CurrentUser() user: { id: string }) {
+    const data = await this.service.createMarket(user.id);
+    return { data };
+  }
+
   @Get(':id')
   async getById(
     @CurrentUser() user: { id: string },
@@ -59,6 +66,7 @@ export class StocksController {
     @Param('id') id: string,
     @Query('days') days?: string,
   ) {
+    await this.service.assertEquityOperation(user.id, id);
     const data = await this.dailySync.getHistory(user.id, id, days ? Number(days) : 30);
     return { data };
   }
@@ -124,6 +132,7 @@ export class StocksController {
     @CurrentUser() user: { id: string },
     @Param('id') id: string,
   ) {
+    await this.service.assertEquityOperation(user.id, id);
     const data = await this.dailyBrief.generateBrief(user.id, id);
     return { data };
   }
@@ -137,6 +146,7 @@ export class StocksController {
     @Param('id') id: string,
     @Query('days') days?: string,
   ) {
+    await this.service.assertEquityOperation(user.id, id);
     const data = await this.dailyBrief.getRecent(user.id, id, days ? Number(days) : 7);
     return { data };
   }

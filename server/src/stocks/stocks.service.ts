@@ -11,6 +11,7 @@ import {
   sellStockTransaction,
   TradeStateError,
 } from './trade-persistence';
+import { assertEquitySubject, MARKET_SUBJECT } from './stock-subject';
 
 /**
  * 服务端价格刷新限频:1 分钟 / 股
@@ -117,6 +118,42 @@ export class StocksService {
     return this.tushare.searchListedOrdinaryStocks(normalized, limit)
   }
 
+  async createMarket(uid: string) {
+    const existing = await this.db
+      .select({ id: schema.stocks.id })
+      .from(schema.stocks)
+      .where(and(eq(schema.stocks.user_id, uid), eq(schema.stocks.code, MARKET_SUBJECT.code)))
+      .limit(1)
+    if (existing.length) throw new ConflictException('市场大盘已在自选中')
+
+    try {
+      const [row] = await this.db
+        .insert(schema.stocks)
+        .values({
+          user_id: uid,
+          code: MARKET_SUBJECT.code,
+          name: MARKET_SUBJECT.name,
+          subject_type: MARKET_SUBJECT.subjectType,
+          industry: null,
+          status: 'watching',
+          sort_order: 0,
+        })
+        .returning()
+      return row
+    } catch (error) {
+      if ((error as { code?: string }).code === '23505') {
+        throw new ConflictException('市场大盘已在自选中')
+      }
+      throw error
+    }
+  }
+
+  async assertEquityOperation(uid: string, stockId: string) {
+    const stock = await this.getById(uid, stockId)
+    assertEquitySubject(stock)
+    return stock
+  }
+
   async create(uid: string, dto: CreateStockDto) {
     const code = dto.code.trim()
     const existing = await this.db
@@ -139,6 +176,7 @@ export class StocksService {
           user_id: uid,
           code: basic.code,
           name: basic.name,
+          subject_type: 'stock',
           industry: basic.industry || null,
           sort_order: dto.sortOrder ?? 0,
         })
@@ -224,6 +262,7 @@ export class StocksService {
    * - 同时落一条 note 记录 buy_reason(tags=['buy']),direction='bull'
    */
   async buy(uid: string, id: string, dto: BuyStockDto) {
+    await this.assertEquityOperation(uid, id)
     const client = await this.pool.connect()
     try {
       return await buyStockTransaction(client, {
@@ -252,6 +291,7 @@ export class StocksService {
    * - 落一条 note 记录卖出理由(direction='bear', tags=['sell', 'exit'])
    */
   async sell(uid: string, id: string, dto: SellStockDto) {
+    await this.assertEquityOperation(uid, id)
     const client = await this.pool.connect()
     try {
       return await sellStockTransaction(client, {
@@ -283,6 +323,7 @@ export class StocksService {
       .where(and(eq(schema.stocks.id, id), eq(schema.stocks.user_id, uid)))
       .limit(1)
     if (!stock) throw new NotFoundException(`股票 ${id} 不存在`)
+    assertEquitySubject(stock)
     if (stock.status !== 'holding') {
       return {
         status: 'inactive' as const,
@@ -369,6 +410,7 @@ export class StocksService {
       .where(and(eq(schema.stocks.id, stockId), eq(schema.stocks.user_id, uid)))
       .limit(1)
     if (!stock) throw new NotFoundException(`股票 ${stockId} 不存在`)
+    assertEquitySubject(stock)
 
     const tsCode = this.toTushareCode(stock.code)
 
@@ -532,6 +574,7 @@ export class StocksService {
 
   /** 读 stock 详情端点直接覆盖了 stocks.current_price;为兼容老 client,这里再暴露一个 fallback */
   async getRefreshStatus(uid: string, stockId: string) {
+    await this.assertEquityOperation(uid, stockId)
     const lockKey = `${uid}:${stockId}`
     const next = _refreshLocks.get(lockKey) ?? 0
     const remaining = Math.max(0, Math.ceil((next - Date.now()) / 1000))

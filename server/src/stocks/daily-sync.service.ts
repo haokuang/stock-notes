@@ -6,6 +6,7 @@ import { eq, and, sql } from 'drizzle-orm'
 import { TushareService } from '../tushare/tushare.service'
 import { DailyBriefService } from '../ai/daily-brief.service'
 import { AlertService } from '../monitoring/alert.service'
+import { assertEquitySubject, type StockSubjectType } from './stock-subject'
 
 /**
  * 每日行情同步
@@ -100,8 +101,13 @@ export class DailySyncService {
 
   /** 同步指定用户的所有自选股 */
   async syncAll(uid: string): Promise<{ success: number; failed: number; skipped: number }> {
-    const list: Array<{ id: string; code: string; name: string }> = await this.db
-      .select({ id: schema.stocks.id, code: schema.stocks.code, name: schema.stocks.name })
+    const list: Array<{ id: string; code: string; name: string; subject_type: StockSubjectType }> = await this.db
+      .select({
+        id: schema.stocks.id,
+        code: schema.stocks.code,
+        name: schema.stocks.name,
+        subject_type: schema.stocks.subject_type,
+      })
       .from(schema.stocks)
       .where(eq(schema.stocks.user_id, uid))
 
@@ -109,6 +115,10 @@ export class DailySyncService {
     let failed = 0
     let skipped = 0
     for (const s of list) {
+      if (s.subject_type === 'market') {
+        skipped++
+        continue
+      }
       try {
         const ts_code = this.toTushareCode(s.code)
         const r = await this.syncOne(uid, s.id, ts_code)
@@ -126,11 +136,12 @@ export class DailySyncService {
   /** 同步单只:返回 'ok' | 'skipped' | 'error' */
   async syncOne(uid: string, stockId: string, tsCode: string): Promise<'ok' | 'skipped' | 'error'> {
     const [owner] = await this.db
-      .select({ id: schema.stocks.id })
+      .select({ id: schema.stocks.id, subject_type: schema.stocks.subject_type })
       .from(schema.stocks)
       .where(sql`${schema.stocks.id} = ${stockId} AND ${schema.stocks.user_id} = ${uid}`)
       .limit(1)
     if (!owner) return 'error'
+    assertEquitySubject(owner)
 
     const quotes = await this.tushare.getDaily(tsCode, 5)
     if (!quotes.length) return 'skipped'
@@ -193,6 +204,14 @@ export class DailySyncService {
 
   /** 取单只股票最近 N 天的日线历史 */
   async getHistory(uid: string, stockId: string, days = 30) {
+    const [owner] = await this.db
+      .select({ id: schema.stocks.id, subject_type: schema.stocks.subject_type })
+      .from(schema.stocks)
+      .where(sql`${schema.stocks.id} = ${stockId} AND ${schema.stocks.user_id} = ${uid}`)
+      .limit(1)
+    if (!owner) return []
+    assertEquitySubject(owner)
+
     const rows = await this.db
       .select()
       .from(schema.stockPrices)
