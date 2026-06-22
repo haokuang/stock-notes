@@ -3,9 +3,11 @@ import Taro, { useLoad } from '@tarojs/taro'
 import { useEffect, useRef, useState } from 'react'
 import { Check, CirclePlus, Search } from 'lucide-react-taro'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Network } from '@/network'
+import { MARKET_SUBJECT_META, type SubjectType } from '@/stocks/subject'
 
 interface SearchResult {
   code: string
@@ -18,6 +20,7 @@ interface SearchResult {
 
 interface ExistingStock {
   code: string
+  subject_type: SubjectType
 }
 
 const EXCHANGE_LABELS: Record<SearchResult['exchange'], string> = {
@@ -32,13 +35,15 @@ export default function StockAddPage() {
   const [loading, setLoading] = useState(false)
   const [searchError, setSearchError] = useState('')
   const [adding, setAdding] = useState<string | null>(null)
-  const [added, setAdded] = useState<Set<string>>(new Set())
+  const [existingSubjects, setExistingSubjects] = useState<ExistingStock[]>([])
   const searchSequence = useRef(0)
+  const added = new Set(existingSubjects.map((stock) => stock.code))
+  const marketAdded = existingSubjects.some((subject) => subject.subject_type === 'market')
 
   useLoad(async () => {
     try {
       const res = await Network.request<{ data: ExistingStock[] }>({ url: '/api/stocks' })
-      setAdded(new Set((res.data?.data ?? []).map((stock) => stock.code)))
+      setExistingSubjects(res.data?.data ?? [])
     } catch (error) {
       console.error('[stock-add] load existing stocks failed', error)
     }
@@ -88,7 +93,10 @@ export default function StockAddPage() {
         method: 'POST',
         data: { code: item.code },
       })
-      setAdded((current) => new Set([...current, item.code]))
+      setExistingSubjects((current) => [
+        ...current,
+        { code: item.code, subject_type: 'stock' },
+      ])
       Taro.showToast({ title: '已添加', icon: 'success' })
     } catch (error: any) {
       console.error('[stock-add] add failed', error)
@@ -99,9 +107,70 @@ export default function StockAddPage() {
     }
   }
 
+  const onAddMarket = async () => {
+    if (adding || marketAdded) return
+    setAdding(MARKET_SUBJECT_META.code)
+    try {
+      await Network.request({
+        url: '/api/stocks/market',
+        method: 'POST',
+      })
+      setExistingSubjects((current) => [
+        ...current,
+        { code: MARKET_SUBJECT_META.code, subject_type: 'market' },
+      ])
+      Taro.showToast({ title: '已添加', icon: 'success' })
+    } catch (error: any) {
+      console.error('[stock-add] add market failed', error)
+      const message = error?.data?.message ?? error?.data?.msg ?? '添加失败'
+      Taro.showToast({ title: message, icon: 'none' })
+    } finally {
+      setAdding(null)
+    }
+  }
+
   return (
     <View className="min-h-full w-full bg-surface pb-[calc(2rem+env(safe-area-inset-bottom))]">
       <View className="px-4 pt-3">
+        <Card>
+          <CardContent className="flex items-center gap-3 p-4">
+            <View className="min-w-0 flex-1">
+              <View className="flex items-center gap-2">
+                <Text className="block text-base font-semibold text-on-surface">
+                  {MARKET_SUBJECT_META.name}
+                </Text>
+                <Badge variant="secondary">
+                  <Text className="block text-xs font-semibold">{MARKET_SUBJECT_META.label}</Text>
+                </Badge>
+              </View>
+              <Text className="mt-2 block text-xs leading-relaxed text-on-surface-variant">
+                记录市场观点，与 AI 讨论指数、行业轮动、资金与情绪
+              </Text>
+            </View>
+            <Button
+              size="sm"
+              variant={marketAdded ? 'secondary' : 'default'}
+              disabled={marketAdded || adding === MARKET_SUBJECT_META.code}
+              onClick={onAddMarket}
+            >
+              {marketAdded ? (
+                <Check size={14} color="#0F8C66" />
+              ) : (
+                <CirclePlus size={14} color="#ffffff" />
+              )}
+              <Text className="block text-xs font-semibold">
+                {marketAdded
+                  ? '已添加'
+                  : adding === MARKET_SUBJECT_META.code
+                    ? '添加中'
+                    : '添加大盘'}
+              </Text>
+            </Button>
+          </CardContent>
+        </Card>
+      </View>
+
+      <View className="px-4 pt-4">
         <View className="flex items-center gap-2">
           <Search size={20} color="#5B5E72" />
           <Input
@@ -114,7 +183,7 @@ export default function StockAddPage() {
           />
         </View>
         <Text className="mt-2 block text-xs text-on-surface-variant">
-          仅支持沪深北已上市的 A 股普通股票
+          下方搜索仅支持沪深北已上市 A 股普通股票
         </Text>
       </View>
 
@@ -123,7 +192,7 @@ export default function StockAddPage() {
           <Card>
             <CardContent className="p-6">
               <Text className="block text-center text-sm text-on-surface-variant">
-                输入 6 位股票代码或中文名称开始搜索
+                输入 6 位股票代码或中文名称搜索个股
               </Text>
             </CardContent>
           </Card>
