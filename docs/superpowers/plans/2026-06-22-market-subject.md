@@ -619,7 +619,7 @@ const onAddMarket = async () => {
 }
 ```
 
-Render a `Card` before the stock search input. Its `CardContent` contains title「A股大盘」、Badge-like text「市场研究」、description「记录市场观点，与 AI 讨论指数、行业轮动、资金与情绪」and a `Button` labelled `添加大盘` or `已添加`. Continue using `Button`, `Card`, and `Input` from `@/components/ui`; do not create a `View`-styled button.
+Import `Badge` from `@/components/ui/badge`. Render a `Card` before the stock search input. Its `CardContent` contains title「A股大盘」、`<Badge variant="secondary">市场研究</Badge>`、description「记录市场观点，与 AI 讨论指数、行业轮动、资金与情绪」and a `Button` labelled `添加大盘` or `已添加`. Continue using `Button`, `Badge`, `Card`, and `Input` from `@/components/ui`; do not create a `View`-styled button or badge.
 
 Change the stock-only hint to「下方搜索仅支持沪深北已上市 A 股普通股票」and the empty prompt to「输入 6 位股票代码或中文名称搜索个股」。
 
@@ -808,7 +808,7 @@ export function formatResearchSubjectOption(subject: {
 }
 ```
 
-Extend all local `Stock`/`StockOption` interfaces in the five pages with `subject_type: 'stock' | 'market'` and use `isMarketSubject`, `subjectSecondaryText`, or `formatResearchSubjectOption` instead of rendering the fixed internal code.
+Extend all local `Stock`/`StockOption` interfaces in the five pages with `subject_type: 'stock' | 'market'` and use `isMarketSubject`, `subjectSecondaryText`, or `formatResearchSubjectOption` instead of rendering the fixed internal code. Wherever a visible「市场研究」标签 is required, import and use `Badge` from `@/components/ui/badge`; do not reproduce a badge with styled `View`/`Text`.
 
 - [ ] **Step 4: Update each page with explicit product wording**
 
