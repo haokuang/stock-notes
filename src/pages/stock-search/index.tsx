@@ -4,12 +4,15 @@ import Taro, { useLoad } from '@tarojs/taro'
 import { useState } from 'react'
 import { Network } from '@/network'
 import { Search, X } from 'lucide-react-taro'
+import { Badge } from '@/components/ui/badge'
+import { isMarketSubject, subjectSecondaryText, type SubjectType } from '@/stocks/subject'
 import { buildSearchUrl } from '../prelaunch-navigation'
 
 interface Stock {
   id: string
   code: string
   name: string
+  subject_type: SubjectType
   industry: string | null
   notes_count: number
 }
@@ -65,7 +68,7 @@ export default function StockSearchPage() {
           <Input
             className="flex-1 bg-transparent"
             style={{ fontSize: '14px', color: '#161826' }}
-            placeholder={mode === 'stock' ? '搜索股票' : '搜索观点'}
+            placeholder={mode === 'stock' ? '搜索标的' : '搜索观点'}
             placeholderTextColor="#9498AC"
             value={keyword}
             onInput={(e) => setKeyword(e.detail.value)}
@@ -84,7 +87,7 @@ export default function StockSearchPage() {
       <View className="px-4 pt-3">
         <View className="flex items-center gap-2">
           {[
-            { v: 'stock' as const, label: '股票' },
+            { v: 'stock' as const, label: '标的' },
             { v: 'note' as const, label: '观点' },
           ].map((m) => (
             <View
@@ -110,7 +113,7 @@ export default function StockSearchPage() {
         ) : mode === 'stock' ? (
           stocks.length === 0 ? (
             <View className="rounded-2xl p-6 bg-white bg-opacity-72 border border-white border-opacity-85">
-              <Text className="block text-sm text-on-surface-variant text-center">没有匹配的股票</Text>
+              <Text className="block text-sm text-on-surface-variant text-center">没有匹配的标的</Text>
             </View>
           ) : (
             <View className="rounded-2xl bg-white bg-opacity-72 border border-white border-opacity-85 overflow-hidden">
@@ -125,9 +128,16 @@ export default function StockSearchPage() {
                     <Text className="block text-base font-bold text-primary">{s.name.slice(0, 1)}</Text>
                   </View>
                   <View className="flex-1 min-w-0">
-                    <Text className="block text-sm font-semibold text-on-surface truncate">{s.name}</Text>
+                    <View className="flex items-center gap-2">
+                      <Text className="block text-sm font-semibold text-on-surface truncate">{s.name}</Text>
+                      {isMarketSubject(s) ? (
+                        <Badge variant="secondary">
+                          <Text className="block text-xs font-semibold">市场研究</Text>
+                        </Badge>
+                      ) : null}
+                    </View>
                     <Text className="block text-xs text-on-surface-variant mt-1 tabular-nums">
-                      {s.code}{s.industry ? ` · ${s.industry}` : ''} · {s.notes_count ?? 0} 条观点
+                      {subjectSecondaryText(s)} · {s.notes_count ?? 0} 条观点
                     </Text>
                   </View>
                 </View>

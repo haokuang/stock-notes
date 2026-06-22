@@ -3,6 +3,8 @@ import Taro, { useDidShow, useLoad, usePullDownRefresh } from '@tarojs/taro'
 import { useCallback, useEffect, useState } from 'react'
 import { Network } from '@/network'
 import { PenLine, Search, FileText } from 'lucide-react-taro'
+import { Badge } from '@/components/ui/badge'
+import { isMarketSubject, type SubjectType } from '@/stocks/subject'
 import { buildLibraryNotesUrl, resolveLibraryRoute } from '../prelaunch-navigation'
 
 interface Note {
@@ -30,6 +32,7 @@ interface Stock {
   id: string
   code: string
   name: string
+  subject_type: SubjectType
   industry: string | null
 }
 
@@ -138,7 +141,7 @@ export default function LibraryPage() {
           onClick={() => Taro.navigateTo({ url: '/pages/stock-search/index' })}
         >
           <Search size={16} color="#5B5E72" />
-          <Text className="block text-sm text-on-surface-variant">搜索股票代码 / 名称</Text>
+          <Text className="block text-sm text-on-surface-variant">搜索研究标的或观点</Text>
         </View>
       </View>
 
@@ -194,7 +197,7 @@ export default function LibraryPage() {
               className={`shrink-0 px-3 py-2 rounded-full text-xs ${!stockId ? 'bg-primary-container' : 'bg-white bg-opacity-72 border border-white border-opacity-85'}`}
               onClick={() => setStockId('')}
             >
-              <Text className={`block text-xs ${!stockId ? 'text-primary font-semibold' : 'text-on-surface-variant'}`}>全部股票</Text>
+              <Text className={`block text-xs ${!stockId ? 'text-primary font-semibold' : 'text-on-surface-variant'}`}>全部标的</Text>
             </View>
             {stocks.map((s) => (
               <View
@@ -202,9 +205,16 @@ export default function LibraryPage() {
                 className={`shrink-0 px-3 py-2 rounded-full text-xs ${stockId === s.id ? 'bg-primary-container' : 'bg-white bg-opacity-72 border border-white border-opacity-85'}`}
                 onClick={() => setStockId(s.id === stockId ? '' : s.id)}
               >
-                <Text className={`block text-xs ${stockId === s.id ? 'text-primary font-semibold' : 'text-on-surface-variant'}`}>
-                  {s.name}
-                </Text>
+                <View className="flex items-center gap-1">
+                  <Text className={`block text-xs ${stockId === s.id ? 'text-primary font-semibold' : 'text-on-surface-variant'}`}>
+                    {s.name}
+                  </Text>
+                  {isMarketSubject(s) ? (
+                    <Badge variant="secondary">
+                      <Text className="block text-xs font-semibold">大盘</Text>
+                    </Badge>
+                  ) : null}
+                </View>
               </View>
             ))}
           </View>

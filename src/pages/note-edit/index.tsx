@@ -17,6 +17,7 @@ import { ArrowLeft, X, Sparkles, FileText, PenLine, Eye, Upload, File } from 'lu
 import {
   buildNoteMutation,
   buildNotePayload,
+  formatResearchSubjectOption,
   parseNoteEditorRoute,
   resolveNoteTitle,
 } from './note-editor-logic'
@@ -26,6 +27,7 @@ interface StockOption {
   id: string
   code: string
   name: string
+  subject_type: 'stock' | 'market'
 }
 
 interface ExistingNote {
@@ -216,7 +218,7 @@ export default function NoteEditPage() {
   const onSave = async () => {
     if (loading || saving || loadError) return
     if (!stockId) {
-      Taro.showToast({ title: '请选择关联股票', icon: 'none' })
+      Taro.showToast({ title: '请选择关联标的', icon: 'none' })
       return
     }
     if (type === 'doc' && !docMd.trim()) {
@@ -374,7 +376,7 @@ export default function NoteEditPage() {
           <View className="px-4 pt-3">
             <Card className="rounded-2xl bg-white bg-opacity-72 border-white border-opacity-85">
               <CardContent className="p-4">
-                <Text className="block text-xs text-on-surface-variant mb-2">关联股票</Text>
+                <Text className="block text-xs text-on-surface-variant mb-2">关联标的</Text>
                 <Select
                   value={stockId}
                   onValueChange={(value) => {
@@ -384,12 +386,12 @@ export default function NoteEditPage() {
                   }}
                 >
                   <SelectTrigger className="w-full h-10 bg-surface-container border-0">
-                    <SelectValue placeholder="请选择一只自选股" />
+                    <SelectValue placeholder="请选择一个自选标的" />
                   </SelectTrigger>
                   <SelectContent align="start">
                     {stocks.map((stock) => (
                       <SelectItem key={stock.id} value={stock.id}>
-                        {`${stock.name} · ${stock.code}`}
+                        {formatResearchSubjectOption(stock)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -405,7 +407,7 @@ export default function NoteEditPage() {
                   <Text className="block text-sm font-bold text-primary">{stockName.slice(0, 1)}</Text>
                 </View>
                 <View className="flex-1">
-                  <Text className="block text-xs text-on-surface-variant">关联股票</Text>
+                  <Text className="block text-xs text-on-surface-variant">关联标的</Text>
                   <Text className="block text-sm font-semibold text-on-surface mt-1">{stockName}</Text>
                 </View>
               </CardContent>
@@ -416,13 +418,13 @@ export default function NoteEditPage() {
             <Card className="rounded-2xl bg-white bg-opacity-72 border-white border-opacity-85">
               <CardContent className="p-5 flex flex-col items-center">
                 <Text className="block text-sm font-semibold text-on-surface">还没有可关联的股票</Text>
-                <Text className="block text-xs text-on-surface-variant mt-2">请先添加一只自选股，再记录观点或文档</Text>
+                <Text className="block text-xs text-on-surface-variant mt-2">请先添加一个研究标的，再记录观点或文档</Text>
                 <Button
                   size="sm"
                   className="mt-4 rounded-full"
                   onClick={() => Taro.navigateTo({ url: '/pages/stock-add/index' })}
                 >
-                  <Text className="block text-xs text-white">添加股票</Text>
+                  <Text className="block text-xs text-white">添加标的</Text>
                 </Button>
               </CardContent>
             </Card>

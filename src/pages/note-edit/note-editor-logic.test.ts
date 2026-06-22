@@ -3,9 +3,23 @@ import test from 'node:test'
 import {
   buildNoteMutation,
   buildNotePayload,
+  formatResearchSubjectOption,
   parseNoteEditorRoute,
   resolveNoteTitle,
 } from './note-editor-logic'
+
+test('formats stock and market choices as research subjects', () => {
+  assert.equal(formatResearchSubjectOption({
+    name: 'A股大盘',
+    code: 'MARKET_A_SHARE',
+    subject_type: 'market',
+  }), 'A股大盘 · 市场研究')
+  assert.equal(formatResearchSubjectOption({
+    name: '贵州茅台',
+    code: '600519',
+    subject_type: 'stock',
+  }), '贵州茅台 · 600519')
+})
 
 test('parses edit route and requested document type', () => {
   assert.deepEqual(

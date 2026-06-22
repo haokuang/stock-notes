@@ -4,12 +4,15 @@ import { useState } from 'react'
 import { Network } from '@/network'
 import { sessionStore } from '@/auth/session'
 import { Search, Bell, Plus, CirclePlus, PenLine, ImagePlus, Sparkles, ChevronRight, Clock } from 'lucide-react-taro'
+import { Badge } from '@/components/ui/badge'
+import { isMarketSubject, type SubjectType } from '@/stocks/subject'
 
 /* === 类型定义 === */
 interface Stock {
   id: string
   code: string
   name: string
+  subject_type: SubjectType
   industry: string | null
   current_price: string | null
   change_amount: string | null
@@ -320,7 +323,7 @@ export default function IndexPage() {
       <View className="px-4 mt-5">
         <View className="grid grid-cols-4 gap-3">
           {[
-            { icon: <CirclePlus size={24} color="#6D4DFF" />, label: '添加股票', url: '/pages/stock-add/index' },
+            { icon: <CirclePlus size={24} color="#6D4DFF" />, label: '添加标的', url: '/pages/stock-add/index' },
             { icon: <PenLine size={24} color="#6D4DFF" />, label: '新建观点', url: '/pages/note-edit/index' },
             { icon: <ImagePlus size={24} color="#6D4DFF" />, label: '截图解读', url: '/pages/image-ai/index' },
             { icon: <Sparkles size={24} color="#6D4DFF" />, label: 'AI 报告', url: '/pages/analysis/index' },
@@ -447,12 +450,13 @@ export default function IndexPage() {
             {stocks.length === 0 ? (
               <View className="w-44 rounded-2xl p-4 bg-white bg-opacity-72 border border-white border-opacity-85">
                 <Text className="block text-sm text-on-surface-variant">暂无自选</Text>
-                <Text className="block text-xs text-on-surface-variant text-opacity-70 mt-1">点击 + 添加股票</Text>
+                <Text className="block text-xs text-on-surface-variant text-opacity-70 mt-1">点击 + 添加标的</Text>
               </View>
             ) : (
               stocks.map((s) => {
                 const pct = toNum(s.change_percent)
                 const isUp = pct >= 0
+                const market = isMarketSubject(s)
                 return (
                   <View
                     key={s.id}
@@ -463,9 +467,15 @@ export default function IndexPage() {
                     <View className="flex items-start justify-between gap-2">
                       <View className="min-w-0">
                         <Text className="block text-base font-semibold text-on-surface truncate">{s.name}</Text>
-                        <Text className="block text-xs text-on-surface-variant mt-1 tabular-nums">{s.code}</Text>
+                        {market ? (
+                          <Badge variant="secondary" className="mt-1">
+                            <Text className="block text-xs font-semibold">市场研究</Text>
+                          </Badge>
+                        ) : (
+                          <Text className="block text-xs text-on-surface-variant mt-1 tabular-nums">{s.code}</Text>
+                        )}
                       </View>
-                      <View className="flex items-center gap-1 shrink-0">
+                      {!market ? <View className="flex items-center gap-1 shrink-0">
                         {/* 状态徽章:watching / holding */}
                         {s.status === 'holding' ? (
                           <View className="px-2 py-1 rounded-md" style={{ background: 'rgba(15, 140, 102, 0.10)' }}>
@@ -486,8 +496,13 @@ export default function IndexPage() {
                             <Text className="block text-xs font-medium text-primary">{s.industry}</Text>
                           </View>
                         ) : null}
-                      </View>
+                      </View> : null}
                     </View>
+                    {market ? (
+                      <Text className="mt-3 block text-xs leading-relaxed text-on-surface-variant">
+                        记录市场观点，与 AI 讨论行业轮动、资金与情绪
+                      </Text>
+                    ) : (
                     <View className="mt-3">
                       <View className="flex items-end justify-between">
                         <Text className="block text-xl font-bold text-on-surface tabular-nums leading-none">
@@ -518,6 +533,7 @@ export default function IndexPage() {
                         ) : null}
                       </View>
                     </View>
+                    )}
                   </View>
                 )
               })

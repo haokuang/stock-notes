@@ -1,6 +1,16 @@
 export type NoteType = 'note' | 'doc'
 export type NoteDirection = 'bull' | 'bear' | 'neutral'
 
+export function formatResearchSubjectOption(subject: {
+  name: string
+  code: string
+  subject_type: 'stock' | 'market'
+}): string {
+  return subject.subject_type === 'market'
+    ? `${subject.name} · 市场研究`
+    : `${subject.name} · ${subject.code}`
+}
+
 export interface NoteEditorRoute {
   noteId: string
   stockId: string

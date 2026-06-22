@@ -4,11 +4,15 @@ import { useState } from 'react'
 import { Network } from '@/network'
 import { sessionStore } from '@/auth/session'
 import { Settings, Bell, CircleAlert, ChevronRight, CirclePlus, House, Sparkles, BookOpen, LogOut } from 'lucide-react-taro'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { isMarketSubject, subjectSecondaryText, type SubjectType } from '@/stocks/subject'
 
 interface Stock {
   id: string
   code: string
   name: string
+  subject_type: SubjectType
   industry: string | null
 }
 
@@ -110,7 +114,7 @@ export default function ProfilePage() {
             <View className="mt-4 grid grid-cols-3 gap-3">
               <View className="flex flex-col items-center">
                 <Text className="block text-xl font-bold text-on-surface tabular-nums">{summary.stocks}</Text>
-                <Text className="block text-[11px] text-on-surface-variant mt-1">自选股</Text>
+                <Text className="block text-[11px] text-on-surface-variant mt-1">自选标的</Text>
               </View>
               <View className="flex flex-col items-center border-x border-outline-variant border-opacity-30">
                 <Text className="block text-xl font-bold text-on-surface tabular-nums">{summary.notes}</Text>
@@ -131,7 +135,7 @@ export default function ProfilePage() {
               { icon: <House size={18} color="#5B5E72" />, label: '首页', url: '/pages/index/index', tab: true },
               { icon: <BookOpen size={18} color="#5B5E72" />, label: '观点库', url: '/pages/library/index', tab: true },
               { icon: <Sparkles size={18} color="#5B5E72" />, label: 'AI 分析', url: '/pages/analysis/index', tab: true },
-              { icon: <CirclePlus size={18} color="#5B5E72" />, label: '添加股票', url: '/pages/stock-add/index' },
+              { icon: <CirclePlus size={18} color="#5B5E72" />, label: '添加标的', url: '/pages/stock-add/index' },
             ].map((item, i) => (
               <View
                 key={item.label}
@@ -147,21 +151,22 @@ export default function ProfilePage() {
           </View>
         </View>
 
-        {/* 自选股管理 */}
+        {/* 自选管理 */}
         <View className="px-4 mt-4">
           <View className="flex items-center justify-between mb-3">
-            <Text className="block text-base font-semibold text-on-surface">管理自选股</Text>
-            <View
-              className="flex items-center gap-1 px-3 py-2 rounded-full bg-primary"
+            <Text className="block text-base font-semibold text-on-surface">管理自选</Text>
+            <Button
+              size="sm"
+              className="rounded-full"
               onClick={() => Taro.navigateTo({ url: '/pages/stock-add/index' })}
             >
               <CirclePlus size={14} color="#ffffff" />
               <Text className="block text-xs font-semibold text-white">添加</Text>
-            </View>
+            </Button>
           </View>
           {stocks.length === 0 ? (
             <View className="rounded-2xl p-6 bg-white bg-opacity-72 border border-white border-opacity-85">
-              <Text className="block text-sm text-on-surface-variant text-center">还没有添加自选股</Text>
+              <Text className="block text-sm text-on-surface-variant text-center">还没有添加研究标的</Text>
             </View>
           ) : (
             <View className="rounded-2xl bg-white bg-opacity-72 border border-white border-opacity-85 overflow-hidden">
@@ -172,17 +177,26 @@ export default function ProfilePage() {
                   style={{ borderTop: i > 0 ? '1px solid rgba(221, 223, 233, 0.5)' : 'none' }}
                 >
                   <View className="flex-1 min-w-0" onClick={() => Taro.navigateTo({ url: `/pages/stock/index?stock_id=${s.id}` })}>
-                    <Text className="block text-sm font-semibold text-on-surface truncate">{s.name}</Text>
-                    <Text className="block text-xs text-on-surface-variant mt-1 tabular-nums">{s.code}{s.industry ? ` · ${s.industry}` : ''}</Text>
+                    <View className="flex items-center gap-2">
+                      <Text className="block text-sm font-semibold text-on-surface truncate">{s.name}</Text>
+                      {isMarketSubject(s) ? (
+                        <Badge variant="secondary">
+                          <Text className="block text-xs font-semibold">市场研究</Text>
+                        </Badge>
+                      ) : null}
+                    </View>
+                    <Text className="block text-xs text-on-surface-variant mt-1 tabular-nums">{subjectSecondaryText(s)}</Text>
                   </View>
-                  <View
-                    className="px-3 py-1 rounded-md bg-error bg-opacity-10"
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    disabled={removing === s.id}
                     onClick={() => handleRemove(s)}
                   >
-                    <Text className="block text-xs font-semibold text-error">
+                    <Text className="block text-xs font-semibold text-white">
                       {removing === s.id ? '删除中' : '删除'}
                     </Text>
-                  </View>
+                  </Button>
                 </View>
               ))}
             </View>
