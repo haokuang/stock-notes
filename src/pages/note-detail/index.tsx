@@ -349,22 +349,22 @@ export default function NoteDetailPage() {
           <View className="rounded-2xl p-4 bg-white bg-opacity-72 border border-white border-opacity-85">
             <View className="flex items-center gap-2 mb-3">
               {isDoc ? (
-                <View className="px-3 py-1 rounded-full flex items-center gap-1" style={{ background: 'rgba(15, 140, 102, 0.10)' }}>
-                  <FileText size={12} color="#0F8C66" />
-                  <Text className="block text-[11px] font-semibold" style={{ color: '#0F8C66' }}>文档</Text>
+                <View className="px-3 py-2 rounded-full flex items-center gap-1" style={{ background: 'rgba(15, 140, 102, 0.10)' }}>
+                  <FileText size={14} color="#0F8C66" />
+                  <Text className="block text-sm font-semibold" style={{ color: '#0F8C66' }}>文档</Text>
                 </View>
               ) : (
-                <View className="px-3 py-1 rounded-full" style={{ background: dirBg }}>
-                  <Text className="block text-[11px] font-semibold" style={{ color: dirColor }}>{dirLabel}</Text>
+                <View className="px-3 py-2 rounded-full" style={{ background: dirBg }}>
+                  <Text className="block text-sm font-semibold" style={{ color: dirColor }}>{dirLabel}</Text>
                 </View>
               )}
               <View
-                className="flex items-center gap-2 px-2 py-1 rounded-full"
+                className="flex items-center gap-2 px-3 py-2 rounded-full"
                 style={{ background: 'rgba(109, 77, 255, 0.08)' }}
                 onClick={() => Taro.navigateTo({ url: `/pages/stock/index?stock_id=${note.stock_id}` })}
               >
-                <Text className="block text-[11px] font-semibold text-primary">{note.stock_name}</Text>
-                <Text className="block text-[10px] text-on-surface-variant tabular-nums">{note.stock_code}</Text>
+                <Text className="block text-sm font-semibold text-primary">{note.stock_name}</Text>
+                <Text className="block text-xs text-on-surface-variant tabular-nums">{note.stock_code}</Text>
               </View>
             </View>
             <Text className="block text-xl font-bold text-on-surface leading-tight">{note.title}</Text>

@@ -555,7 +555,7 @@ export default function IndexPage() {
             <ChevronRight size={14} color="#6D4DFF" />
           </View>
         </View>
-        <View className="space-y-3 md:grid md:grid-cols-2 md:gap-3 md:space-y-0">
+        <View className="space-y-3">
           {notes.length === 0 ? (
             <View className="rounded-2xl p-6 bg-white bg-opacity-72 border border-white border-opacity-85 flex flex-col items-center">
               <Text className="block text-sm text-on-surface-variant">还没有观点记录</Text>

@@ -92,17 +92,17 @@ export default function AnalysisPage() {
             结合你的历史笔记与联网资料，持续追问、核验来源，{`\n`}最后沉淀成可保存的研究报告
           </Text>
           <View className="mt-4 flex items-center gap-2">
-            <View className="flex items-center gap-1 rounded-full bg-white bg-opacity-20 px-3 py-1">
-              <TrendingUp size={12} color="#ffffff" />
-              <Text className="block text-xs font-bold text-white">看多 {bullCount}</Text>
+            <View className="flex items-center gap-1 rounded-full bg-white px-3 py-1">
+              <TrendingUp size={12} color="#6D4DFF" />
+              <Text className="block text-xs font-bold text-primary">看多 {bullCount}</Text>
             </View>
-            <View className="flex items-center gap-1 rounded-full bg-white bg-opacity-20 px-3 py-1">
-              <TrendingDown size={12} color="#ffffff" />
-              <Text className="block text-xs font-bold text-white">看空 {bearCount}</Text>
+            <View className="flex items-center gap-1 rounded-full bg-white px-3 py-1">
+              <TrendingDown size={12} color="#6D4DFF" />
+              <Text className="block text-xs font-bold text-primary">看空 {bearCount}</Text>
             </View>
-            <View className="flex items-center gap-1 rounded-full bg-white bg-opacity-20 px-3 py-1">
-              <Zap size={12} color="#ffffff" />
-              <Text className="block text-xs font-bold text-white">中性 {neutralCount}</Text>
+            <View className="flex items-center gap-1 rounded-full bg-white px-3 py-1">
+              <Zap size={12} color="#6D4DFF" />
+              <Text className="block text-xs font-bold text-primary">中性 {neutralCount}</Text>
             </View>
           </View>
         </View>
@@ -111,7 +111,7 @@ export default function AnalysisPage() {
       <View className="px-4">
         <Text className="mb-3 block text-base font-semibold text-on-surface">选择研究标的</Text>
         {loading ? (
-          <View className="grid grid-cols-1 gap-3 md:grid-cols-2">
+          <View className="space-y-3">
             <Skeleton className="h-20 w-full rounded-2xl" />
             <Skeleton className="h-20 w-full rounded-2xl" />
           </View>
@@ -122,7 +122,7 @@ export default function AnalysisPage() {
             </CardContent>
           </Card>
         ) : (
-          <View className="grid grid-cols-1 gap-3 md:grid-cols-2">
+          <View className="space-y-3">
             {stocks.map((stock) => (
               <Card key={stock.id}>
                 <CardContent className="flex items-center gap-3 p-4">

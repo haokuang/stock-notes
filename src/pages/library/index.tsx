@@ -224,7 +224,7 @@ export default function LibraryPage() {
       )}
 
       {/* 列表 */}
-      <View className="px-4 space-y-3 md:grid md:grid-cols-2 md:gap-3 md:space-y-0">
+      <View className="px-4 space-y-3">
         {notes.length === 0 ? (
           <View className="rounded-2xl p-12 bg-white bg-opacity-72 border border-white border-opacity-85 flex flex-col items-center">
             <Text className="block text-base font-semibold text-on-surface">

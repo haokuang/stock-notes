@@ -5,6 +5,7 @@ import { Check, ChevronRight, Circle } from "lucide-react-taro"
 import { cn } from "@/lib/utils"
 import { isH5 } from "@/lib/platform"
 import { computePosition, getRectById, getViewport } from "@/lib/measure"
+import { computeContextMenuPosition } from "@/components/ui/context-menu-position"
 import { Portal } from "@/components/ui/portal"
 
 const ContextMenuContext = React.createContext<{
@@ -122,17 +123,25 @@ const ContextMenuContent = React.forwardRef<
     let cancelled = false
 
     const compute = async () => {
-      const { width: vw, height: vh } = getViewport()
-      let { x, y } = context.position
+      const viewport = getViewport()
 
       if (isH5() && typeof document !== "undefined") {
         const el = document.getElementById(contentId.current)
         const rect = el?.getBoundingClientRect()
         if (rect) {
-          if (x + rect.width > vw) x = vw - rect.width - 8
-          if (y + rect.height > vh) y = vh - rect.height - 8
+          const pos = computeContextMenuPosition({
+            anchor: context.position,
+            content: { width: rect.width, height: rect.height },
+            viewport,
+          })
+          if (!cancelled) setAdjustedPos(pos)
+          return
         }
-        if (!cancelled) setAdjustedPos({ x, y })
+        if (!cancelled) setAdjustedPos(computeContextMenuPosition({
+          anchor: context.position,
+          content: { width: 0, height: 0 },
+          viewport,
+        }))
         return
       }
 
@@ -143,10 +152,18 @@ const ContextMenuContent = React.forwardRef<
           if (cancelled) return
           const rect = Array.isArray(res) ? res[0] : res
           if (rect?.width) {
-            if (x + rect.width > vw) x = vw - rect.width - 8
-            if (y + rect.height > vh) y = vh - rect.height - 8
+            setAdjustedPos(computeContextMenuPosition({
+              anchor: context.position,
+              content: { width: rect.width, height: rect.height },
+              viewport,
+            }))
+            return
           }
-          setAdjustedPos({ x, y })
+          setAdjustedPos(computeContextMenuPosition({
+            anchor: context.position,
+            content: { width: 0, height: 0 },
+            viewport,
+          }))
         })
         .exec()
     }
@@ -170,9 +187,14 @@ const ContextMenuContent = React.forwardRef<
 
   if (!context?.open) return null
 
+  const fallbackPos = computeContextMenuPosition({
+    anchor: context.position,
+    content: { width: 0, height: 0 },
+    viewport: getViewport(),
+  })
   const contentStyle: React.CSSProperties = adjustedPos
     ? { left: adjustedPos.x, top: adjustedPos.y }
-    : { left: context.position.x, top: context.position.y }
+    : { left: fallbackPos.x, top: fallbackPos.y }
 
   return (
     <Portal>
