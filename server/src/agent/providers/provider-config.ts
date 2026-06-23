@@ -20,6 +20,12 @@ export interface ProviderConfig {
   minimax: MiniMaxConfigEntry
 }
 
+// 以下写死常量,不再走环境变量配置
+const DEEPSEEK_BASE_URL = 'https://api.deepseek.com'
+const DEEPSEEK_AGENT_MODEL = 'deepseek-v4-pro'
+const MINIMAX_API_BASE_URL = 'https://api.minimaxi.com/v1'
+const MINIMAX_MODEL = 'MiniMax-M3'
+
 const value = (env: NodeJS.ProcessEnv, key: string) => env[key]?.trim() ?? ''
 
 export function loadProviderConfig(env: NodeJS.ProcessEnv): ProviderConfig {
@@ -31,10 +37,10 @@ export function loadProviderConfig(env: NodeJS.ProcessEnv): ProviderConfig {
     : value(env, 'MINIMAX_API_KEY')
   const miniBase = credentialMode === 'coding_plan'
     ? value(env, 'MINIMAX_CODING_PLAN_BASE_URL')
-    : value(env, 'MINIMAX_BASE_URL')
-  const miniModel = value(env, 'AGENT_MINIMAX_MODEL')
+    : MINIMAX_API_BASE_URL
+  const miniModel = MINIMAX_MODEL
   const deepseekKey = value(env, 'DEEPSEEK_API_KEY')
-  const deepseekModel = value(env, 'AGENT_DEEPSEEK_MODEL')
+  const deepseekModel = DEEPSEEK_AGENT_MODEL
   const openaiKey = value(env, 'OPENAI_API_KEY')
   const openaiModel = value(env, 'AGENT_OPENAI_MODEL')
 
@@ -42,7 +48,7 @@ export function loadProviderConfig(env: NodeJS.ProcessEnv): ProviderConfig {
     deepseek: {
       enabled: Boolean(deepseekKey && deepseekModel),
       apiKey: deepseekKey,
-      baseURL: value(env, 'DEEPSEEK_BASE_URL') || 'https://api.deepseek.com',
+      baseURL: DEEPSEEK_BASE_URL,
       model: deepseekModel,
       unavailableReason: deepseekKey && deepseekModel ? undefined : 'DeepSeek 未配置',
     },

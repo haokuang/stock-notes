@@ -9,8 +9,6 @@ test('enables MiniMax Coding Plan in production using only selected credentials'
     MINIMAX_CODING_PLAN_API_KEY: 'coding-secret',
     MINIMAX_CODING_PLAN_BASE_URL: 'https://api.minimax.example/v1',
     MINIMAX_API_KEY: 'unused-secret',
-    MINIMAX_BASE_URL: 'https://unused.example/v1',
-    AGENT_MINIMAX_MODEL: 'MiniMax-M2.5',
   })
 
   assert.equal(config.minimax.enabled, true)
@@ -19,7 +17,8 @@ test('enables MiniMax Coding Plan in production using only selected credentials'
   assert.equal(config.minimax.baseURL, 'https://api.minimax.example/v1')
 
   const catalog = buildModelCatalog(config, {})
-  assert.equal(catalog[0].label, 'MiniMax-M2.5 · Coding Plan')
+  const minimaxOption = catalog.find((item) => item.provider === 'minimax')
+  assert.equal(minimaxOption?.label, 'MiniMax-M3 · Coding Plan')
   assert.doesNotMatch(JSON.stringify(catalog), /secret|baseURL|example\/v1/)
 })
 
@@ -27,8 +26,6 @@ test('marks a provider unavailable when selected credentials are incomplete', ()
   const config = loadProviderConfig({
     MINIMAX_CREDENTIAL_MODE: 'api',
     MINIMAX_API_KEY: '',
-    MINIMAX_BASE_URL: '',
-    AGENT_MINIMAX_MODEL: 'MiniMax-M2.5',
   })
   const option = buildModelCatalog(config, {}).find((item) => item.provider === 'minimax')
 

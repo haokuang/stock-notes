@@ -2,9 +2,13 @@ import OpenAI from 'openai'
 
 /**
  * DeepSeek (OpenAI 兼容) 客户端工厂
- * - 模型由调用方指定(flash/pro/chat)
- * - 走环境变量配置,key 留空时所有 invoke 都会抛错
+ * - 模型/baseURL 写死常量,不再走环境变量
+ * - API key 仍由环境变量 DEEPSEEK_API_KEY 提供,key 留空时所有 invoke 都会抛错
  */
+const DEEPSEEK_BASE_URL = 'https://api.deepseek.com'
+export const DEEPSEEK_FLASH_MODEL = 'deepseek-v4-flash'
+export const DEEPSEEK_PRO_MODEL = 'deepseek-v4-pro'
+
 let _client: OpenAI | null = null
 
 function getClient(): OpenAI {
@@ -15,13 +19,10 @@ function getClient(): OpenAI {
   }
   _client = new OpenAI({
     apiKey,
-    baseURL: process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com',
+    baseURL: DEEPSEEK_BASE_URL,
   })
   return _client
 }
-
-export const DEEPSEEK_FLASH_MODEL = process.env.DEEPSEEK_FLASH_MODEL || 'deepseek-v4-flash'
-export const DEEPSEEK_PRO_MODEL = process.env.DEEPSEEK_PRO_MODEL || 'deepseek-v4-pro'
 
 export interface DeepseekChatMessage {
   role: 'system' | 'user' | 'assistant'

@@ -62,9 +62,8 @@ test('normalizes non-owned thread and run reads to 404', async () => {
 })
 
 test('rejects an unavailable or unlisted model before creating a run', async () => {
-  const previous = { key: process.env.DEEPSEEK_API_KEY, model: process.env.AGENT_DEEPSEEK_MODEL }
+  const previous = { key: process.env.DEEPSEEK_API_KEY }
   process.env.DEEPSEEK_API_KEY = 'test-key'
-  process.env.AGENT_DEEPSEEK_MODEL = 'deepseek-chat'
   let connections = 0
   const service = new AgentService({} as never, {
     snapshot: () => ({ deepseek: { status: 'unavailable', reason: '限流', retryAfter: 30, checkedAt: '' } }),
@@ -82,7 +81,5 @@ test('rejects an unavailable or unlisted model before creating a run', async () 
   } finally {
     if (previous.key === undefined) delete process.env.DEEPSEEK_API_KEY
     else process.env.DEEPSEEK_API_KEY = previous.key
-    if (previous.model === undefined) delete process.env.AGENT_DEEPSEEK_MODEL
-    else process.env.AGENT_DEEPSEEK_MODEL = previous.model
   }
 })
