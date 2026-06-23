@@ -10,6 +10,7 @@ import type { AgentReportSummary } from '@/agent/agent-api'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
+import { ResponsivePage } from '@/components/layout/responsive-page'
 import type { SubjectType } from '@/stocks/subject'
 import { detailCapabilities, detailRequestUrls } from './stock-detail-logic'
 
@@ -273,6 +274,7 @@ export default function StockDetailPage() {
       </View>
 
       <ScrollView scrollY enhanced showScrollbar={false} className="w-full">
+        <ResponsivePage padded={false}>
         {/* Hero 区 */}
         {stock && (
           marketMode ? (
@@ -804,6 +806,7 @@ export default function StockDetailPage() {
           )}
         </View>
         <View className="h-4" />
+        </ResponsivePage>
       </ScrollView>
     </View>
   )

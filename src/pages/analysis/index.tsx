@@ -6,6 +6,7 @@ import { getAgentApi } from '@/agent/agent-client'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
+import { ResponsivePage } from '@/components/layout/responsive-page'
 import { Network } from '@/network'
 import { Badge } from '@/components/ui/badge'
 import { isMarketSubject, subjectSecondaryText, type SubjectType } from '@/stocks/subject'
@@ -77,6 +78,7 @@ export default function AnalysisPage() {
 
   return (
     <View className="min-h-full w-full bg-[#EEF0F6] pb-24">
+      <ResponsivePage padded={false}>
       <View className="px-4 pb-4 pt-3">
         <View className="overflow-hidden rounded-2xl bg-primary p-5 shadow-lg">
           <View className="mb-2 flex items-center gap-2">
@@ -109,7 +111,7 @@ export default function AnalysisPage() {
       <View className="px-4">
         <Text className="mb-3 block text-base font-semibold text-on-surface">选择研究标的</Text>
         {loading ? (
-          <View className="space-y-3">
+          <View className="grid grid-cols-1 gap-3 md:grid-cols-2">
             <Skeleton className="h-20 w-full rounded-2xl" />
             <Skeleton className="h-20 w-full rounded-2xl" />
           </View>
@@ -120,7 +122,7 @@ export default function AnalysisPage() {
             </CardContent>
           </Card>
         ) : (
-          <View className="space-y-3">
+          <View className="grid grid-cols-1 gap-3 md:grid-cols-2">
             {stocks.map((stock) => (
               <Card key={stock.id}>
                 <CardContent className="flex items-center gap-3 p-4">
@@ -163,6 +165,7 @@ export default function AnalysisPage() {
           </CardContent>
         </Card>
       </View>
+      </ResponsivePage>
     </View>
   )
 }

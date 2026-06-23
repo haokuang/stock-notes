@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Network } from '@/network'
 import { PenLine, Search, FileText } from 'lucide-react-taro'
 import { Badge } from '@/components/ui/badge'
+import { ResponsivePage } from '@/components/layout/responsive-page'
 import { isMarketSubject, type SubjectType } from '@/stocks/subject'
 import { buildLibraryNotesUrl, resolveLibraryRoute } from '../prelaunch-navigation'
 
@@ -135,6 +136,7 @@ export default function LibraryPage() {
 
   return (
     <View className="w-full min-h-full pb-[calc(4rem+env(safe-area-inset-bottom))]" style={{ background: '#EEF0F6' }}>
+      <ResponsivePage padded={false}>
       {/* 顶部搜索栏 */}
       <View className="sticky top-0 z-30 px-4 py-3 bg-background bg-opacity-80 backdrop-blur-md">
         <View className="flex items-center gap-2 px-3 h-10 rounded-full bg-white bg-opacity-72 border border-white border-opacity-85"
@@ -222,7 +224,7 @@ export default function LibraryPage() {
       )}
 
       {/* 列表 */}
-      <View className="px-4 space-y-3">
+      <View className="px-4 space-y-3 md:grid md:grid-cols-2 md:gap-3 md:space-y-0">
         {notes.length === 0 ? (
           <View className="rounded-2xl p-12 bg-white bg-opacity-72 border border-white border-opacity-85 flex flex-col items-center">
             <Text className="block text-base font-semibold text-on-surface">
@@ -344,6 +346,7 @@ export default function LibraryPage() {
           })
         )}
       </View>
+      </ResponsivePage>
 
       {/* FAB */}
       <View

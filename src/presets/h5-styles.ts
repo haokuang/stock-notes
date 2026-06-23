@@ -131,79 +131,81 @@ const PC_WIDESCREEN_STYLES = `
 /* PC 宽屏适配 - 基础布局 */
 @media (min-width: 769px) {
   html {
-    font-size: 15px !important;
+    font-size: clamp(14px, 1vw, 16px) !important;
   }
 
   body {
-    background-color: #f3f4f6 !important;
-    display: flex !important;
-    justify-content: center !important;
-    align-items: center !important;
+    background-color: #EEF0F6 !important;
     min-height: 100vh !important;
   }
 }
 `;
 
-const PC_WIDESCREEN_PHONE_FRAME = `
-/* PC 宽屏适配 - 手机框样式（有 TabBar 页面） */
+const PC_WIDESCREEN_RESPONSIVE_SHELL = `
+/* PC 宽屏适配 - 响应式网页壳（有 TabBar 页面） */
 @media (min-width: 769px) {
   .taro-tabbar__container {
-    width: 375px !important;
-    max-width: 375px !important;
-    height: calc(100vh - 40px) !important;
-    max-height: 900px !important;
-    background-color: #fff !important;
+    width: 100% !important;
+    max-width: 1180px !important;
+    min-height: 100vh !important;
+    margin: 0 auto !important;
+    background-color: #EEF0F6 !important;
     transform: translateX(0) !important;
-    box-shadow: 0 0 20px rgba(0, 0, 0, 0.1) !important;
-    border-radius: 20px !important;
-    overflow: hidden !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    overflow: visible !important;
     position: relative !important;
   }
 
   .taro-tabbar__panel {
-    height: 100% !important;
-    overflow: auto !important;
+    height: auto !important;
+    min-height: 100vh !important;
+    overflow: visible !important;
   }
 }
 
-/* PC 宽屏适配 - Toast 定位到手机框范围内 */
+/* PC 宽屏适配 - Toast 定位到网页内容范围内 */
 @media (min-width: 769px) {
   body .toaster {
     left: 50% !important;
     right: auto !important;
-    width: 375px !important;
-    max-width: 375px !important;
+    width: 100% !important;
+    max-width: 1180px !important;
     transform: translateX(-50%) !important;
     box-sizing: border-box !important;
   }
 }
 
-/* PC 宽屏适配 - 手机框样式（无 TabBar 页面，通过 JS 添加 no-tabbar 类） */
+/* PC 宽屏适配 - 响应式网页壳（无 TabBar 页面，通过 JS 添加 no-tabbar 类） */
 @media (min-width: 769px) {
   body.no-tabbar #app {
-    width: 375px !important;
-    max-width: 375px !important;
-    height: calc(100vh - 40px) !important;
-    max-height: 900px !important;
-    background-color: #fff !important;
-    box-shadow: 0 0 20px rgba(0, 0, 0, 0.1) !important;
-    border-radius: 20px !important;
-    overflow: hidden !important;
+    width: 100% !important;
+    max-width: 1180px !important;
+    min-height: 100vh !important;
+    margin: 0 auto !important;
+    background-color: #EEF0F6 !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    overflow: visible !important;
     position: relative !important;
     transform: translateX(0) !important;
   }
 
   body.no-tabbar #app .taro_router {
-    height: 100% !important;
-    overflow: auto !important;
+    height: auto !important;
+    min-height: 100vh !important;
+    overflow: visible !important;
   }
 }
 `;
 
+export function buildH5InjectedStyles() {
+  return H5_BASE_STYLES + PC_WIDESCREEN_STYLES + PC_WIDESCREEN_RESPONSIVE_SHELL;
+}
+
 function injectStyles() {
   const style = document.createElement('style');
-  style.innerHTML =
-    H5_BASE_STYLES + PC_WIDESCREEN_STYLES + PC_WIDESCREEN_PHONE_FRAME;
+  style.innerHTML = buildH5InjectedStyles();
   document.head.appendChild(style);
 }
 

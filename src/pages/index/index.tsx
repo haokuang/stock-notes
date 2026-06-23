@@ -5,6 +5,7 @@ import { Network } from '@/network'
 import { sessionStore } from '@/auth/session'
 import { Search, Bell, Plus, CirclePlus, PenLine, ImagePlus, Sparkles, ChevronRight, Clock } from 'lucide-react-taro'
 import { Badge } from '@/components/ui/badge'
+import { ResponsivePage } from '@/components/layout/responsive-page'
 import { isMarketSubject, type SubjectType } from '@/stocks/subject'
 
 /* === 类型定义 === */
@@ -236,6 +237,7 @@ export default function IndexPage() {
           'radial-gradient(ellipse 70% 50% at 50% -10%, rgba(109, 77, 255, 0.12), transparent 60%), #EEF0F6',
       }}
     >
+      <ResponsivePage padded={false}>
       {/* === 1. Header === */}
       <View className="sticky top-0 z-30 h-14 flex items-center justify-between px-4 bg-background bg-opacity-80 backdrop-blur-md">
         <View className="flex items-center gap-3">
@@ -553,7 +555,7 @@ export default function IndexPage() {
             <ChevronRight size={14} color="#6D4DFF" />
           </View>
         </View>
-        <View className="space-y-3">
+        <View className="space-y-3 md:grid md:grid-cols-2 md:gap-3 md:space-y-0">
           {notes.length === 0 ? (
             <View className="rounded-2xl p-6 bg-white bg-opacity-72 border border-white border-opacity-85 flex flex-col items-center">
               <Text className="block text-sm text-on-surface-variant">还没有观点记录</Text>
@@ -615,6 +617,7 @@ export default function IndexPage() {
           )}
         </View>
       </View>
+      </ResponsivePage>
 
       {/* === 8. 悬浮 + 按钮 === */}
       <View
