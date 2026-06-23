@@ -87,11 +87,13 @@ export default function LoginPage() {
             <View>
               <Text className="block text-xs font-medium text-on-surface-variant mb-2">密码</Text>
               <Input
-                type="safe-password"
+                type="text"
+                password
                 value={password}
                 onInput={(e: any) => setPassword(e.detail.value)}
                 placeholder="至少 6 位"
                 disabled={loading}
+                confirmType="done"
               />
             </View>
 
