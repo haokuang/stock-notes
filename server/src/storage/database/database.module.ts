@@ -7,6 +7,7 @@ import { createDatabasePoolConfig } from './connection-config'
 
 export const DRIZZLE_DB = 'DRIZZLE_DB'
 export const SUPABASE_CLIENT = 'SUPABASE_CLIENT'
+export const SUPABASE_ANON_CLIENT = 'SUPABASE_ANON_CLIENT'
 export const PG_POOL = 'PG_POOL'
 
 @Global()
@@ -50,7 +51,22 @@ export const PG_POOL = 'PG_POOL'
         })
       },
     },
+    {
+      provide: SUPABASE_ANON_CLIENT,
+      useFactory: (): SupabaseClient => {
+        const url = process.env.SUPABASE_URL
+        const anonKey = process.env.SUPABASE_ANON_KEY
+        if (!url || !anonKey) {
+          throw new Error(
+            'Supabase anon env not configured. Set SUPABASE_URL and SUPABASE_ANON_KEY.',
+          )
+        }
+        return createClient(url, anonKey, {
+          auth: { autoRefreshToken: false, persistSession: false },
+        })
+      },
+    },
   ],
-  exports: [DRIZZLE_DB, SUPABASE_CLIENT, PG_POOL],
+  exports: [DRIZZLE_DB, SUPABASE_CLIENT, SUPABASE_ANON_CLIENT, PG_POOL],
 })
 export class DatabaseModule {}

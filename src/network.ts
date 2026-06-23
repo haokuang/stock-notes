@@ -3,7 +3,12 @@ import { createAuthenticatedRequester } from './auth/authenticated-request'
 import { Session, sessionStore } from './auth/session'
 
 export namespace Network {
-  const PUBLIC_PATHS = ['/api/auth/sign-in', '/api/auth/sign-up', '/api/auth/refresh']
+  const PUBLIC_PATHS = [
+    '/api/auth/sign-in',
+    '/api/auth/sign-up',
+    '/api/auth/refresh',
+    '/api/auth/wechat-login',
+  ]
 
   const createUrl = (url: string): string => {
     if (url.startsWith('http://') || url.startsWith('https://')) return url

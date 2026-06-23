@@ -1,11 +1,12 @@
-import { View, Text, ScrollView } from '@tarojs/components'
+import { View, Text, ScrollView, Image } from '@tarojs/components'
 import Taro, { useLoad, usePullDownRefresh, useDidShow } from '@tarojs/taro'
 import { useState } from 'react'
 import { Network } from '@/network'
 import { sessionStore } from '@/auth/session'
-import { Settings, Bell, CircleAlert, ChevronRight, CirclePlus, House, Sparkles, BookOpen, LogOut } from 'lucide-react-taro'
+import { Settings, Bell, CircleAlert, ChevronRight, CirclePlus, House, Sparkles, BookOpen, LogOut, UserCog } from 'lucide-react-taro'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import WechatProfileEditor from '@/components/wechat-profile-editor'
 import { isMarketSubject, subjectSecondaryText, type SubjectType } from '@/stocks/subject'
 
 interface Stock {
@@ -22,11 +23,22 @@ interface Summary {
   bull: number
 }
 
+interface WechatProfile {
+  nickname: string | null
+  avatar_url: string | null
+}
+
+// 平台检测:直接判断(AGENTS.md 跨端规范)
+const isWeapp = Taro.getEnv() === Taro.ENV_TYPE.WEAPP
+
 export default function ProfilePage() {
   const [summary, setSummary] = useState<Summary>({ stocks: 0, notes: 0, bull: 0 })
   const [stocks, setStocks] = useState<Stock[]>([])
   const [removing, setRemoving] = useState<string | null>(null)
   const [email, setEmail] = useState<string>('')
+  const [wechat, setWechat] = useState<WechatProfile>({ nickname: null, avatar_url: null })
+  // 完善资料弹窗
+  const [editOpen, setEditOpen] = useState(false)
 
   const load = async () => {
     try {
@@ -43,6 +55,15 @@ export default function ProfilePage() {
     }
   }
 
+  const loadWechatProfile = async () => {
+    try {
+      const res = await Network.request<{ data: WechatProfile }>({ url: '/api/auth/wechat-profile' })
+      setWechat(res.data?.data ?? { nickname: null, avatar_url: null })
+    } catch (e) {
+      // 非微信用户或未绑定,静默
+    }
+  }
+
   useLoad(() => {
     if (!sessionStore.getAccessToken()) {
       Taro.reLaunch({ url: '/pages/login/index' })
@@ -50,12 +71,14 @@ export default function ProfilePage() {
     }
     setEmail(sessionStore.get()?.user?.email ?? '')
     load()
+    loadWechatProfile()
   })
 
   // 每次页面显示都重新拉取(包括从 stock-add 等子页面返回时)— 2026-06-14
   useDidShow(() => {
     if (sessionStore.getAccessToken()) {
       load()
+      loadWechatProfile()
     }
   })
 
@@ -63,6 +86,11 @@ export default function ProfilePage() {
     await load()
     Taro.stopPullDownRefresh()
   })
+
+  // 展示名:微信昵称 > 邮箱 > 默认
+  const displayName = wechat.nickname || email || '未设置'
+  // 头像首字 fallback
+  const avatarFallback = (wechat.nickname || email || 'U').slice(0, 1).toUpperCase()
 
   const handleRemove = async (stock: Stock) => {
     const res = await Taro.showModal({
@@ -100,15 +128,29 @@ export default function ProfilePage() {
             style={{ boxShadow: '0 1px 2px rgba(20, 18, 60, 0.04), 0 6px 24px rgba(20, 18, 60, 0.06)' }}
           >
             <View className="flex items-center gap-3">
-              <View className="w-16 h-16 rounded-full flex items-center justify-center shrink-0"
-                style={{ background: 'linear-gradient(135deg, #6D4DFF 0%, #0F8C66 100%)' }}
-              >
-                <Text className="block text-2xl font-bold text-white">初</Text>
-              </View>
+              {wechat.avatar_url ? (
+                <Image src={wechat.avatar_url} className="w-16 h-16 rounded-full shrink-0" />
+              ) : (
+                <View className="w-16 h-16 rounded-full flex items-center justify-center shrink-0"
+                  style={{ background: 'linear-gradient(135deg, #6D4DFF 0%, #0F8C66 100%)' }}
+                >
+                  <Text className="block text-2xl font-bold text-white">{avatarFallback}</Text>
+                </View>
+              )}
               <View className="flex-1 min-w-0">
-                <Text className="block text-lg font-bold text-on-surface">小初</Text>
+                <Text className="block text-lg font-bold text-on-surface truncate">{displayName}</Text>
                 <Text className="block text-xs text-on-surface-variant mt-1">个人投资者 · 投研笔记</Text>
               </View>
+              {isWeapp ? (
+                <View
+                  className="px-3 py-2 rounded-lg flex items-center gap-1 border border-primary border-opacity-30"
+                  style={{ backgroundColor: 'rgba(109, 77, 255, 0.08)' }}
+                  onClick={() => setEditOpen(true)}
+                >
+                  <UserCog size={14} color="#6D4DFF" />
+                  <Text className="text-sm font-semibold text-primary">完善资料</Text>
+                </View>
+              ) : null}
             </View>
             {/* 数据小卡 */}
             <View className="mt-4 grid grid-cols-3 gap-3">
@@ -227,11 +269,15 @@ export default function ProfilePage() {
         {email ? (
           <View className="px-4 mt-6">
             <View className="rounded-2xl p-4 bg-white bg-opacity-72 border border-white border-opacity-85 flex items-center gap-3">
-              <View className="w-9 h-9 rounded-full flex items-center justify-center text-white font-bold text-sm"
-                style={{ background: 'linear-gradient(135deg, #6D4DFF 0%, #0F8C66 100%)' }}
-              >
-                <Text className="block text-white font-bold text-sm">{email.slice(0, 1).toUpperCase()}</Text>
-              </View>
+              {wechat.avatar_url ? (
+                <Image src={wechat.avatar_url} className="w-9 h-9 rounded-full shrink-0" />
+              ) : (
+                <View className="w-9 h-9 rounded-full flex items-center justify-center text-white font-bold text-sm"
+                  style={{ background: 'linear-gradient(135deg, #6D4DFF 0%, #0F8C66 100%)' }}
+                >
+                  <Text className="block text-white font-bold text-sm">{email.slice(0, 1).toUpperCase()}</Text>
+                </View>
+              )}
               <View className="flex-1 min-w-0">
                 <Text className="block text-sm text-on-surface truncate">{email}</Text>
                 <Text className="block text-[11px] text-on-surface-variant">已登录</Text>
@@ -254,6 +300,17 @@ export default function ProfilePage() {
           </View>
         ) : null}
       </View>
+
+      {/* 完善资料弹窗:微信头像昵称填写能力 */}
+      {isWeapp ? (
+        <WechatProfileEditor
+          open={editOpen}
+          onOpenChange={setEditOpen}
+          current={wechat}
+          fallbackInitial={avatarFallback}
+          onSaved={setWechat}
+        />
+      ) : null}
     </ScrollView>
   )
 }

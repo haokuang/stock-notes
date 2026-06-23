@@ -33,9 +33,12 @@ export function validateProductionServerEnvironment(
   if (!env.SUPABASE_SERVICE_ROLE_KEY?.trim()) {
     missing.push('SUPABASE_SERVICE_ROLE_KEY')
   }
+  if (!env.SUPABASE_ANON_KEY?.trim()) missing.push('SUPABASE_ANON_KEY')
   if (!env.SUPABASE_DB_PASSWORD?.trim() && !env.SUPABASE_DB_URL?.trim()) {
     missing.push('SUPABASE_DB_PASSWORD or SUPABASE_DB_URL')
   }
+  if (!env.WECHAT_APPID?.trim()) missing.push('WECHAT_APPID')
+  if (!env.WECHAT_SECRET?.trim()) missing.push('WECHAT_SECRET')
 
   if (missing.length > 0) {
     throw new Error(

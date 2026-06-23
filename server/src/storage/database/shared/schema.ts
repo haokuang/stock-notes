@@ -454,3 +454,37 @@ export const noteHighlights = pgTable(
 
 export type NoteHighlight = typeof noteHighlights.$inferSelect;
 export type NewNoteHighlight = typeof noteHighlights.$inferInsert;
+
+/**
+ * 微信小程序账号绑定(2026-06-23)
+ * - openid 唯一标识微信用户;同一 openid 只绑定一个 Supabase auth.users
+ * - user_id 指向 Supabase 托管的 auth.users(id),应用层不存 users 表
+ * - nickname / avatar_url 由用户通过「头像昵称填写能力」按需完善
+ * - 不存 session_key(MVP 不需要解密加密数据,安全考虑)
+ */
+export const wechatAccounts = pgTable(
+  "wechat_accounts",
+  {
+    id: varchar("id", { length: 36 })
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    user_id: uuid("user_id").notNull(),
+    openid: varchar("openid", { length: 64 }).notNull(),
+    unionid: varchar("unionid", { length: 64 }),
+    nickname: varchar("nickname", { length: 100 }),
+    avatar_url: varchar("avatar_url", { length: 500 }),
+    created_at: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updated_at: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("wechat_accounts_openid_uq").on(table.openid),
+    index("wechat_accounts_user_id_idx").on(table.user_id),
+  ],
+);
+
+export type WechatAccount = typeof wechatAccounts.$inferSelect;
+export type NewWechatAccount = typeof wechatAccounts.$inferInsert;
