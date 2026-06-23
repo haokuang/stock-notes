@@ -2,6 +2,8 @@
 /* stylelint-disable at-rule-no-unknown */
 /* stylelint-disable number-max-precision */
 @import url('weapp-tailwindcss');
+@source not "../.cozeproj";
+@source not "../node_modules";
 
 /* 小程序页面容器高度设置，确保垂直居中生效 */
 page {
