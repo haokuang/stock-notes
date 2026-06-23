@@ -2,6 +2,10 @@
 
 declare const PROJECT_DOMAIN: string | undefined;
 declare const TARO_ENV: "weapp" | "h5" | undefined;
+/** 临时测试登录账号:仅开发环境注入,生产构建为空字符串 */
+declare const TEST_LOGIN_EMAIL: string | undefined;
+/** 临时测试登录密码:仅开发环境注入,生产构建为空字符串 */
+declare const TEST_LOGIN_PASSWORD: string | undefined;
 
 declare module '*.png';
 declare module '*.gif';

@@ -99,6 +99,17 @@ export default defineConfig<'vite'>(async (merge, _env) => {
       // 前端 Realtime 订阅用 — 客户端可见,只读权限
       SUPABASE_URL: JSON.stringify(process.env.SUPABASE_URL || ''),
       SUPABASE_ANON_KEY: JSON.stringify(process.env.SUPABASE_ANON_KEY || ''),
+      // 临时测试登录账号:仅开发环境注入,生产构建留空 → 登录页测试入口自动隐藏
+      TEST_LOGIN_EMAIL: JSON.stringify(
+        process.env.NODE_ENV === 'development'
+          ? process.env.TEST_LOGIN_EMAIL || ''
+          : '',
+      ),
+      TEST_LOGIN_PASSWORD: JSON.stringify(
+        process.env.NODE_ENV === 'development'
+          ? process.env.TEST_LOGIN_PASSWORD || ''
+          : '',
+      ),
     },
     copy: {
       patterns: [],

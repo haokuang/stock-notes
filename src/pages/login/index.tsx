@@ -6,6 +6,12 @@ import { sessionStore, Session } from '@/auth/session'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 
+// 由 config/index.ts 通过 defineConstants 注入;生产构建为空字符串,测试入口自动隐藏
+const TEST_LOGIN =
+  TEST_LOGIN_EMAIL && TEST_LOGIN_PASSWORD
+    ? { email: TEST_LOGIN_EMAIL, password: TEST_LOGIN_PASSWORD }
+    : null
+
 async function authCall(url: string, body: { email: string; password: string }): Promise<Session> {
   const res = await Network.request<{ data: Session }>({
     url,
@@ -22,12 +28,15 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const submit = async () => {
-    if (!email || !password) {
+  const loginWithCredentials = async (
+    credentials: { email: string; password: string },
+    options: { mode: 'sign-in' | 'sign-up'; successTitle?: string },
+  ) => {
+    if (!credentials.email || !credentials.password) {
       setError('请填写邮箱和密码')
       return
     }
-    if (password.length < 6) {
+    if (credentials.password.length < 6) {
       setError('密码至少 6 位')
       return
     }
@@ -35,22 +44,37 @@ export default function LoginPage() {
     setError(null)
     try {
       const data =
-        mode === 'sign-up'
-          ? await authCall('/api/auth/sign-up', { email, password })
-          : await authCall('/api/auth/sign-in', { email, password })
+        options.mode === 'sign-up'
+          ? await authCall('/api/auth/sign-up', credentials)
+          : await authCall('/api/auth/sign-in', credentials)
       sessionStore.set(data)
-      Taro.showToast({ title: mode === 'sign-up' ? '注册成功' : '登录成功', icon: 'success' })
+      Taro.showToast({
+        title: options.successTitle ?? (options.mode === 'sign-up' ? '注册成功' : '登录成功'),
+        icon: 'success',
+      })
       setTimeout(() => Taro.reLaunch({ url: '/pages/index/index' }), 600)
     } catch (e: any) {
       const msg =
         e?.data?.message ||
         e?.data?.error?.message ||
         e?.errMsg ||
-        (mode === 'sign-up' ? '注册失败' : '登录失败')
+        (options.mode === 'sign-up' ? '注册失败' : '登录失败')
       setError(msg)
     } finally {
       setLoading(false)
     }
+  }
+
+  const submit = async () => {
+    await loginWithCredentials({ email, password }, { mode })
+  }
+
+  const loginAsTestUser = async () => {
+    if (!TEST_LOGIN) return
+    setMode('sign-in')
+    setEmail(TEST_LOGIN.email)
+    setPassword(TEST_LOGIN.password)
+    await loginWithCredentials(TEST_LOGIN, { mode: 'sign-in', successTitle: '测试账号登录成功' })
   }
 
   return (
@@ -110,6 +134,16 @@ export default function LoginPage() {
             >
               {mode === 'sign-in' ? '登录' : '注册'}
             </Button>
+
+            {TEST_LOGIN ? (
+              <Button
+                onClick={loginAsTestUser}
+                disabled={loading}
+                className="w-full py-3 rounded-xl bg-white text-primary text-sm font-semibold border border-primary border-opacity-30"
+              >
+                临时测试登录
+              </Button>
+            ) : null}
           </View>
         </View>
 

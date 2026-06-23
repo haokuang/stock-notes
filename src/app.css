@@ -169,6 +169,10 @@ root-portal {
   --radius-2xl: 1.5rem;
   --font-sans: "Space Grotesk", "Noto Sans SC", system-ui, sans-serif;
   --font-display: "Space Grotesk", "Noto Sans SC", system-ui, sans-serif;
+  --text-xs: 0.8125rem;
+  --text-xs--line-height: calc(1.125 / 0.8125);
+  --text-sm: 0.9375rem;
+  --text-sm--line-height: calc(1.375 / 0.9375);
 
 }
 
@@ -260,7 +264,34 @@ image {
   cursor: pointer;
 }
 .md-content {
+  font-size: 1rem;
   line-height: 1.75;
   -webkit-user-select: text;
   user-select: text;
+}
+
+/* === 全局可读性字号修正 ===
+   移动端 10/11/12px 长时间阅读负担较大，这里统一抬高下限，
+   保留原有 xs/sm 的层级关系，同时覆盖散落在页面里的任意字号类。 */
+.text-\[10px\],
+.text-\[11px\] {
+  font-size: 0.75rem;
+  line-height: 1rem;
+}
+
+.text-\[12px\] {
+  font-size: 0.8125rem;
+  line-height: 1.125rem;
+}
+
+.md-content p,
+.md-content li,
+.md-content td,
+.md-content th {
+  font-size: 1rem;
+}
+
+.md-content pre,
+.md-content table {
+  font-size: 0.9375rem;
 }
