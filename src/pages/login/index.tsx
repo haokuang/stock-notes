@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { View, Text } from '@tarojs/components'
-import Taro, { useLoad } from '@tarojs/taro'
+import Taro from '@tarojs/taro'
 import { Network } from '@/network'
 import { sessionStore, Session } from '@/auth/session'
 import { Button } from '@/components/ui/button'
@@ -36,8 +36,6 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  // WEAPP 自动登录时是否已尝试过一次(失败后展示手动入口)
-  const [autoLoginAttempted, setAutoLoginAttempted] = useState(false)
 
   const loginWithCredentials = async (
     credentials: { email: string; password: string },
@@ -83,7 +81,7 @@ export default function LoginPage() {
     await loginWithCredentials(TEST_LOGIN, { mode: 'sign-in', successTitle: '测试账号登录成功' })
   }
 
-  const loginWithWechat = async (options?: { silent?: boolean }) => {
+  const loginWithWechat = async () => {
     setLoading(true)
     setError(null)
     try {
@@ -97,26 +95,11 @@ export default function LoginPage() {
       applySession(res.data.data, '登录成功')
     } catch (e: any) {
       const msg = e?.data?.message || e?.errMsg || '微信登录失败'
-      if (options?.silent) {
-        // 自动登录失败:静默,展示手动入口
-        setAutoLoginAttempted(true)
-      } else {
-        setError(msg)
-      }
+      setError(msg)
     } finally {
       setLoading(false)
     }
   }
-
-  // WEAPP 端:进入页面时自动尝试微信登录
-  useLoad(() => {
-    if (isWeapp && !sessionStore.getAccessToken()) {
-      loginWithWechat({ silent: true })
-    }
-  })
-
-  // WEAPP 自动登录中:展示 loading 占位,避免闪烁
-  const showAutoLoginLoading = isWeapp && loading && !autoLoginAttempted && !error
 
   return (
     <View
@@ -130,120 +113,95 @@ export default function LoginPage() {
         <View className="mb-8 text-center">
           <Text className="block text-3xl font-bold text-on-surface">投研笔记</Text>
           <Text className="block text-sm text-on-surface-variant mt-2">
-            {showAutoLoginLoading
-              ? '正在通过微信登录…'
-              : mode === 'sign-in'
-                ? '登录以查看你的自选股与笔记'
-                : '创建账户开始记录你的投研'}
+            {mode === 'sign-in' ? '登录以查看你的自选股与笔记' : '创建账户开始记录你的投研'}
           </Text>
         </View>
 
-        {showAutoLoginLoading ? (
-          <View className="rounded-2xl p-8 bg-white bg-opacity-72 border border-white border-opacity-85 flex flex-col items-center gap-4"
-            style={{ boxShadow: '0 1px 2px rgba(20,18,60,0.04), 0 6px 24px rgba(20,18,60,0.06)' }}
-          >
-            <Text className="block text-sm text-on-surface-variant">请稍候…</Text>
-          </View>
-        ) : (
-          <>
-            {/* 微信登录区(WEAPP 优先展示) */}
-            {isWeapp ? (
-              <View className="space-y-4">
-                <Button
-                  onClick={() => loginWithWechat()}
-                  disabled={loading}
-                  className="w-full py-3 rounded-xl bg-[#07C160] text-white text-sm font-semibold"
-                >
-                  微信一键登录
-                </Button>
-
-                {error ? (
-                  <View className="rounded-lg p-3 bg-error bg-opacity-10">
-                    <Text className="block text-xs text-error">{error}</Text>
-                  </View>
-                ) : null}
-
-                {/* 分隔线 */}
-                <View className="flex items-center gap-3 py-2">
-                  <View className="flex-1 h-px bg-on-surface-variant opacity-20" />
-                  <Text className="text-xs text-on-surface-variant">或使用邮箱</Text>
-                  <View className="flex-1 h-px bg-on-surface-variant opacity-20" />
-                </View>
-              </View>
-            ) : null}
-
-            {/* 邮箱密码区(WEAPP 降级 / H5 唯一) */}
-            {!isWeapp || autoLoginAttempted || error ? (
-              <View
-                className="rounded-2xl p-6 bg-white bg-opacity-72 border border-white border-opacity-85"
-                style={{ boxShadow: '0 1px 2px rgba(20,18,60,0.04), 0 6px 24px rgba(20,18,60,0.06)' }}
-              >
-                <View className="space-y-4">
-                  <View>
-                    <Text className="block text-xs font-medium text-on-surface-variant mb-2">邮箱</Text>
-                    <Input
-                      type="text"
-                      value={email}
-                      onInput={(e: any) => setEmail(e.detail.value)}
-                      placeholder="you@example.com"
-                      disabled={loading}
-                    />
-                  </View>
-                  <View>
-                    <Text className="block text-xs font-medium text-on-surface-variant mb-2">密码</Text>
-                    <Input
-                      type="text"
-                      password
-                      value={password}
-                      onInput={(e: any) => setPassword(e.detail.value)}
-                      placeholder="至少 6 位"
-                      disabled={loading}
-                      confirmType="done"
-                    />
-                  </View>
-
-                  {/* H5 端 error 显示在这里(WEAPP 端 error 在上方微信区显示) */}
-                  {error && !isWeapp ? (
-                    <View className="rounded-lg p-3 bg-error bg-opacity-10">
-                      <Text className="block text-xs text-error">{error}</Text>
-                    </View>
-                  ) : null}
-
-                  <Button
-                    onClick={submit}
-                    disabled={loading}
-                    className="w-full py-3 rounded-xl bg-primary text-white text-sm font-semibold"
-                  >
-                    {mode === 'sign-in' ? '登录' : '注册'}
-                  </Button>
-
-                  {TEST_LOGIN ? (
-                    <Button
-                      onClick={loginAsTestUser}
-                      disabled={loading}
-                      className="w-full py-3 rounded-xl bg-white text-primary text-sm font-semibold border border-primary border-opacity-30"
-                    >
-                      临时测试登录
-                    </Button>
-                  ) : null}
-                </View>
-              </View>
-            ) : null}
-
-            {/* 切换登录/注册 */}
-            <View className="mt-4 text-center">
-              <Text
-                className="text-xs text-primary"
-                onClick={() => {
-                  setMode(mode === 'sign-in' ? 'sign-up' : 'sign-in')
-                  setError(null)
-                }}
-              >
-                {mode === 'sign-in' ? '没有账号?立即注册' : '已有账号?返回登录'}
-              </Text>
+        {/* 邮箱密码登录区(主入口) */}
+        <View
+          className="rounded-2xl p-6 bg-white bg-opacity-72 border border-white border-opacity-85"
+          style={{ boxShadow: '0 1px 2px rgba(20,18,60,0.04), 0 6px 24px rgba(20,18,60,0.06)' }}
+        >
+          <View className="space-y-4">
+            <View>
+              <Text className="block text-xs font-medium text-on-surface-variant mb-2">邮箱</Text>
+              <Input
+                type="text"
+                value={email}
+                onInput={(e: any) => setEmail(e.detail.value)}
+                placeholder="you@example.com"
+                disabled={loading}
+              />
             </View>
+            <View>
+              <Text className="block text-xs font-medium text-on-surface-variant mb-2">密码</Text>
+              <Input
+                type="text"
+                password
+                value={password}
+                onInput={(e: any) => setPassword(e.detail.value)}
+                placeholder="至少 6 位"
+                disabled={loading}
+                confirmType="done"
+              />
+            </View>
+
+            {error ? (
+              <View className="rounded-lg p-3 bg-error bg-opacity-10">
+                <Text className="block text-xs text-error">{error}</Text>
+              </View>
+            ) : null}
+
+            <Button
+              onClick={submit}
+              disabled={loading}
+              className="w-full py-3 rounded-xl bg-primary text-white text-sm font-semibold"
+            >
+              {mode === 'sign-in' ? '登录' : '注册'}
+            </Button>
+
+            {TEST_LOGIN ? (
+              <Button
+                onClick={loginAsTestUser}
+                disabled={loading}
+                className="w-full py-3 rounded-xl bg-white text-primary text-sm font-semibold border border-primary border-opacity-30"
+              >
+                临时测试登录
+              </Button>
+            ) : null}
+          </View>
+        </View>
+
+        {/* 切换登录/注册 */}
+        <View className="mt-4 text-center">
+          <Text
+            className="text-xs text-primary"
+            onClick={() => {
+              setMode(mode === 'sign-in' ? 'sign-up' : 'sign-in')
+              setError(null)
+            }}
+          >
+            {mode === 'sign-in' ? '没有账号?立即注册' : '已有账号?返回登录'}
+          </Text>
+        </View>
+
+        {/* 微信登录(WEAPP 端,邮箱下方) */}
+        {isWeapp ? (
+          <>
+            <View className="flex items-center gap-3 py-6">
+              <View className="flex-1 h-px bg-on-surface-variant opacity-20" />
+              <Text className="text-xs text-on-surface-variant">或使用微信</Text>
+              <View className="flex-1 h-px bg-on-surface-variant opacity-20" />
+            </View>
+            <Button
+              onClick={loginWithWechat}
+              disabled={loading}
+              className="w-full py-3 rounded-xl bg-[#07C160] text-white text-sm font-semibold"
+            >
+              微信一键登录
+            </Button>
           </>
-        )}
+        ) : null}
       </View>
     </View>
   )
