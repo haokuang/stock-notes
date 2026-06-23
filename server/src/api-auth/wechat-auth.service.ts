@@ -4,6 +4,7 @@ import {
   InternalServerErrorException,
   UnauthorizedException,
   BadRequestException,
+  ConflictException,
   Logger,
 } from '@nestjs/common'
 import { SupabaseClient } from '@supabase/supabase-js'
@@ -30,6 +31,8 @@ interface Code2SessionResponse {
 export interface WechatProfileResult {
   nickname: string | null
   avatar_url: string | null
+  /** 是否已绑定微信账号(有 wechat_accounts 记录) */
+  bound: boolean
 }
 
 export interface UpdateWechatProfileInput {
@@ -91,6 +94,7 @@ export class WechatAuthService {
     return {
       nickname: account?.nickname ?? null,
       avatar_url: account?.avatar_url ?? null,
+      bound: !!account,
     }
   }
 
@@ -120,7 +124,64 @@ export class WechatAuthService {
     return {
       nickname: account?.nickname ?? null,
       avatar_url: account?.avatar_url ?? null,
+      bound: !!account,
     }
+  }
+
+  /**
+   * POST /api/auth/wechat-bind — 邮箱登录用户绑定微信
+   *
+   * 用 wx.login code 换 openid,将当前邮箱用户的 user_id 写入 wechat_accounts。
+   * 不创建新 Supabase 用户、不发新 session,用户保持现有邮箱 JWT。
+   */
+  async bindWechat(userId: string, code: string): Promise<WechatProfileResult> {
+    if (!code) throw new BadRequestException('code is required')
+
+    const { openid, unionid } = await this.code2session(code)
+
+    // 查 openid 是否已绑定
+    const existing = await this.db
+      .select({ user_id: schema.wechatAccounts.user_id })
+      .from(schema.wechatAccounts)
+      .where(eq(schema.wechatAccounts.openid, openid))
+      .limit(1)
+
+    if (existing[0]?.user_id) {
+      if (existing[0].user_id === userId) {
+        // 幂等:已绑定到当前用户
+        return this.getProfile(userId)
+      }
+      // openid 已绑定到其他账号
+      throw new ConflictException('该微信号已绑定其他账号')
+    }
+
+    // 插入绑定记录
+    try {
+      await this.db.insert(schema.wechatAccounts).values({
+        user_id: userId,
+        openid,
+        unionid: unionid ?? null,
+      })
+    } catch (e: any) {
+      // 并发重复插入:再查一次判断归属
+      const retry = await this.db
+        .select({ user_id: schema.wechatAccounts.user_id })
+        .from(schema.wechatAccounts)
+        .where(eq(schema.wechatAccounts.openid, openid))
+        .limit(1)
+      if (retry[0]?.user_id === userId) {
+        return this.getProfile(userId)
+      }
+      if (retry[0]?.user_id) {
+        throw new ConflictException('该微信号已绑定其他账号')
+      }
+      throw new InternalServerErrorException(
+        `Bind wechat failed: ${e?.message ?? 'unknown'}`,
+      )
+    }
+
+    this.logger.log(`WeChat bind success: openid=${openid.slice(0, 8)}… userId=${userId}`)
+    return { nickname: null, avatar_url: null, bound: true }
   }
 
   // ────────────────────────────────────────────────────────────

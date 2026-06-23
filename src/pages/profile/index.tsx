@@ -26,6 +26,7 @@ interface Summary {
 interface WechatProfile {
   nickname: string | null
   avatar_url: string | null
+  bound?: boolean
 }
 
 // 平台检测:直接判断(AGENTS.md 跨端规范)
@@ -39,6 +40,8 @@ export default function ProfilePage() {
   const [wechat, setWechat] = useState<WechatProfile>({ nickname: null, avatar_url: null })
   // 完善资料弹窗
   const [editOpen, setEditOpen] = useState(false)
+  // 绑定微信中
+  const [binding, setBinding] = useState(false)
 
   const load = async () => {
     try {
@@ -91,6 +94,30 @@ export default function ProfilePage() {
   const displayName = wechat.nickname || email || '未设置'
   // 头像首字 fallback
   const avatarFallback = (wechat.nickname || email || 'U').slice(0, 1).toUpperCase()
+  // 邮箱登录用户(非微信虚拟邮箱)
+  const isEmailUser = !!email && !email.endsWith('@wechat.local')
+  // 已绑定微信
+  const wechatBound = wechat.bound === true
+
+  const bindWechat = async () => {
+    setBinding(true)
+    try {
+      const { code } = await Taro.login()
+      if (!code) throw new Error('未获取到微信登录凭证')
+      await Network.request({
+        url: '/api/auth/wechat-bind',
+        method: 'POST',
+        data: { code },
+      })
+      await loadWechatProfile()
+      Taro.showToast({ title: '绑定成功', icon: 'success' })
+    } catch (e: any) {
+      const msg = e?.data?.message || e?.errMsg || '绑定失败'
+      Taro.showToast({ title: msg, icon: 'none' })
+    } finally {
+      setBinding(false)
+    }
+  }
 
   const handleRemove = async (stock: Stock) => {
     const res = await Taro.showModal({
@@ -280,8 +307,20 @@ export default function ProfilePage() {
               )}
               <View className="flex-1 min-w-0">
                 <Text className="block text-sm text-on-surface truncate">{email}</Text>
-                <Text className="block text-[11px] text-on-surface-variant">已登录</Text>
+                <Text className="block text-[11px] text-on-surface-variant">
+                  {wechatBound ? '已绑定微信 · 已登录' : '已登录'}
+                </Text>
               </View>
+              {/* 邮箱用户未绑定微信时显示绑定按钮 */}
+              {isWeapp && isEmailUser && !wechatBound ? (
+                <View
+                  className="px-3 py-2 rounded-lg flex items-center gap-1 border border-primary border-opacity-30"
+                  style={{ backgroundColor: 'rgba(109, 77, 255, 0.08)' }}
+                  onClick={bindWechat}
+                >
+                  <Text className="text-sm font-semibold text-primary">{binding ? '绑定中…' : '绑定微信'}</Text>
+                </View>
+              ) : null}
               <View
                 className="px-3 py-2 rounded-lg flex items-center gap-1 border"
                 style={{ backgroundColor: 'rgba(209, 26, 74, 0.10)', borderColor: 'rgba(209, 26, 74, 0.30)' }}

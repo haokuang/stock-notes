@@ -256,6 +256,7 @@ test('getProfile returns nickname and avatar_url from db', async () => {
 
   assert.equal(profile.nickname, '微信用户')
   assert.equal(profile.avatar_url, 'https://tos.example/avatar.jpg')
+  assert.equal(profile.bound, true)
 })
 
 test('getProfile returns nulls when no record found', async () => {
@@ -268,6 +269,7 @@ test('getProfile returns nulls when no record found', async () => {
 
   assert.equal(profile.nickname, null)
   assert.equal(profile.avatar_url, null)
+  assert.equal(profile.bound, false)
 })
 
 test('updateProfile patches nickname and avatar_url', async () => {
@@ -286,4 +288,74 @@ test('updateProfile patches nickname and avatar_url', async () => {
 
   assert.equal(result.nickname, '新昵称')
   assert.equal(result.avatar_url, 'https://tos.example/new.jpg')
+  assert.equal(result.bound, true)
+})
+
+// ── bindWechat 测试 ──────────────────────────────────────────
+
+test('bindWechat success: openid unbound → insert → returns null profile with bound=true', async () => {
+  mockFetch({ openid: 'openid-to-bind', session_key: 'sk', unionid: 'uid' })
+
+  // select 查 openid 未绑定(空数组);getProfile 也查不到(复用同一 mock)
+  const db = createMockDrizzle([], [])
+  const adminClient = createMockSupabaseClient()
+  const anonClient = createMockSupabaseClient()
+
+  const service = new WechatAuthService(adminClient, anonClient, db)
+  const result = await service.bindWechat('email-user-uuid', 'valid-code')
+
+  assert.equal(result.nickname, null)
+  assert.equal(result.avatar_url, null)
+  assert.equal(result.bound, true)
+})
+
+test('bindWechat idempotent: openid already bound to current user → returns profile, no insert', async () => {
+  mockFetch({ openid: 'openid-already-mine' })
+
+  // select 查到 openid 已绑定到当前用户
+  const db = createMockDrizzle([{ user_id: 'email-user-uuid' }], [])
+  const adminClient = createMockSupabaseClient()
+  const anonClient = createMockSupabaseClient()
+
+  const service = new WechatAuthService(adminClient, anonClient, db)
+  const result = await service.bindWechat('email-user-uuid', 'some-code')
+
+  assert.equal(result.bound, true)
+})
+
+test('bindWechat conflict: openid already bound to another user → throws ConflictException', async () => {
+  mockFetch({ openid: 'openid-taken' })
+
+  // select 查到 openid 已绑定到其他用户
+  const db = createMockDrizzle([{ user_id: 'other-user-uuid' }], [])
+  const adminClient = createMockSupabaseClient()
+  const anonClient = createMockSupabaseClient()
+
+  const service = new WechatAuthService(adminClient, anonClient, db)
+
+  await assert.rejects(
+    () => service.bindWechat('email-user-uuid', 'some-code'),
+    (error: Error) => {
+      assert.match(error.message, /已绑定其他账号/)
+      return true
+    },
+  )
+})
+
+test('bindWechat code2session failure → throws UnauthorizedException', async () => {
+  mockFetch({ errcode: 40029, errmsg: 'invalid code' })
+
+  const db = createMockDrizzle()
+  const adminClient = createMockSupabaseClient()
+  const anonClient = createMockSupabaseClient()
+
+  const service = new WechatAuthService(adminClient, anonClient, db)
+
+  await assert.rejects(
+    () => service.bindWechat('email-user-uuid', 'bad-code'),
+    (error: Error) => {
+      assert.match(error.message, /code2session failed/)
+      return true
+    },
+  )
 })

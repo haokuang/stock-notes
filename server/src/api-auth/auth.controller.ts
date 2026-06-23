@@ -38,6 +38,12 @@ class WechatProfileDto {
   avatar_url?: string
 }
 
+class WechatBindDto {
+  @IsString()
+  @MinLength(1)
+  code!: string
+}
+
 @Controller('auth')
 export class AuthController {
   constructor(
@@ -87,6 +93,15 @@ export class AuthController {
     @Body() dto: WechatProfileDto,
   ) {
     return { data: await this.wechatAuth.updateProfile(userId, dto) }
+  }
+
+  @Post('wechat-bind')
+  @HttpCode(200)
+  async wechatBind(
+    @CurrentUser('id') userId: string,
+    @Body() dto: WechatBindDto,
+  ) {
+    return { data: await this.wechatAuth.bindWechat(userId, dto.code) }
   }
 
   @Get('me')
