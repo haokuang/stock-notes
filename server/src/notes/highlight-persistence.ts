@@ -4,6 +4,7 @@
  *
  * - 所有写入走 client.query() 绕开 Drizzle 已知 prepared-stmt bug(参考 daily-brief-persistence)
  * - reconcile 在同一事务内: 解析已有锚点 → 更新有效 / 删除失效,原子返回剩余 row
+ * - 批量重定位用 unnest 把 N 行参数一次 UPDATE,避免 N+1 串行 RTT(高延迟链路优化)
  */
 
 import type { PoolClient } from 'pg'
@@ -65,6 +66,25 @@ export async function createNoteHighlight(
   }
   if (!input.selectedText.trim()) {
     throw new Error('selected_text must not be empty')
+  }
+  const overlap = await client.query<{ id: string }>(
+    `SELECT id FROM note_highlights
+     WHERE user_id = $1
+       AND note_id = $2
+       AND source_hash = $3
+       AND start_offset < $5
+       AND $4 < end_offset
+     LIMIT 1`,
+    [
+      input.userId,
+      input.noteId,
+      input.sourceHash,
+      input.startOffset,
+      input.endOffset,
+    ],
+  )
+  if (overlap.rows.length > 0) {
+    throw new Error('overlap: highlight range conflicts with an existing highlight')
   }
   try {
     const result = await client.query<StoredHighlight>(
@@ -136,20 +156,38 @@ export async function reconcileNoteHighlights(
       invalidIds.push(row.id)
       continue
     }
-    valid.push({ ...row, ...resolved, source_hash: input.currentHash })
+    valid.push({
+      ...row,
+      start_offset: resolved.startOffset,
+      end_offset: resolved.endOffset,
+      source_hash: input.currentHash,
+    })
   }
 
   await client.query('BEGIN')
   try {
     if (valid.length > 0) {
-      for (const v of valid) {
-        await client.query(
-          `UPDATE note_highlights
-           SET start_offset = $1, end_offset = $2, source_hash = $3, updated_at = now()
-           WHERE id = $4 AND user_id = $5 AND note_id = $6`,
-          [v.start_offset, v.end_offset, v.source_hash, v.id, v.user_id, v.note_id],
-        )
-      }
+      // 批量 UPDATE: 用 unnest 把 N 行参数作为数组传入,1 次 RTT 完成全部重定位
+      // (旧实现是 for 循环 N 次串行 UPDATE,在高延迟链路上 N×RTT 相加)
+      const ids = valid.map((v) => v.id)
+      const userIds = valid.map((v) => v.user_id)
+      const startOffsets = valid.map((v) => v.start_offset)
+      const endOffsets = valid.map((v) => v.end_offset)
+      const sourceHashes = valid.map((v) => v.source_hash)
+      await client.query(
+        `UPDATE note_highlights AS h
+         SET start_offset = u.start_offset,
+             end_offset = u.end_offset,
+             source_hash = u.source_hash,
+             updated_at = now()
+         FROM unnest(
+           $1::varchar[], $2::uuid[], $3::integer[], $4::integer[], $5::varchar[]
+         ) AS u(id, user_id, start_offset, end_offset, source_hash)
+         WHERE h.id = u.id
+           AND h.user_id = u.user_id
+           AND h.note_id = $6`,
+        [ids, userIds, startOffsets, endOffsets, sourceHashes, input.noteId],
+      )
     }
     if (invalidIds.length > 0) {
       await client.query(

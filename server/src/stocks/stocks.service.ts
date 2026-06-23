@@ -226,33 +226,11 @@ export class StocksService {
   }
 
   async summary(uid: string) {
-    const [stockCount] = await this.db
-      .select({ count: sql<number>`count(*)::int` })
-      .from(schema.stocks)
-      .where(eq(schema.stocks.user_id, uid))
-    const [noteCount] = await this.db
-      .select({ count: sql<number>`count(*)::int` })
-      .from(schema.notes)
-      .where(eq(schema.notes.user_id, uid))
-    const [reportCount] = await this.db
-      .select({ count: sql<number>`count(*)::int` })
-      .from(schema.aiReports)
-      .where(eq(schema.aiReports.user_id, uid))
-    const bullCount = await this.db
-      .select({ count: sql<number>`count(*)::int` })
-      .from(schema.notes)
-      .where(
-        and(
-          eq(schema.notes.user_id, uid),
-          eq(schema.notes.direction, 'bull'),
-          eq(schema.notes.type, 'note'),
-        ),
-      )
-    return {
-      stocks: stockCount?.count ?? 0,
-      notes: noteCount?.count ?? 0,
-      reports: reportCount?.count ?? 0,
-      bull: bullCount[0]?.count ?? 0,
+    const client = await this.pool.connect()
+    try {
+      return await fetchSummary(client, uid)
+    } finally {
+      client.release()
     }
   }
 
@@ -579,5 +557,43 @@ export class StocksService {
     const next = _refreshLocks.get(lockKey) ?? 0
     const remaining = Math.max(0, Math.ceil((next - Date.now()) / 1000))
     return { cooldown_remaining_sec: remaining, can_refresh: remaining === 0 }
+  }
+}
+
+export interface StockSummary {
+  stocks: number
+  notes: number
+  reports: number
+  bull: number
+}
+
+/**
+ * 首页/个人页汇总统计:stocks / notes / ai_reports / bull 观点数
+ * 全部用 scalar subquery 合并成一条 SQL,避免 4 次串行 round-trip
+ */
+export async function fetchSummary(
+  client: import('pg').PoolClient,
+  uid: string,
+): Promise<StockSummary> {
+  const { rows } = await client.query<{
+    stocks: number
+    notes: number
+    reports: number
+    bull: number
+  }>(
+    `SELECT
+       (SELECT count(*)::int FROM stocks WHERE user_id = $1) AS stocks,
+       (SELECT count(*)::int FROM notes WHERE user_id = $1) AS notes,
+       (SELECT count(*)::int FROM ai_reports WHERE user_id = $1) AS reports,
+       (SELECT count(*)::int FROM notes
+         WHERE user_id = $1 AND direction = 'bull' AND type = 'note') AS bull`,
+    [uid],
+  )
+  const r = rows[0]
+  return {
+    stocks: r?.stocks ?? 0,
+    notes: r?.notes ?? 0,
+    reports: r?.reports ?? 0,
+    bull: r?.bull ?? 0,
   }
 }
