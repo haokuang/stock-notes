@@ -2,7 +2,7 @@ import { View, Text, ScrollView } from '@tarojs/components'
 import Taro, { useLoad, usePullDownRefresh, useDidShow } from '@tarojs/taro'
 import { useEffect, useRef, useState } from 'react'
 import { Network } from '@/network'
-import { ArrowLeft, EllipsisVertical, TrendingUp, Target, Shield, CirclePlus, Clock, RefreshCw, Sparkles, BookOpenCheck } from 'lucide-react-taro'
+import { EllipsisVertical, TrendingUp, Target, Shield, CirclePlus, Clock, RefreshCw, Sparkles, BookOpenCheck } from 'lucide-react-taro'
 import { useBriefRealtime, type BriefEvent } from '@/hooks/useBriefRealtime'
 import { useStockRefresh } from '@/hooks/useStockRefresh'
 import { getAgentApi } from '@/agent/agent-client'
@@ -10,6 +10,7 @@ import type { AgentReportSummary } from '@/agent/agent-api'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
+import { PageHeader } from '@/components/ui/page-header'
 import { ResponsivePage } from '@/components/layout/responsive-page'
 import type { SubjectType } from '@/stocks/subject'
 import { detailCapabilities, detailRequestUrls } from './stock-detail-logic'
@@ -263,15 +264,15 @@ export default function StockDetailPage() {
   return (
     <View className="w-full min-h-full pb-[calc(4rem+env(safe-area-inset-bottom))]" style={{ background: '#EEF0F6' }}>
       {/* 自定义 Header */}
-      <View className="flex items-center justify-between px-4 pt-3 pb-2 bg-background sticky top-0 z-40" style={{ paddingTop: 'calc(0.75rem + env(safe-area-inset-top))' }}>
-        <View className="w-10 h-10 flex items-center justify-center rounded-full active:bg-surface-container" onClick={() => Taro.navigateBack()}>
-          <ArrowLeft size={20} color="#161826" />
-        </View>
-        <Text className="block text-base font-semibold text-on-surface">{stock?.name ?? '加载中...'}</Text>
-        <View className="w-10 h-10 flex items-center justify-center rounded-full active:bg-surface-container">
-          <EllipsisVertical size={20} color="#5B5E72" />
-        </View>
-      </View>
+      <PageHeader
+        title={stock?.name ?? '加载中...'}
+        onBack={() => Taro.navigateBack()}
+        rightSlot={
+          <View className="w-10 h-10 flex items-center justify-center rounded-full active:bg-surface-container">
+            <EllipsisVertical size={20} color="#5B5E72" />
+          </View>
+        }
+      />
 
       <ScrollView scrollY enhanced showScrollbar={false} className="w-full">
         <ResponsivePage padded={false}>
