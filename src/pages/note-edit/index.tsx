@@ -3,6 +3,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
+import { PageHeader } from '@/components/ui/page-header'
 import {
   Select,
   SelectContent,
@@ -13,7 +14,7 @@ import {
 import Taro, { useDidShow, useLoad } from '@tarojs/taro'
 import { useState } from 'react'
 import { Network } from '@/network'
-import { ArrowLeft, X, Sparkles, FileText, PenLine, Eye, Upload, File } from 'lucide-react-taro'
+import { X, Sparkles, FileText, PenLine, Eye, Upload, File } from 'lucide-react-taro'
 import {
   buildNoteMutation,
   buildNotePayload,
@@ -290,27 +291,30 @@ export default function NoteEditPage() {
   return (
     <View className="w-full min-h-full pb-[calc(5rem+env(safe-area-inset-bottom))]" style={{ background: '#EEF0F6' }}>
       {/* Header */}
-      <View
-        className="flex items-center justify-between px-4 pb-2 bg-background sticky top-0 z-40"
-        style={{ paddingTop: 'calc(0.75rem + env(safe-area-inset-top))' }}
-      >
-        <View className="w-10 h-10 flex items-center justify-center rounded-full active:bg-surface-container" onClick={() => Taro.navigateBack()}>
-          <ArrowLeft size={20} color="#161826" />
-        </View>
-        <Text className="block text-base font-semibold text-on-surface">
-          {noteId
-            ? type === 'doc' ? '编辑文档' : '编辑笔记'
-            : type === 'doc' ? '上传文档' : '记录笔记'}
-        </Text>
-        <Button
-          size="sm"
-          className="rounded-full"
-          disabled={loading || saving || Boolean(loadError)}
-          onClick={onSave}
-        >
-          <Text className="block text-xs font-semibold text-white">{saving ? '保存中' : '保存'}</Text>
-        </Button>
-      </View>
+      <PageHeader
+        title={
+          noteId
+            ? type === 'doc'
+              ? '编辑文档'
+              : '编辑笔记'
+            : type === 'doc'
+              ? '上传文档'
+              : '记录笔记'
+        }
+        onBack={() => Taro.navigateBack()}
+        rightSlot={
+          <Button
+            size="sm"
+            className="rounded-full"
+            disabled={loading || saving || Boolean(loadError)}
+            onClick={onSave}
+          >
+            <Text className="block text-xs font-semibold text-white">
+              {saving ? '保存中' : '保存'}
+            </Text>
+          </Button>
+        }
+      />
 
       <ScrollView scrollY enhanced showScrollbar={false} className="w-full">
         {loading && (
