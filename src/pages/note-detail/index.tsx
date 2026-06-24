@@ -3,11 +3,12 @@ import Taro, { useDidShow, useLoad } from '@tarojs/taro'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Network } from '@/network'
 import { IS_H5_ENV } from '@/presets/env'
-import { ArrowLeft, Clock, FileText, Sparkles, Trash2, Pencil } from 'lucide-react-taro'
+import { Clock, FileText, Sparkles, Trash2, Pencil } from 'lucide-react-taro'
 import {
   NoteSelectionToolbar,
   type NoteSelectionToolbarProps,
 } from '@/components/note-selection-toolbar'
+import { PageHeader } from '@/components/ui/page-header'
 import { formatNotePrice, hasNotePrice } from './note-detail-logic'
 import type { NotePrice } from './note-detail-logic'
 import {
@@ -325,23 +326,20 @@ export default function NoteDetailPage() {
   return (
     <View className="w-full min-h-full pb-8" style={{ background: '#EEF0F6' }}>
       {/* Header */}
-      <View
-        className="flex items-center justify-between px-4 pb-2 bg-background sticky top-0 z-40"
-        style={{ paddingTop: 'calc(0.75rem + env(safe-area-inset-top))' }}
-      >
-        <View className="w-10 h-10 flex items-center justify-center rounded-full active:bg-surface-container" onClick={() => Taro.navigateBack()}>
-          <ArrowLeft size={20} color="#161826" />
-        </View>
-        <Text className="block text-base font-semibold text-on-surface">{isDoc ? '文档详情' : '笔记详情'}</Text>
-        <View className="flex items-center gap-1">
-          <View className="w-9 h-9 flex items-center justify-center rounded-full active:bg-surface-container" onClick={onEdit}>
-            <Pencil size={18} color="#5B5E72" />
+      <PageHeader
+        title={isDoc ? '文档详情' : '笔记详情'}
+        onBack={() => Taro.navigateBack()}
+        rightSlot={
+          <View className="flex items-center gap-1">
+            <View className="w-9 h-9 flex items-center justify-center rounded-full active:bg-surface-container" onClick={onEdit}>
+              <Pencil size={18} color="#5B5E72" />
+            </View>
+            <View className="w-9 h-9 flex items-center justify-center rounded-full active:bg-surface-container" onClick={onDelete}>
+              <Trash2 size={18} color="#D11A4A" />
+            </View>
           </View>
-          <View className="w-9 h-9 flex items-center justify-center rounded-full active:bg-surface-container" onClick={onDelete}>
-            <Trash2 size={18} color="#D11A4A" />
-          </View>
-        </View>
-      </View>
+        }
+      />
 
       <ScrollView scrollY enhanced showScrollbar={false} className="w-full">
         {/* 类型徽章 + 股票关联 + 标题 */}
