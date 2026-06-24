@@ -29,8 +29,9 @@ test('computeHeaderMetrics: WEAPP without systemInfo falls back to statusBarHeig
     isWeapp: true,
     capsule: { top: 4, height: 32, right: 87, width: 87 },
   })
+  // 缺 systemInfo 时 windowWidth 也是 undefined,无法算几何,capsule 也降级到固定 fallback
   assert.equal(m.statusBarHeight, 20)
-  assert.equal(m.capsuleRightGap, 288)
+  assert.equal(m.capsuleRightGap, 16)
   assert.equal(m.totalHeight, 28)
 })
 
