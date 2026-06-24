@@ -1,9 +1,10 @@
 import { View, Text, ScrollView, Image } from '@tarojs/components'
 import { Input } from '@/components/ui/input'
+import { PageHeader } from '@/components/ui/page-header'
 import Taro, { useLoad } from '@tarojs/taro'
 import { useState } from 'react'
 import { Network } from '@/network'
-import { ArrowLeft, Image as ImageIcon, Sparkles, Save } from 'lucide-react-taro'
+import { Image as ImageIcon, Sparkles, Save } from 'lucide-react-taro'
 
 interface AiResult {
   summary: string
@@ -97,16 +98,7 @@ export default function ImageAiPage() {
 
   return (
     <View className="w-full min-h-full pb-[calc(2rem+env(safe-area-inset-bottom))]" style={{ background: '#EEF0F6' }}>
-      <View
-        className="flex items-center justify-between px-4 pb-2 bg-background sticky top-0 z-40"
-        style={{ paddingTop: 'calc(0.75rem + env(safe-area-inset-top))' }}
-      >
-        <View className="w-10 h-10 flex items-center justify-center rounded-full active:bg-surface-container" onClick={() => Taro.navigateBack()}>
-          <ArrowLeft size={20} color="#161826" />
-        </View>
-        <Text className="block text-base font-semibold text-on-surface">AI 单图解读</Text>
-        <View className="w-10 h-10" />
-      </View>
+      <PageHeader title="AI 单图解读" onBack={() => Taro.navigateBack()} />
 
       <ScrollView scrollY enhanced showScrollbar={false} className="w-full">
         {/* 上传区 */}

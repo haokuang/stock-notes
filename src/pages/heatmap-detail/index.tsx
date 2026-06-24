@@ -2,7 +2,8 @@ import { View, Text, ScrollView } from '@tarojs/components'
 import Taro, { useLoad, usePullDownRefresh } from '@tarojs/taro'
 import { useState } from 'react'
 import { Network } from '@/network'
-import { ArrowLeft, Calendar } from 'lucide-react-taro'
+import { Calendar } from 'lucide-react-taro'
+import { PageHeader } from '@/components/ui/page-header'
 import { HeatmapResponse, normalizeHeatmap } from '../prelaunch-navigation'
 
 interface DayBucket {
@@ -52,16 +53,7 @@ export default function HeatmapDetailPage() {
 
   return (
     <View className="w-full min-h-full pb-8" style={{ background: '#EEF0F6' }}>
-      <View
-        className="flex items-center justify-between px-4 pb-2 bg-background sticky top-0 z-40"
-        style={{ paddingTop: 'calc(0.75rem + env(safe-area-inset-top))' }}
-      >
-        <View className="w-10 h-10 flex items-center justify-center rounded-full active:bg-surface-container" onClick={() => Taro.navigateBack()}>
-          <ArrowLeft size={20} color="#161826" />
-        </View>
-        <Text className="block text-base font-semibold text-on-surface">记录热力图</Text>
-        <View className="w-10 h-10" />
-      </View>
+      <PageHeader title="记录热力图" onBack={() => Taro.navigateBack()} />
 
       {/* 统计卡片 */}
       <View className="px-4 pt-3">
