@@ -2,10 +2,11 @@ import { View, Text, ScrollView } from '@tarojs/components'
 import Taro, { useLoad } from '@tarojs/taro'
 import { useState } from 'react'
 import { Network } from '@/network'
-import { ArrowLeft, Sparkles, Share2, TrendingUp, TrendingDown, Activity, ExternalLink } from 'lucide-react-taro'
+import { Sparkles, Share2, TrendingUp, TrendingDown, Activity, ExternalLink } from 'lucide-react-taro'
 import { getAgentApi } from '@/agent/agent-client'
 import type { AgentReportDetail } from '@/agent/agent-api'
 import { Button } from '@/components/ui/button'
+import { PageHeader } from '@/components/ui/page-header'
 import {
   DailyBriefApiResult,
   normalizeDailyBrief,
@@ -111,18 +112,15 @@ export default function AiReportPage() {
 
   return (
     <View className="w-full min-h-full pb-8" style={{ background: '#EEF0F6' }}>
-      <View
-        className="flex items-center justify-between px-4 pb-2 bg-background sticky top-0 z-40"
-        style={{ paddingTop: 'calc(0.75rem + env(safe-area-inset-top))' }}
-      >
-        <View className="w-10 h-10 flex items-center justify-center rounded-full active:bg-surface-container" onClick={() => Taro.navigateBack()}>
-          <ArrowLeft size={20} color="#161826" />
-        </View>
-        <Text className="block text-base font-semibold text-on-surface">{brief ? '今日简评' : agentReport ? '研究报告' : 'AI 投研报告'}</Text>
-        <View className="w-10 h-10 flex items-center justify-center rounded-full active:bg-surface-container" onClick={onShare}>
-          <Share2 size={18} color="#5B5E72" />
-        </View>
-      </View>
+      <PageHeader
+        title={brief ? '今日简评' : agentReport ? '研究报告' : 'AI 投研报告'}
+        onBack={() => Taro.navigateBack()}
+        rightSlot={
+          <View className="w-10 h-10 flex items-center justify-center rounded-full active:bg-surface-container" onClick={onShare}>
+            <Share2 size={18} color="#5B5E72" />
+          </View>
+        }
+      />
 
       <ScrollView scrollY enhanced showScrollbar={false} className="w-full">
         {/* Brief 模式 */}
