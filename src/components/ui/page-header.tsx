@@ -50,10 +50,8 @@ function getInitialMetrics(): HeaderMetrics {
       capsule,
     })
   } catch (e) {
-    if (process.env.NODE_ENV !== 'production') {
-      // eslint-disable-next-line no-console
-      console.warn('[PageHeader] getMenuButtonBoundingClientRect failed, falling back to safe-area defaults', e)
-    }
+    // eslint-disable-next-line no-console
+    console.warn('[PageHeader] getMenuButtonBoundingClientRect failed, falling back to safe-area defaults', e)
     return computeHeaderMetrics({ isWeapp: true })
   }
 }
