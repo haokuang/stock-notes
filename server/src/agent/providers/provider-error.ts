@@ -43,8 +43,9 @@ export function normalizeProviderError(provider: AgentProvider, input: unknown):
   const status = typeof error.status === 'number' ? error.status : null
   const code = typeof error.code === 'string' ? error.code.toLowerCase() : ''
   const name = typeof error.name === 'string' ? error.name : ''
+  const message = typeof error.message === 'string' ? error.message.toLowerCase() : ''
 
-  if (name === 'AbortError') {
+  if (name === 'AbortError' || name.toLowerCase().includes('abort') || message.includes('aborted')) {
     return new ProviderError(provider, 'PROVIDER_TIMEOUT', true, '模型调用超时，请重试', null, { cause: input })
   }
   if (status === 401 || status === 403) {

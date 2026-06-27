@@ -22,17 +22,38 @@ test('uses a legacy full database URL directly', () => {
   assert.equal(config.connectionString, url)
 })
 
-test('prefers the explicit database password over a legacy URL', () => {
+test('prefers DATABASE_URL over Supabase-specific database settings', () => {
+  const url = 'postgresql://postgres:secret@database-url.example.test:5432/postgres'
   const config = createDatabasePoolConfig({
-    SUPABASE_DB_PASSWORD: 'preferred-password',
-    SUPABASE_DB_URL: 'postgresql://legacy:secret@db.example.test:5432/postgres',
+    DATABASE_URL: url,
+    SUPABASE_DB_URL: 'postgresql://postgres:secret@supabase-url.example.test:5432/postgres',
+    SUPABASE_DB_PASSWORD: 'supabase-password',
     DB_CONNECTION_PROFILE: 'pooler-session',
   })
 
-  assert.match(
-    String(config.connectionString),
-    /postgres\.hgpxchebcipynrfjssiq:preferred-password@aws-1-ap-northeast-1\.pooler\.supabase\.com:5432/,
-  )
+  assert.equal(config.connectionString, url)
+})
+
+test('allows disabling SSL for an explicit database URL', () => {
+  const url = 'postgresql://postgres:secret@aliyun-rds.example.test:5432/supabase_db'
+  const config = createDatabasePoolConfig({
+    SUPABASE_DB_URL: url,
+    DATABASE_SSL: 'false',
+  })
+
+  assert.equal(config.connectionString, url)
+  assert.equal(config.ssl, false)
+})
+
+test('prefers a full Supabase database URL over a profile password', () => {
+  const url = 'postgresql://postgres:secret@db.example.test:5432/postgres'
+  const config = createDatabasePoolConfig({
+    SUPABASE_DB_PASSWORD: 'preferred-password',
+    SUPABASE_DB_URL: url,
+    DB_CONNECTION_PROFILE: 'pooler-session',
+  })
+
+  assert.equal(config.connectionString, url)
 })
 
 test('rejects an unknown database connection profile', () => {
@@ -49,6 +70,6 @@ test('rejects an unknown database connection profile', () => {
 test('reports missing database credentials without exposing values', () => {
   assert.throws(
     () => createDatabasePoolConfig({}),
-    /SUPABASE_DB_PASSWORD.*SUPABASE_DB_URL/,
+    /DATABASE_URL.*SUPABASE_DB_URL.*SUPABASE_DB_PASSWORD/,
   )
 })

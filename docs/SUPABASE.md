@@ -24,8 +24,8 @@
          │ pg (postgres 角色 + 真 db password,直连 5432)
          ▼
 ┌──────────────────┐
-│  Supabase        │  Postgres 17 (ap-northeast-1)
-│  hgpxchebcipyn...│  5 张用户业务表 + 20 条 RLS 策略
+│  Supabase        │  Postgres 17 (东京或阿里云 RDS Supabase)
+│  public schema   │  用户业务表 + RLS + Realtime publication
 └──────────────────┘
 ```
 
@@ -39,7 +39,7 @@
 
 ### 3.2 跑 SQL 建表 + RLS
 
-打开 Supabase Dashboard → SQL Editor → New query，按编号顺序执行 `server/migrations/0001_init.sql` 到最新迁移。当前最新为 `0007_schema_consistency.sql`。
+打开 Supabase Dashboard → SQL Editor → New query，按编号顺序执行 `server/migrations/0001_init.sql` 到最新迁移。当前最新为 `0013_wechat_accounts.sql`。
 
 迁移完成后有 5 张按用户隔离的业务表，共 20 条 RLS 策略；另有 `error_logs` 内部监控表及相关索引、触发器。
 
@@ -68,8 +68,11 @@ SUPABASE_URL=https://hgpxchebcipynrfjssiq.supabase.co
 SUPABASE_ANON_KEY=sb_publishable_xxx                # 或 legacy eyJ... JWT
 SUPABASE_SERVICE_ROLE_KEY=sb_secret_xxx             # 或 legacy eyJ... JWT
 
-# DB 直连(5432 session mode,密码是 3.4 重置的那个)
+# DB 直连，优先级 DATABASE_URL > SUPABASE_DB_URL > SUPABASE_DB_PASSWORD
 SUPABASE_DB_URL=postgresql://postgres:数据库密码@db.<ref>.supabase.co:5432/postgres
+
+# 可省略，默认 true；若 RDS 返回 “server does not support SSL connections” 则设为 false
+DATABASE_SSL=true
 
 # Personal Access Token(从 https://supabase.com/dashboard/account/tokens 生成)
 SUPABASE_ACCESS_TOKEN=sbp_xxx
@@ -82,6 +85,83 @@ DEFAULT_USER_ID=<uuid>
 ```
 
 ⚠️ `.env.local` 已在 `.gitignore` 里忽略,不会进 git。但**不要**把 `SUPABASE_SERVICE_ROLE_KEY` 泄露到任何前端 bundle 里(它绕过 RLS)。
+
+### 3.6 阿里云 RDS Supabase 切换要点
+
+阿里云 RDS Supabase 与普通 Supabase 项目一样需要三组应用凭据：
+
+```bash
+SUPABASE_URL=<阿里云 Supabase 项目 URL>
+SUPABASE_ANON_KEY=<阿里云 anon key>
+SUPABASE_SERVICE_ROLE_KEY=<阿里云 service role key>
+```
+
+数据库连接推荐使用完整连接串，避免旧东京 Supavisor profile 被误用：
+
+```bash
+DATABASE_URL=postgresql://postgres:数据库密码@阿里云 RDS 外网或内网地址:5432/supabase_db
+# 或继续使用兼容变量:
+SUPABASE_DB_URL=postgresql://postgres:数据库密码@阿里云 RDS 外网或内网地址:5432/supabase_db
+
+# 阿里云 RDS 若未启用 SSL，需要显式关闭
+DATABASE_SSL=false
+
+# 使用完整连接串时不要再填写旧 profile 密码
+SUPABASE_DB_PASSWORD=
+DB_CONNECTION_PROFILE=
+```
+
+验证 SQL：
+
+```sql
+select exists(select 1 from pg_namespace where nspname = 'auth') as has_auth_schema;
+select exists(select 1 from pg_proc where proname = 'uid' and pronamespace = 'auth'::regnamespace) as has_auth_uid;
+select exists(select 1 from pg_publication where pubname = 'supabase_realtime') as has_supabase_realtime;
+```
+
+本项目已验证阿里云 RDS Supabase 需要 `DATABASE_SSL=false` 才能用 `pg` 直连当前外网地址；生产部署在同 VPC 的 ECS 上时优先使用内网地址。
+
+### 3.7 本地保留多套 Supabase 配置并快速切换
+
+项目提供本地 profile 切换脚本，用于在“阿里云 RDS Supabase”和“Supabase 东京项目”之间切换 `.env.local`。profile 文件放在 `.env.profiles/` 下，此目录已被 `.gitignore` 忽略，密钥不会提交到 Git。
+
+```bash
+mkdir -p .env.profiles
+```
+
+阿里云示例 `.env.profiles/aliyun.env`：
+
+```bash
+SUPABASE_URL=<阿里云 Supabase URL>
+SUPABASE_ANON_KEY=<阿里云 anon key>
+SUPABASE_SERVICE_ROLE_KEY=<阿里云 service role key>
+SUPABASE_DB_URL=postgresql://postgres:密码@阿里云 RDS 地址:5432/supabase_db
+DATABASE_SSL=false
+```
+
+东京示例 `.env.profiles/tokyo.env`：
+
+```bash
+SUPABASE_URL=https://<project-ref>.supabase.co
+SUPABASE_ANON_KEY=<东京 anon key>
+SUPABASE_SERVICE_ROLE_KEY=<东京 service role key>
+SUPABASE_DB_URL=postgresql://postgres:密码@db.<project-ref>.supabase.co:5432/postgres
+DATABASE_SSL=true
+```
+
+切换命令：
+
+```bash
+pnpm supabase:switch aliyun
+pnpm supabase:switch tokyo
+```
+
+脚本只会改 `.env.local` 中 Supabase / 数据库连接相关变量，并清空目标 profile 未声明的同类变量，避免新旧实例配置混用。切换后需要重启后端服务：
+
+```bash
+docker compose -f docker-compose.dev.yml restart server-dev
+# 或本地 pnpm dev:server 进程重启
+```
 
 ## 4. Supabase Auth 配置
 

@@ -41,8 +41,34 @@ test('rejects malformed tool arguments as an invalid request', async () => {
     id: 'response-1',
     choices: [{ message: { content: '', tool_calls: [{ id: 'call-1', function: { name: 'tool', arguments: '{' } }] } }],
   }) } } }
-  const provider = new OpenAICompatibleProvider('minimax', client as never, 'model-1')
+  const provider = new OpenAICompatibleProvider('minimax', client as never, 'model-1', { warn: () => undefined })
   await assert.rejects(provider.generate(request()), (error: { code?: string }) => error.code === 'PROVIDER_INVALID_REQUEST')
+})
+
+test('logs safe provider failure details without raw upstream body', async () => {
+  const client = { chat: { completions: { create: async () => {
+    throw {
+      name: 'APIError',
+      status: 503,
+      message: 'raw secret upstream body',
+      code: 'temporarily_unavailable',
+      request_id: 'req-upstream-1',
+    }
+  } } } }
+  const entries: unknown[] = []
+  const logger = { warn: (message: unknown) => entries.push(message) }
+  const provider = new OpenAICompatibleProvider('minimax', client as never, 'model-1', logger)
+
+  await assert.rejects(provider.generate(request()), (error: { code?: string }) => error.code === 'PROVIDER_TEMPORARY_FAILURE')
+
+  assert.equal(entries.length, 1)
+  const line = String(entries[0])
+  assert.match(line, /provider=minimax/)
+  assert.match(line, /traceId=trace-1/)
+  assert.match(line, /status=503/)
+  assert.match(line, /code=PROVIDER_TEMPORARY_FAILURE/)
+  assert.match(line, /upstreamRequestId=req-upstream-1/)
+  assert.doesNotMatch(line, /raw secret upstream body/)
 })
 
 test('registry never falls back after the selected provider fails', async () => {

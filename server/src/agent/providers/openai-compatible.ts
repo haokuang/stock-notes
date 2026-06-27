@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common'
 import type { AgentProvider } from '../agent.types'
 import { normalizeProviderError, ProviderError } from './provider-error'
 import type {
@@ -27,6 +28,30 @@ interface CompatibleClient {
       create(body: any, options?: any): Promise<any>
     }
   }
+}
+
+interface LoggerLike {
+  warn(message: unknown, ...optional: unknown[]): void
+}
+
+function record(error: unknown): Record<string, unknown> {
+  return typeof error === 'object' && error !== null ? error as Record<string, unknown> : {}
+}
+
+function upstreamRequestId(error: Record<string, unknown>): string {
+  const headers = record(error.headers)
+  const raw = error.request_id ?? error.requestId ?? headers['x-request-id'] ?? headers['x-minimax-request-id']
+  return typeof raw === 'string' && raw ? raw : 'none'
+}
+
+function upstreamCode(error: Record<string, unknown>): string {
+  const raw = error.code
+  return typeof raw === 'string' && raw ? raw : 'none'
+}
+
+function upstreamStatus(error: Record<string, unknown>): string {
+  const raw = error.status
+  return typeof raw === 'number' ? String(raw) : 'none'
 }
 
 function mapMessage(message: AgentStandardMessage): Record<string, unknown> {
@@ -64,6 +89,7 @@ export class OpenAICompatibleProvider implements AgentModelProvider {
     readonly provider: AgentProvider,
     private readonly client: CompatibleClient,
     private readonly defaultModel: string,
+    private readonly logger: LoggerLike = new Logger('AgentProvider'),
   ) {}
 
   async generate(request: AgentProviderRequest) {
@@ -96,7 +122,9 @@ export class OpenAICompatibleProvider implements AgentModelProvider {
         },
       }
     } catch (error) {
-      throw normalizeProviderError(this.provider, error)
+      const normalized = normalizeProviderError(this.provider, error)
+      this.logFailure(request.traceId, error, normalized)
+      throw normalized
     }
   }
 
@@ -121,5 +149,13 @@ export class OpenAICompatibleProvider implements AgentModelProvider {
     } finally {
       clearTimeout(timer)
     }
+  }
+
+  private logFailure(traceId: string, cause: unknown, error: ProviderError): void {
+    const upstream = record(cause)
+    const name = typeof upstream.name === 'string' && upstream.name ? upstream.name : 'unknown'
+    this.logger.warn(
+      `[agent-provider] provider=${this.provider} traceId=${traceId} status=${upstreamStatus(upstream)} upstreamCode=${upstreamCode(upstream)} upstreamRequestId=${upstreamRequestId(upstream)} errorName=${name} code=${error.code} safeMessage=${error.safeMessage}`,
+    )
   }
 }

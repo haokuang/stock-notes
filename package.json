@@ -45,7 +45,8 @@
     "docker:prod:down": "docker compose --env-file .env.production -f docker-compose.yml down",
     "docker:build:weapp": "DOCKER_BUILDKIT=1 docker build --platform=linux/amd64 --target mini-build -t codex-docker-runtime-mini-build:amd64 -f Dockerfile . && docker compose --env-file .env.production -f docker-compose.tools.yml run --rm weapp-build",
     "tsc": "npx tsc --noEmit --skipLibCheck",
-    "validate": "pnpm exec concurrently --kill-others-on-fail --kill-signal SIGKILL -n lint,tsc -c red,blue \"pnpm lint:build\" \"pnpm tsc\""
+    "validate": "pnpm exec concurrently --kill-others-on-fail --kill-signal SIGKILL -n lint,tsc -c red,blue \"pnpm lint:build\" \"pnpm tsc\"",
+    "supabase:switch": "node scripts/switch-supabase-profile.mjs"
   },
   "lint-staged": {
     "src/**/*.{js,jsx,ts,tsx,css}": [

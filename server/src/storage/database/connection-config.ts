@@ -52,6 +52,12 @@ function resolveProfile(env: NodeJS.ProcessEnv): DbConnectionConfig {
 }
 
 function buildConnectionString(env: NodeJS.ProcessEnv): string {
+  const databaseUrl = env.DATABASE_URL?.trim()
+  if (databaseUrl) return databaseUrl
+
+  const explicitSupabaseUrl = env.SUPABASE_DB_URL?.trim()
+  if (explicitSupabaseUrl) return explicitSupabaseUrl
+
   const password = env.SUPABASE_DB_PASSWORD?.trim()
   if (password) {
     const config = resolveProfile(env)
@@ -59,11 +65,20 @@ function buildConnectionString(env: NodeJS.ProcessEnv): string {
     return `postgresql://${config.user}:${encodeURIComponent(password)}@${config.host}:${config.port}/${config.database}${ssl}`
   }
 
-  const legacyUrl = env.SUPABASE_DB_URL?.trim()
-  if (legacyUrl) return legacyUrl
-
   throw new Error(
-    'Database credentials not configured. Set SUPABASE_DB_PASSWORD (recommended) or SUPABASE_DB_URL (legacy).',
+    'Database credentials not configured. Set DATABASE_URL, SUPABASE_DB_URL, or SUPABASE_DB_PASSWORD.',
+  )
+}
+
+function resolveSsl(env: NodeJS.ProcessEnv): PoolConfig['ssl'] {
+  const value = env.DATABASE_SSL?.trim().toLowerCase()
+  if (!value) return { rejectUnauthorized: false }
+  if (['false', '0', 'no', 'off', 'disable', 'disabled'].includes(value)) return false
+  if (['true', '1', 'yes', 'on', 'require', 'required'].includes(value)) {
+    return { rejectUnauthorized: false }
+  }
+  throw new Error(
+    'Invalid DATABASE_SSL value. Use true/false, require, or disable.',
   )
 }
 
@@ -75,6 +90,6 @@ export function createDatabasePoolConfig(
     max: 10,
     idleTimeoutMillis: 30_000,
     connectionTimeoutMillis: 10_000,
-    ssl: { rejectUnauthorized: false },
+    ssl: resolveSsl(env),
   }
 }

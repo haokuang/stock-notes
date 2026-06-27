@@ -22,13 +22,22 @@ test('keeps injected values and fills missing values from a local env file', () 
   assert.equal(env.TAVILY_API_KEY, 'file-key')
 })
 
-test('production validation accepts password or legacy database URL', () => {
+test('production validation accepts password, Supabase URL, or generic database URL', () => {
   assert.doesNotThrow(() => validateProductionServerEnvironment({
     NODE_ENV: 'production',
     SUPABASE_URL: 'https://project.supabase.co',
     SUPABASE_SERVICE_ROLE_KEY: 'service-key',
     SUPABASE_ANON_KEY: 'anon-key',
     SUPABASE_DB_PASSWORD: 'password',
+    WECHAT_APPID: 'wxxxxxxxx',
+    WECHAT_SECRET: 'secret',
+  }))
+  assert.doesNotThrow(() => validateProductionServerEnvironment({
+    NODE_ENV: 'production',
+    SUPABASE_URL: 'https://project.supabase.co',
+    SUPABASE_SERVICE_ROLE_KEY: 'service-key',
+    SUPABASE_ANON_KEY: 'anon-key',
+    DATABASE_URL: 'postgresql://example',
     WECHAT_APPID: 'wxxxxxxxx',
     WECHAT_SECRET: 'secret',
   }))
@@ -54,7 +63,7 @@ test('production validation lists missing names without printing secret values',
       assert.match(error.message, /SUPABASE_ANON_KEY/)
       assert.match(error.message, /WECHAT_APPID/)
       assert.match(error.message, /WECHAT_SECRET/)
-      assert.match(error.message, /SUPABASE_DB_PASSWORD or SUPABASE_DB_URL/)
+      assert.match(error.message, /DATABASE_URL, SUPABASE_DB_URL, or SUPABASE_DB_PASSWORD/)
       assert.doesNotMatch(error.message, /must-not-appear/)
       return true
     },

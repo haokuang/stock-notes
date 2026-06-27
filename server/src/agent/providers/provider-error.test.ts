@@ -30,6 +30,11 @@ test('maps abort and network failures without exposing raw messages', () => {
   assert.equal(timeout.code, 'PROVIDER_TIMEOUT')
   assert.equal(timeout.retryable, true)
 
+  const sdkAbort = normalizeProviderError('minimax', { name: 'APIUserAbortError', message: 'Request was aborted.' })
+  assert.equal(sdkAbort.code, 'PROVIDER_TIMEOUT')
+  assert.equal(sdkAbort.retryable, true)
+  assert.equal(sdkAbort.safeMessage, '模型调用超时，请重试')
+
   const network = normalizeProviderError('deepseek', new TypeError('socket secret'))
   assert.equal(network.code, 'PROVIDER_TEMPORARY_FAILURE')
   assert.doesNotMatch(network.safeMessage, /socket secret/)

@@ -10,15 +10,29 @@ export const SUPABASE_CLIENT = 'SUPABASE_CLIENT'
 export const SUPABASE_ANON_CLIENT = 'SUPABASE_ANON_CLIENT'
 export const PG_POOL = 'PG_POOL'
 
+interface PoolErrorLogger {
+  warn(message: unknown, ...optionalParams: unknown[]): void
+}
+
+export function attachPoolErrorLogger(pool: Pool, logger: PoolErrorLogger): Pool {
+  pool.on('error', (error: Error) => {
+    logger.warn(`Database idle connection error ignored: ${error.message}`)
+  })
+  return pool
+}
+
+export function createPgPool(logger = new Logger('DatabaseModule')): Pool {
+  logger.log('Creating pg pool…')
+  return attachPoolErrorLogger(new Pool(createDatabasePoolConfig()), logger)
+}
+
 @Global()
 @Module({
   providers: [
     {
       provide: PG_POOL,
       useFactory: (): Pool => {
-        const logger = new Logger('DatabaseModule')
-        logger.log('Creating pg pool…')
-        return new Pool(createDatabasePoolConfig())
+        return createPgPool()
       },
     },
     {
