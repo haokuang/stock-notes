@@ -10,7 +10,7 @@
 - **交易纪律**：记录买入理由、入场价和止损比例；买入、卖出与对应笔记在同一数据库事务中完成。
 - **观点与笔记**：支持普通笔记、文档笔记、Markdown 渲染、永久高亮、编辑后锚点重定位和观点筛选。
 - **每日简评**：结合行情、历史价格和已有笔记生成单段简评及红黄绿信号，并通过 Supabase Realtime 同步。
-- **股票研究 Agent**：围绕单只股票连续对话，可读取股票资料、价格历史、笔记和每日简评，支持 DeepSeek、OpenAI、MiniMax 与 Tavily 联网检索。
+- **股票研究 Agent**：围绕单只股票连续对话，可读取股票资料、价格历史、笔记和每日简评，支持 DeepSeek、OpenAI、MiniMax，并通过 MiniMax CLI 联网检索。
 - **跨端运行**：同一套 Taro 前端支持 H5、微信小程序及现有非 Docker 抖音构建；NestJS 提供统一 `/api`。
 
 图片上传与视觉模型协议已经具备，但需要额外配置 TOS 和视觉模型凭据；跨观点 AI 报告等仍在后续迭代中，实际进度以 [Roadmap](docs/ROADMAP.md) 为准。
@@ -24,7 +24,7 @@ flowchart LR
     API -->|"Postgres"| Supabase
     API --> Market["腾讯行情 / Tushare"]
     API --> Models["DeepSeek / OpenAI / MiniMax"]
-    API --> Search["Tavily"]
+    API --> Search["MiniMax CLI Search"]
     API --> Storage["TOS 对象存储"]
 ```
 
@@ -33,7 +33,7 @@ flowchart LR
 | 前端 | Taro 4、React 18、TypeScript、Tailwind CSS 4、Zustand、Taro shadcn/ui |
 | 后端 | NestJS 10、Node.js、Zod、Drizzle ORM、`pg` |
 | 数据与认证 | Supabase Auth、Postgres、RLS、Realtime |
-| 外部能力 | 腾讯行情、Tushare、DeepSeek、OpenAI、MiniMax、Tavily、TOS |
+| 外部能力 | 腾讯行情、Tushare、DeepSeek、OpenAI、MiniMax、MiniMax CLI Search、TOS |
 | 工程化 | pnpm、Vite、Docker Compose、Nginx |
 
 ## 快速开始
@@ -65,7 +65,7 @@ SUPABASE_DB_PASSWORD=
 # 或：SUPABASE_DB_URL=
 ```
 
-Tushare、模型、Tavily、TOS、邮件告警和测试账号均为按功能启用项，完整说明见 [.env.example](.env.example)。首次使用前还需按 [Supabase 接入指南](docs/SUPABASE.md) 应用数据库迁移与 RLS。
+Tushare、模型、MiniMax CLI 联网搜索、TOS、邮件告警和测试账号均为按功能启用项，完整说明见 [.env.example](.env.example)。首次使用前还需按 [Supabase 接入指南](docs/SUPABASE.md) 应用数据库迁移与 RLS。
 
 ### 安装与启动
 

@@ -11,7 +11,7 @@ import {
 test('keeps injected values and fills missing values from a local env file', () => {
   const directory = mkdtempSync(join(tmpdir(), 'stock-notes-env-'))
   const envFile = join(directory, '.env.local')
-  writeFileSync(envFile, 'SUPABASE_URL=https://file.example\nTAVILY_API_KEY=file-key\n')
+  writeFileSync(envFile, 'SUPABASE_URL=https://file.example\nMINIMAX_CLI_PATH=mmx\n')
   const env: NodeJS.ProcessEnv = {
     SUPABASE_URL: 'https://injected.example',
   }
@@ -19,7 +19,7 @@ test('keeps injected values and fills missing values from a local env file', () 
   loadRuntimeEnvironment(env, envFile)
 
   assert.equal(env.SUPABASE_URL, 'https://injected.example')
-  assert.equal(env.TAVILY_API_KEY, 'file-key')
+  assert.equal(env.MINIMAX_CLI_PATH, 'mmx')
 })
 
 test('production validation accepts password, Supabase URL, or generic database URL', () => {

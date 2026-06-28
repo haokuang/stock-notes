@@ -1,17 +1,17 @@
 import { z } from 'zod'
 import type { AgentCitation, AgentSubjectIdentity } from '../agent.types'
-import type { TavilyClient, TavilyUnavailableError } from './tavily.client'
+import type { SearchClient, SearchUnavailableError } from './search.client'
 import { normalizeCitations, wrapSearchMaterial } from './citation'
 import type { AgentTool } from './tool.types'
 
 export interface StockNewsToolDeps {
-  tavily: TavilyClient
+  searchClient: SearchClient
   stockIdentity: (userId: string, stockId: string) => Promise<AgentSubjectIdentity>
 }
 
 export const stockNewsInput = z.object({
   query: z.string().min(1).max(200),
-  maxResults: z.number().int().min(1).max(8).optional(),
+  maxResults: z.number().int().min(1).max(20).optional(),
 })
 
 export interface StockNewsToolResult {
@@ -33,7 +33,11 @@ export function createStockNewsTool(
       const prefix = subjectType === 'market' ? 'A股市场' : `${code} ${name}`
       const composedQuery = `${prefix} ${input.query}`.trim()
       try {
-        const search = await deps.tavily.search({ query: composedQuery, maxResults: input.maxResults ?? 8 })
+        const search = await deps.searchClient.search({
+          query: composedQuery,
+          maxResults: input.maxResults ?? 8,
+          signal: context.signal,
+        })
         const citations = normalizeCitations(search.results)
         const wrapped = wrapSearchMaterial(JSON.stringify(search.results, null, 2))
         const result: StockNewsToolResult = {
@@ -59,4 +63,4 @@ export function createStockNewsTool(
   }
 }
 
-export type { TavilyUnavailableError }
+export type { SearchUnavailableError }

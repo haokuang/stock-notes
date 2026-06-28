@@ -13,7 +13,8 @@ import { createStockNotesTool } from './tools/stock-notes.tool'
 import { createDailyBriefsTool } from './tools/daily-briefs.tool'
 import { createStockNewsTool } from './tools/stock-news.tool'
 import { AgentToolRegistry } from './tools/tool-registry'
-import { TavilyClient } from './tools/tavily.client'
+import { MiniMaxSearchClient } from './tools/minimax-search.client'
+import type { SearchClient } from './tools/search.client'
 import { PG_POOL } from '../storage/database/database.module'
 import { loadProviderConfig } from './providers/provider-config'
 import { DeepSeekProvider } from './providers/deepseek.provider'
@@ -28,7 +29,7 @@ import { RunRecoveryService } from './runs/run-recovery.service'
 import { AgentRuntimeService } from './runs/agent-runtime.service'
 
 export const AGENT_TOOL_REGISTRY = Symbol('AGENT_TOOL_REGISTRY')
-export const AGENT_TAVILY_CLIENT = Symbol('AGENT_TAVILY_CLIENT')
+export const AGENT_SEARCH_CLIENT = Symbol('AGENT_SEARCH_CLIENT')
 export const AGENT_PROVIDER_REGISTRY = Symbol('AGENT_PROVIDER_REGISTRY')
 export const AGENT_ORCHESTRATOR = Symbol('AGENT_ORCHESTRATOR')
 export const AGENT_RUN_QUEUE = Symbol('AGENT_RUN_QUEUE')
@@ -36,8 +37,20 @@ export const AGENT_WORKER = Symbol('AGENT_WORKER')
 export const AGENT_RECOVERY = Symbol('AGENT_RECOVERY')
 export const AGENT_RUNTIME = Symbol('AGENT_RUNTIME')
 
-function resolveTavilyApiKey(): string {
-  return process.env.TAVILY_API_KEY?.trim() ?? ''
+function resolveMiniMaxApiKey(): string {
+  return process.env.MINIMAX_API_KEY?.trim() ?? ''
+}
+
+function resolveMiniMaxCliPath(): string | undefined {
+  return process.env.MINIMAX_CLI_PATH?.trim() || undefined
+}
+
+function resolveMiniMaxCliBaseURL(): string {
+  return process.env.MINIMAX_CLI_BASE_URL?.trim() || process.env.MINIMAX_BASE_URL?.trim() || ''
+}
+
+function resolveMiniMaxRegion(): string {
+  return process.env.MINIMAX_REGION?.trim() ?? ''
 }
 
 @Module({
@@ -50,13 +63,18 @@ function resolveTavilyApiKey(): string {
       useFactory: () => createProviderHealthService(),
     },
     {
-      provide: AGENT_TAVILY_CLIENT,
-      useFactory: () => new TavilyClient({ apiKey: resolveTavilyApiKey() }),
+      provide: AGENT_SEARCH_CLIENT,
+      useFactory: () => new MiniMaxSearchClient({
+        apiKey: resolveMiniMaxApiKey(),
+        baseURL: resolveMiniMaxCliBaseURL(),
+        cliPath: resolveMiniMaxCliPath(),
+        region: resolveMiniMaxRegion(),
+      }),
     },
     {
       provide: AGENT_TOOL_REGISTRY,
-      inject: [AgentRepository, AGENT_TAVILY_CLIENT],
-      useFactory: (repository: AgentRepository, tavily: TavilyClient) => {
+      inject: [AgentRepository, AGENT_SEARCH_CLIENT],
+      useFactory: (repository: AgentRepository, searchClient: SearchClient) => {
         const stockIdentity = async (_userId: string, stockId: string) => {
           const profile = await repository.getStockProfile(_userId, stockId)
           if (!profile) {
@@ -69,7 +87,7 @@ function resolveTavilyApiKey(): string {
           createPriceHistoryTool(repository),
           createStockNotesTool(repository),
           createDailyBriefsTool(repository),
-          createStockNewsTool({ tavily, stockIdentity }),
+          createStockNewsTool({ searchClient, stockIdentity }),
         ]
         return new AgentToolRegistry({ tools })
       },
@@ -135,7 +153,7 @@ function resolveTavilyApiKey(): string {
       }),
     },
   ],
-  exports: [AgentRepository, AgentService, ProviderHealthService, AGENT_TOOL_REGISTRY, AGENT_TAVILY_CLIENT],
+  exports: [AgentRepository, AgentService, ProviderHealthService, AGENT_TOOL_REGISTRY, AGENT_SEARCH_CLIENT],
 })
 export class AgentModule {}
 

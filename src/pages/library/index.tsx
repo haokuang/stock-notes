@@ -3,9 +3,8 @@ import Taro, { useDidShow, useLoad, usePullDownRefresh } from '@tarojs/taro'
 import { useCallback, useEffect, useState } from 'react'
 import { Network } from '@/network'
 import { PenLine, Search, FileText } from 'lucide-react-taro'
-import { Badge } from '@/components/ui/badge'
 import { ResponsivePage } from '@/components/layout/responsive-page'
-import { isMarketSubject, type SubjectType } from '@/stocks/subject'
+import type { SubjectType } from '@/stocks/subject'
 import { buildLibraryNotesUrl, resolveLibraryRoute } from '../prelaunch-navigation'
 
 interface Note {
@@ -44,9 +43,11 @@ const directionMeta = {
 }
 
 const typeMeta = {
-  note: { label: '观点', color: '#6D4DFF', bg: 'rgba(109, 77, 255, 0.10)' },
+  note: { label: '笔记', color: '#6D4DFF', bg: 'rgba(109, 77, 255, 0.10)' },
   doc: { label: '文档', color: '#0F8C66', bg: 'rgba(15, 140, 102, 0.10)' },
 }
+
+const hiddenSystemTags = new Set(['daily-brief', 'auto'])
 
 const timeAgo = (iso: string) => {
   const ms = Date.now() - new Date(iso).getTime()
@@ -63,7 +64,6 @@ export default function LibraryPage() {
   const [notes, setNotes] = useState<Note[]>([])
   const [stocks, setStocks] = useState<Stock[]>([])
   const [typeFilter, setTypeFilter] = useState<'all' | 'note' | 'doc'>('all')
-  const [filter, setFilter] = useState<'all' | 'bull' | 'bear' | 'neutral'>('all')
   const [stockId, setStockId] = useState<string>('')
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
@@ -74,7 +74,7 @@ export default function LibraryPage() {
         url: buildLibraryNotesUrl({
           stockId,
           type: typeFilter,
-          direction: filter,
+          direction: 'all',
           dateFrom,
           dateTo,
         }),
@@ -84,7 +84,7 @@ export default function LibraryPage() {
     } catch (e) {
       console.error('[library] notes load failed', e)
     }
-  }, [dateFrom, dateTo, filter, stockId, typeFilter])
+  }, [dateFrom, dateTo, stockId, typeFilter])
 
   const loadStocks = useCallback(async () => {
     const sRes = await Network.request<{ data: Stock[] }>({ url: '/api/stocks' })
@@ -101,13 +101,12 @@ export default function LibraryPage() {
     const next = resolveLibraryRoute({
       stockId,
       type: typeFilter,
-      direction: filter,
+      direction: 'all',
       dateFrom,
       dateTo,
     }, route)
     setStockId(next.stockId)
     setTypeFilter(next.type)
-    setFilter(next.direction)
     setDateFrom(next.dateFrom)
     setDateTo(next.dateTo)
   })
@@ -123,15 +122,8 @@ export default function LibraryPage() {
 
   const typeTabs = [
     { key: 'all' as const, label: '全部' },
-    { key: 'note' as const, label: '观点' },
+    { key: 'note' as const, label: '笔记' },
     { key: 'doc' as const, label: '文档' },
-  ]
-
-  const dirTabs = [
-    { key: 'all' as const, label: '全部' },
-    { key: 'bull' as const, label: '看多' },
-    { key: 'bear' as const, label: '看空' },
-    { key: 'neutral' as const, label: '中性' },
   ]
 
   return (
@@ -168,29 +160,6 @@ export default function LibraryPage() {
         </View>
       </View>
 
-      {/* 方向筛选 Tab（仅观点模式） */}
-      {typeFilter !== 'doc' && (
-        <View className="px-4 mb-3">
-          <View className="flex items-center gap-2 overflow-x-auto scrollbar-hide">
-            {dirTabs.map((t) => (
-              <View
-                key={t.key}
-                className={`shrink-0 px-3 py-2 rounded-full text-xs ${
-                  filter === t.key
-                    ? 'bg-primary-container text-primary'
-                    : 'bg-white bg-opacity-72 text-on-surface-variant border border-white border-opacity-85'
-                }`}
-                onClick={() => setFilter(t.key)}
-              >
-                <Text className={`block text-xs font-medium ${filter === t.key ? 'text-primary font-semibold' : 'text-on-surface-variant'}`}>
-                  {t.label}
-                </Text>
-              </View>
-            ))}
-          </View>
-        </View>
-      )}
-
       {/* 股票过滤横滚 */}
       {stocks.length > 0 && (
         <View className="px-4 mb-3">
@@ -211,11 +180,6 @@ export default function LibraryPage() {
                   <Text className={`block text-xs ${stockId === s.id ? 'text-primary font-semibold' : 'text-on-surface-variant'}`}>
                     {s.name}
                   </Text>
-                  {isMarketSubject(s) ? (
-                    <Badge variant="secondary">
-                      <Text className="block text-xs font-semibold">大盘</Text>
-                    </Badge>
-                  ) : null}
                 </View>
               </View>
             ))}
@@ -228,7 +192,7 @@ export default function LibraryPage() {
         {notes.length === 0 ? (
           <View className="rounded-2xl p-12 bg-white bg-opacity-72 border border-white border-opacity-85 flex flex-col items-center">
             <Text className="block text-base font-semibold text-on-surface">
-              {typeFilter === 'doc' ? '还没有文档' : '还没有观点'}
+              {typeFilter === 'doc' ? '还没有文档' : '还没有笔记'}
             </Text>
             <Text className="block text-sm text-on-surface-variant mt-2">
               {typeFilter === 'doc' ? '上传你的第一份研究文档' : '记录你对市场的第一份见解'}
@@ -248,6 +212,7 @@ export default function LibraryPage() {
         ) : (
           notes.map((n) => {
             const isDoc = n.type === 'doc'
+            const visibleTags = (n.tags ?? []).filter((tag) => !hiddenSystemTags.has(tag)).slice(0, 2)
             return (
               <View
                 key={n.id}
@@ -311,7 +276,7 @@ export default function LibraryPage() {
                 ) : null}
                 <View className="mt-3 flex items-center justify-between">
                   <View className="flex items-center gap-2">
-                    {n.tags && n.tags.length > 0 ? n.tags.slice(0, 2).map((t) => (
+                    {visibleTags.length > 0 ? visibleTags.map((t) => (
                       <View key={t} className="px-2 py-1 rounded bg-surface-container">
                         <Text className="block text-[10px] text-on-surface-variant">#{t}</Text>
                       </View>

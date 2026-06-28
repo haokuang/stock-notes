@@ -185,7 +185,15 @@ export default function StockDetailPage() {
     Taro.stopPullDownRefresh()
   })
 
-  const goAdd = (asDoc: 'note' | 'doc' = 'note') => Taro.navigateTo({ url: `/pages/note-edit/index?stock_id=${stockId}&type=${asDoc}` })
+  const goAdd = (asDoc: 'note' | 'doc' = 'note') => {
+    Taro.navigateTo({
+      url: `/pages/note-edit/index?stock_id=${stockId}&type=${asDoc}`,
+      fail: (err) => {
+        console.error('[goAdd] navigateTo failed', err)
+        Taro.showToast({ title: '跳转失败', icon: 'none' })
+      },
+    })
+  }
   const goNote = (id: string) => Taro.navigateTo({ url: `/pages/note-detail/index?note_id=${id}` })
   const openAgent = async () => {
     if (!stockId) return
@@ -260,6 +268,7 @@ export default function StockDetailPage() {
   const isUp = (stock?.change_percent ?? 0) >= 0
   const capabilities = detailCapabilities(stock?.subject_type ?? 'stock')
   const marketMode = stock?.subject_type === 'market'
+  const recordCount = notes.length + agentReports.length
 
   return (
     <View className="w-full min-h-full pb-[calc(4rem+env(safe-area-inset-bottom))]" style={{ background: '#EEF0F6' }}>
@@ -621,6 +630,7 @@ export default function StockDetailPage() {
               <Button
                 variant="outline"
                 className="w-full rounded-xl"
+                style={{ borderColor: '#B8BCD0' }}
                 onClick={() => goAdd('note')}
               >
                 <CirclePlus size={14} color="#6D4DFF" />
@@ -629,6 +639,7 @@ export default function StockDetailPage() {
               <Button
                 variant="outline"
                 className="w-full rounded-xl"
+                style={{ borderColor: '#B8BCD0' }}
                 onClick={() => goAdd('doc')}
               >
                 <Text className="block text-xs font-semibold text-on-surface">上传文档</Text>
@@ -709,51 +720,47 @@ export default function StockDetailPage() {
           </View>
         )}
 
-        {/* Agent 研究报告 */}
-        <View className="mt-4 px-4">
-          <View className="mb-3 flex items-center justify-between gap-3">
-            <Text className="block text-base font-semibold text-on-surface">Agent 研究报告</Text>
-            <Button size="sm" variant="outline" onClick={openAgent}>
+        {/* 观点 + 文档列表 */}
+        <View className="px-4 mt-4">
+          <View className="flex items-center justify-between mb-3">
+            <Text className="block text-base font-semibold text-on-surface">记录 · {recordCount}</Text>
+            <Button
+              size="sm"
+              variant="outline"
+              className="rounded-xl"
+              style={{ borderColor: '#9EA3BA', backgroundColor: 'rgba(255, 255, 255, 0.86)' }}
+              onClick={openAgent}
+            >
               <Sparkles size={14} color="#6D4DFF" />
               <Text>继续研究</Text>
             </Button>
           </View>
-          {agentReports.length === 0 ? (
-            <Card>
-              <CardContent className="p-5 text-center">
-                <Text className="block text-sm text-on-surface-variant">还没有沉淀报告，可先与研究 Agent 对话</Text>
-              </CardContent>
-            </Card>
-          ) : (
-            <View className="space-y-3">
-              {agentReports.map((reportItem) => (
-                <Card key={reportItem.id} onClick={() => Taro.navigateTo({ url: `/pages/ai-report/index?report_id=${encodeURIComponent(reportItem.id)}` })}>
-                  <CardContent className="flex items-center gap-3 p-4">
-                    <View className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary-container">
-                      <BookOpenCheck size={19} color="#6D4DFF" />
-                    </View>
-                    <View className="min-w-0 flex-1">
-                      <Text className="block truncate text-sm font-semibold text-on-surface">{reportItem.title}</Text>
-                      <Text className="mt-1 block text-xs text-on-surface-variant">{new Date(reportItem.createdAt).toLocaleDateString('zh-CN')}</Text>
-                    </View>
-                  </CardContent>
-                </Card>
-              ))}
-            </View>
-          )}
-        </View>
-
-        {/* 观点 + 文档列表 */}
-        <View className="px-4 mt-4">
-          <View className="flex items-center justify-between mb-3">
-            <Text className="block text-base font-semibold text-on-surface">记录 · {notes.length}</Text>
-          </View>
-          {notes.length === 0 ? (
+          {recordCount === 0 ? (
             <View className="rounded-2xl p-6 bg-white bg-opacity-72 border border-white border-opacity-85">
               <Text className="block text-sm text-on-surface-variant text-center">还没有记录，点击「新增观点」开始记录</Text>
             </View>
           ) : (
             <View className="space-y-3">
+              {agentReports.map((reportItem) => (
+                <View
+                  key={`report-${reportItem.id}`}
+                  className="rounded-2xl p-4 bg-white bg-opacity-72 border border-white border-opacity-85 active:scale-[0.99] transition-transform"
+                  onClick={() => Taro.navigateTo({ url: `/pages/ai-report/index?report_id=${encodeURIComponent(reportItem.id)}` })}
+                >
+                  <View className="flex items-center gap-2 mb-2">
+                    <View className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-primary-container">
+                      <BookOpenCheck size={16} color="#6D4DFF" />
+                    </View>
+                    <Text className="block text-sm font-semibold text-on-surface flex-1 truncate">{reportItem.title}</Text>
+                  </View>
+                  <View className="flex items-center gap-3 mt-2 text-xs text-on-surface-variant">
+                    <View className="flex items-center gap-1">
+                      <Clock size={12} color="#5B5E72" />
+                      <Text className="block">{new Date(reportItem.createdAt).toLocaleDateString('zh-CN')}</Text>
+                    </View>
+                  </View>
+                </View>
+              ))}
               {notes.map((n) => {
                 const isDoc = n.type === 'doc'
                 return (

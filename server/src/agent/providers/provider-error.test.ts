@@ -38,4 +38,13 @@ test('maps abort and network failures without exposing raw messages', () => {
   const network = normalizeProviderError('deepseek', new TypeError('socket secret'))
   assert.equal(network.code, 'PROVIDER_TEMPORARY_FAILURE')
   assert.doesNotMatch(network.safeMessage, /socket secret/)
+
+  const prematureClose = normalizeProviderError('minimax', {
+    name: 'FetchError',
+    code: 'ERR_STREAM_PREMATURE_CLOSE',
+    message: 'Premature close',
+  })
+  assert.equal(prematureClose.code, 'PROVIDER_TEMPORARY_FAILURE')
+  assert.equal(prematureClose.retryable, true)
+  assert.equal(prematureClose.safeMessage, '模型网络连接失败，请重试')
 })

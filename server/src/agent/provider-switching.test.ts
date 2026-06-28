@@ -60,13 +60,13 @@ function makeStockIdentity() {
 }
 
 function buildOrchestrator(provider: AgentModelProvider, repo: ReturnType<typeof makeRepo>) {
-  const tavily = { async search() { return { results: [] } } }
+  const searchClient = { async search() { return { results: [] } } }
   const tools = [
     createStockProfileTool(repo as never),
     createPriceHistoryTool(repo as never),
     createStockNotesTool(repo as never),
     createDailyBriefsTool(repo as never),
-    createStockNewsTool({ tavily: tavily as never, stockIdentity: makeStockIdentity() }),
+    createStockNewsTool({ searchClient, stockIdentity: makeStockIdentity() }),
   ]
   const registry = new AgentToolRegistry({ tools })
   return new AgentOrchestrator({

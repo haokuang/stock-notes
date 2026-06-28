@@ -88,29 +88,28 @@ function makeProvider(script: Array<{
 }
 
 function buildOrchestrator(provider: AgentModelProvider, options: {
-  tavily?: { results: Array<{ title: string; url: string; content: string; published_date: string | null }>; throw?: boolean }
+  search?: { results: Array<{ title: string; url: string; content: string; published_date: string | null }>; throw?: boolean }
   persistCalls?: AgentToolCall[]
   stockIdentity?: () => Promise<{ code: string; name: string; subjectType: 'stock' | 'market' }>
 } = {}) {
   const repository = makeRepo()
   const stockIdentity = options.stockIdentity ?? makeStockIdentity()
-  const tavily = {
+  const searchClient = {
     async search() {
-      if (options.tavily?.throw) {
-        const err = new Error('TAVILY HTTP 500') as Error & { searchUnavailable?: boolean }
+      if (options.search?.throw) {
+        const err = new Error('SEARCH UNAVAILABLE') as Error & { searchUnavailable?: boolean }
         err.searchUnavailable = true
         throw err
       }
-      return { results: options.tavily?.results ?? [] }
+      return { results: options.search?.results ?? [] }
     },
   }
-  const tavilyClient = tavily as never
   const tools = [
     createStockProfileTool(repository as never),
     createPriceHistoryTool(repository as never),
     createStockNotesTool(repository as never),
     createDailyBriefsTool(repository as never),
-    createStockNewsTool({ tavily: tavilyClient, stockIdentity }),
+    createStockNewsTool({ searchClient, stockIdentity }),
   ]
   const registry = new AgentToolRegistry({ tools })
   const orchestrator = new AgentOrchestrator({
@@ -204,14 +203,14 @@ test('orchestrator surfaces tool execution error to the model', async () => {
   repository.getStockProfile = original
 })
 
-test('orchestrator discloses Tavily failure with fixed sentence when model omits it', async () => {
+test('orchestrator discloses search failure with fixed sentence when model omits it', async () => {
   const { provider } = makeProvider([
     {
       toolCalls: [{ id: 'call-s', name: 'search_stock_news', arguments: { query: '业绩' } }],
     },
     { content: '依据本地资料...' },
   ])
-  const { orchestrator } = buildOrchestrator(provider, { tavily: { results: [], throw: true } })
+  const { orchestrator } = buildOrchestrator(provider, { search: { results: [], throw: true } })
   const result = await orchestrator.run({ run, userId: 'user-1', stockId: 'stock-1', threadId: 'thread-1' })
   assert.match(result.content, /本次联网资料获取失败，回答仅基于本地研究记录/)
   assert.equal(result.citations.length, 0)
@@ -229,7 +228,7 @@ test('orchestrator returns verified citations produced by the news tool', async 
     },
   ]
   const { orchestrator } = buildOrchestrator(provider, {
-    tavily: { results: [{ title: 'A', url: 'https://example.com/a', content: 'snippet', published_date: null }] },
+    search: { results: [{ title: 'A', url: 'https://example.com/a', content: 'snippet', published_date: null }] },
   })
   const result = await orchestrator.run({ run, userId: 'user-1', stockId: 'stock-1', threadId: 'thread-1' })
   assert.deepEqual(result.citations, citations)

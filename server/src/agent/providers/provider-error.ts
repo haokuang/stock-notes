@@ -63,6 +63,9 @@ export function normalizeProviderError(provider: AgentProvider, input: unknown):
   if (status != null && status >= 500) {
     return new ProviderError(provider, 'PROVIDER_TEMPORARY_FAILURE', true, '模型服务暂时不可用，请重试', null, { cause: input })
   }
+  if (code.includes('stream') || code.includes('premature') || message.includes('premature close')) {
+    return new ProviderError(provider, 'PROVIDER_TEMPORARY_FAILURE', true, '模型网络连接失败，请重试', null, { cause: input })
+  }
   if (input instanceof TypeError) {
     return new ProviderError(provider, 'PROVIDER_TEMPORARY_FAILURE', true, '模型网络连接失败，请重试', null, { cause: input })
   }

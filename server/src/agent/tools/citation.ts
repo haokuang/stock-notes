@@ -1,6 +1,6 @@
 import type { AgentCitation } from '../agent.types'
 
-interface TavilySearchResult {
+interface SearchResult {
   title: string
   url: string
   content: string
@@ -64,7 +64,7 @@ export function sanitizeSnippet(raw: string): string {
   return text.slice(0, 800)
 }
 
-export function normalizeCitations(results: TavilySearchResult[]): AgentCitation[] {
+export function normalizeCitations(results: SearchResult[]): AgentCitation[] {
   const seen = new Set<string>()
   const out: AgentCitation[] = []
   let index = 0
