@@ -84,18 +84,21 @@ export function PageHeader({
   return (
     <View
       className={cn(
-        'flex items-center justify-between px-4 pb-2',
+        // items-end 让返回 / 标题 / 保存三列整体下移到下半区,
+        // 顶部 32px 空白让出微信胶囊(约 32px 高 + 边距),避开右上角三个点与关闭按钮的视觉遮挡。
+        // 在 H5 / 非 WEAPP 环境 statusBarHeight=0,等价于纯 32px 上间距。
+        'flex items-end justify-between px-4 pb-3',
         background,
         sticky && 'sticky top-0 z-40',
         className,
       )}
       style={{
-        paddingTop: `calc(${metrics.statusBarHeight}px + env(safe-area-inset-top))`,
+        paddingTop: `calc(${metrics.statusBarHeight}px + 32px + env(safe-area-inset-top))`,
         paddingRight: `calc(${metrics.capsuleRightGap}px + env(safe-area-inset-right))`,
         ...style,
       }}
     >
-      <View className="flex items-center gap-2 min-w-[80px]">
+      <View className="flex items-center gap-2 min-w-[80px] pb-1">
         {leftSlot ??
           (onBack ? (
             <View
@@ -106,10 +109,10 @@ export function PageHeader({
             </View>
           ) : null)}
       </View>
-      <View className="flex-1 flex items-center justify-center overflow-hidden">
+      <View className="flex-1 flex items-end justify-center overflow-hidden pb-1">
         {renderTitle()}
       </View>
-      <View className="flex items-center justify-end gap-2 min-w-[80px]">
+      <View className="flex items-center justify-end gap-2 min-w-[80px] pb-1">
         {rightSlot}
       </View>
     </View>
