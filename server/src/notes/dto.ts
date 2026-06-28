@@ -27,6 +27,7 @@ export class CreateNoteDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(5000)
   content?: string;
 
   /** 文档类：原始 markdown 源 */
@@ -83,6 +84,7 @@ export class UpdateNoteDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(5000)
   content?: string;
 
   @IsOptional()

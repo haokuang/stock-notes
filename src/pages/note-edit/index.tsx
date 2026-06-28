@@ -477,7 +477,7 @@ export default function NoteEditPage() {
                 placeholder="记录你的笔记…"
                 value={content}
                 onInput={(e) => setContent(e.detail.value)}
-                maxlength={2000}
+                maxlength={5000}
               />
             </View>
           </View>
