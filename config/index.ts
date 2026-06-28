@@ -12,6 +12,15 @@ import pkg from '../package.json';
 
 dotenv.config({ path: path.resolve(__dirname, '../.env.local') });
 
+export const H5_VITE_DEDUPED_DEPENDENCIES = ['react', 'react-dom'];
+
+export const H5_VITE_PREBUNDLED_DEPENDENCIES = [
+  'react',
+  'react-dom',
+  'react-dom/client',
+  '@supabase/supabase-js',
+];
+
 const generateTTProjectConfig = (outputRoot: string) => {
   const config = {
     miniprogramRoot: './',
@@ -126,6 +135,23 @@ export default defineConfig<'vite'>(async (merge, _env) => {
     compiler: {
       type: 'vite',
       vitePlugins: [
+        ...(isH5
+          ? [
+              {
+                name: 'h5-react-runtime-singleton',
+                config() {
+                  return {
+                    resolve: {
+                      dedupe: H5_VITE_DEDUPED_DEPENDENCIES,
+                    },
+                    optimizeDeps: {
+                      include: H5_VITE_PREBUNDLED_DEPENDENCIES,
+                    },
+                  };
+                },
+              },
+            ]
+          : []),
         {
           name: 'postcss-config-loader-plugin',
           config(config) {
