@@ -24,7 +24,7 @@
     "new": "taro new",
     "preview:tt": "taro build --type tt --preview",
     "preview:weapp": "taro build --type weapp --preview",
-    "test:daily-brief": "tsx --test server/src/ai/daily-brief-persistence.test.ts",
+    "test:daily-brief": "tsx --test --tsconfig=server/tsconfig.json server/src/ai/daily-brief-context.test.ts server/src/ai/daily-brief-persistence.test.ts",
     "test:price-history": "tsx --test server/src/stocks/price-history.test.ts",
     "test:prelaunch": "tsx --test server/src/ai/image-analysis.test.ts server/src/tushare/stock-search.test.ts server/src/storage/database/connection-config.test.ts src/auth/authenticated-request.test.ts src/auth/session-events.test.ts src/lib/realtime-auth.test.ts src/pages/prelaunch-navigation.test.ts",
     "test:trade": "tsx --test server/src/stocks/trade-persistence.test.ts",

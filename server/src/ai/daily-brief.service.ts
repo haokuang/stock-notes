@@ -8,6 +8,8 @@ import {
   persistDailyBriefArtifacts,
   type StockBriefRow,
 } from './daily-brief-persistence'
+import { MiniMaxSearchClient } from '../agent/tools/minimax-search.client'
+import type { SearchClient, SearchResultItem } from '../agent/tools/search.client'
 import { TushareService } from '../tushare/tushare.service'
 import { ensurePriceHistory } from '../stocks/price-history'
 import { assertEquitySubject } from '../stocks/stock-subject'
@@ -34,9 +36,147 @@ type LLMOutput = {
   content: string
 }
 
+type DailyBriefStockContext = {
+  name: string
+  code: string
+  industry?: string | null
+  status?: string | null
+  entry_price?: string | null
+  loss_rate?: string | null
+  current_price?: string | null
+  change_percent?: string | null
+}
+
+type DailyBriefNoteContext = {
+  direction: string | null
+  title: string | null
+  content?: string | null
+}
+
+export type DailyBriefPromptInput = {
+  stock: DailyBriefStockContext
+  buyReasonText: string
+  recentNotes: DailyBriefNoteContext[]
+  indicators: TechnicalIndicators
+  historySampleSize: number
+  stopLossMessage: string
+  newsContext: string
+  fundamentalsContext: string
+}
+
+export function shouldUseLLMForDailyBrief(
+  stockStatus: string | null | undefined,
+  stopLossStatus: string,
+): boolean {
+  return stockStatus !== 'archived' && stopLossStatus !== 'triggered'
+}
+
+export function formatDailyBriefNewsContext(results: SearchResultItem[]): string {
+  if (results.length === 0) {
+    return '联网新闻暂不可用或无有效结果；本次判断不得编造新闻，只能基于技术面、基本面与历史笔记。'
+  }
+  return results
+    .slice(0, 5)
+    .map((result, index) => {
+      const title = compactText(result.title, 120)
+      const source = hostnameOf(result.url) || '未知来源'
+      const date = result.published_date ?? '未知日期'
+      const snippet = compactText(result.content, 260)
+      return `${index + 1}. ${title} | 来源: ${source} | 日期: ${date} | 摘要: ${snippet}`
+    })
+    .join('\n')
+}
+
+export function buildDailyBriefPrompt(input: DailyBriefPromptInput): string {
+  const { stock, indicators } = input
+  const recentNotesText = formatDailyBriefRecentNotes(input.recentNotes)
+  return `你是 A 股投资助手。请基于“最新技术指标 + 最新新闻/公开资料 + 可用基本面线索”做今日判断，用一段约 ${BRIEF_TARGET_LEN} 字的中文自然语言给出简评，并给一个信号色:green(乐观) / yellow(中性谨慎) / red(警惕)。
+
+判断优先级:
+1. 技术指标优先:趋势、均线位置、MACD、RSI、布林带、量比、今日涨跌幅必须作为主判断依据。
+2. 最新新闻/公开资料用于校验:只允许引用下方给定材料的事实；联网新闻暂缺时，不要编造新闻。
+3. 基本面与估值线索用于解释中期逻辑:行业、业务景气、财报/订单/政策/竞争格局等只在材料支持时使用。
+4. 历史观点只作为辅助，重点判断“今天是否更值得买入/继续观察/警惕风险”。
+
+【股票】${stock.name}(${stock.code}),行业:${stock.industry ?? '未知'}
+【状态】${stock.status ?? '未知'} | 买入价 ¥${stock.entry_price ?? '—'} | 亏损率上限 ${stock.loss_rate ?? '—'}%
+【可用基本面线索】${input.fundamentalsContext}
+【买入理由】${input.buyReasonText}
+【历史观点摘要】${recentNotesText}
+【技术指标样本】${input.historySampleSize} 个交易日${input.historySampleSize < 60 ? '(样本不足 60 日，谨慎解读)' : ''}
+【技术指标】MA5=${indicators.ma5} MA20=${indicators.ma20} MA60=${indicators.ma60} | MACD:DIF=${indicators.macd.dif} DEA=${indicators.macd.dea} 柱=${indicators.macd.hist} | RSI14=${indicators.rsi14} | 布林:${indicators.boll.lower}-${indicators.boll.upper} | 量比=${indicators.volRatio}
+【今日行情】最新价 ¥${stock.current_price ?? '—'} 涨跌 ${stock.change_percent ?? '—'}%
+【止损状态】${input.stopLossMessage}
+【最新新闻/公开资料】
+${input.newsContext}
+
+判色参考:
+- green:技术面趋势偏多且新闻/基本面没有明显反证，买入或继续持有逻辑仍成立
+- yellow:技术面中性、估值/新闻信号矛盾，或上涨后需要等待确认
+- red:技术面破位、放量滞涨/急跌，或新闻/基本面出现重大负面变化，或触及止损
+
+输出严格 JSON(无 markdown):
+{
+  "content": "约 ${BRIEF_TARGET_LEN} 字简评,自然语言,不分行,不空泛；必须同时体现技术面判断和新闻/基本面校验；资料不足时明确说资料不足",
+  "signal": "green" | "yellow" | "red"
+}`
+}
+
+function formatDailyBriefRecentNotes(notes: DailyBriefNoteContext[]): string {
+  const lines = notes
+    .slice(0, 6)
+    .map((note) => {
+      const direction = note.direction ?? 'neutral'
+      const title = compactText(note.title ?? '未命名观点', 60)
+      const content = compactText(note.content ?? '', 100)
+      return `[${direction}] ${title}${content ? `：${content}` : ''}`
+    })
+  return lines.join(' | ').slice(0, 800) || '(暂无)'
+}
+
+function buildDailyBriefFundamentalsContext(stock: DailyBriefStockContext): string {
+  const parts = [
+    `行业:${stock.industry ?? '未知'}`,
+    `持仓状态:${stock.status ?? '未知'}`,
+    `当前价:${stock.current_price != null ? `¥${stock.current_price}` : '—'}`,
+    `涨跌幅:${stock.change_percent != null ? `${stock.change_percent}%` : '—'}`,
+  ]
+  if (stock.entry_price != null || stock.loss_rate != null) {
+    parts.push(`买入价:${stock.entry_price != null ? `¥${stock.entry_price}` : '—'}`)
+    parts.push(`止损阈值:${stock.loss_rate != null ? `${stock.loss_rate}%` : '—'}`)
+  } else {
+    parts.push('买入/止损三件套未完整配置')
+  }
+  return `${parts.join('；')}。公开财报、订单、政策、行业景气等需结合新闻资料判断；没有材料支持时不得补写具体财务指标。`
+}
+
+function compactText(raw: string, maxLength: number): string {
+  return raw.replace(/\s+/g, ' ').trim().slice(0, maxLength)
+}
+
+function hostnameOf(input: string): string {
+  try {
+    return new URL(input).hostname.replace(/^www\./, '')
+  } catch {
+    return ''
+  }
+}
+
+function createDailyBriefSearchClient(): SearchClient {
+  return new MiniMaxSearchClient({
+    apiKey: process.env.MINIMAX_API_KEY?.trim() ?? '',
+    baseURL: process.env.MINIMAX_CLI_BASE_URL?.trim() || process.env.MINIMAX_BASE_URL?.trim() || '',
+    cliPath: process.env.MINIMAX_CLI_PATH?.trim() || undefined,
+    region: process.env.MINIMAX_REGION?.trim() ?? '',
+    timeoutMs: 12_000,
+    maxResults: 5,
+  })
+}
+
 @Injectable()
 export class DailyBriefService {
   private readonly logger = new Logger(DailyBriefService.name)
+  private readonly searchClient = createDailyBriefSearchClient()
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   constructor(
@@ -128,35 +268,20 @@ export class DailyBriefService {
       signal = 'red'
       content = `触及止损线(实际亏损 ${stopLoss.actual_rate.toFixed(2)}% ≥ 上限 ${stopLoss.threshold}%)。已构成原买入逻辑的实质性失效,建议重新评估或执行卖出。`
       stopLossTriggered = true
-    } else if (stock.status === 'watching') {
-      // 观察中:不调 LLM,技术摘要 100 字
-      signal = 'green'
-      content = `观察中。基于 ${historyState.sampleSize} 个交易日样本，MA20=${indicators.ma20},RSI14=${indicators.rsi14},量比=${indicators.volRatio}。技术面尚无明确方向,维持观察。`
-    } else {
-      // holding + 非止损触发:调 LLM
+    } else if (shouldUseLLMForDailyBrief(stock.status, stopLoss.status)) {
+      // 非强止损:调 LLM,结合技术指标、新闻与基本面线索
       const buyReasonText = recentNotes.find((n) => Array.isArray(n.tags) && n.tags.includes('buy'))?.content ?? '(无明确买入理由)'
-
-      const prompt = `你是 A 股投资助手。基于以下数据,用一段 100 字左右的中文自然语言,给出今日简评。同时给一个信号色:green(乐观) / yellow(中性谨慎) / red(警惕)。
-
-【股票】${stock.name}(${stock.code}),行业:${stock.industry ?? '未知'}
-【状态】${stock.status} | 买入价 ¥${stock.entry_price} | 亏损率上限 ${stock.loss_rate}%
-【买入理由】${buyReasonText}
-【历史观点】${recentNotes.map((n) => `[${n.direction}] ${n.title}`).join(' | ').slice(0, 400) || '(暂无)'}
-【技术指标样本】${historyState.sampleSize} 个交易日${historyState.sampleSize < 60 ? '(样本不足 60 日，谨慎解读)' : ''}
-【技术指标】MA5=${indicators.ma5} MA20=${indicators.ma20} MA60=${indicators.ma60} | MACD:DIF=${indicators.macd.dif} DEA=${indicators.macd.dea} 柱=${indicators.macd.hist} | RSI14=${indicators.rsi14} | 布林:${indicators.boll.lower}-${indicators.boll.upper} | 量比=${indicators.volRatio}
-【今日行情】最新价 ¥${stock.current_price ?? '—'} 涨跌 ${stock.change_percent ?? '—'}%
-【止损状态】${stopLoss.message}
-
-判色参考:
-- green:技术面偏多(MA5>MA20、RSI 50-70、量比>1),买入逻辑仍成立
-- yellow:技术面中性或信号矛盾,继续观察
-- red:技术面破位(跌破 MA20、RSI>80 超买或<20 超卖、量比>2 放量滞涨),或触及止损
-
-输出严格 JSON(无 markdown):
-{
-  "content": "100 字左右简评,自然语言,不分行,不空泛",
-  "signal": "green" | "yellow" | "red"
-}`
+      const newsContext = await this.fetchNewsContext(stock)
+      const prompt = buildDailyBriefPrompt({
+        stock,
+        buyReasonText,
+        recentNotes,
+        indicators,
+        historySampleSize: historyState.sampleSize,
+        stopLossMessage: stopLoss.message,
+        newsContext,
+        fundamentalsContext: buildDailyBriefFundamentalsContext(stock),
+      })
 
       try {
         const responseContent = await deepseekChat(
@@ -174,9 +299,12 @@ export class DailyBriefService {
         usedLLM = true
       } catch (e) {
         this.logger.warn(`[brief] DeepSeek 调用失败,使用本地兜底: ${(e as Error).message}`)
-        content = `LLM 不可用,基于本地指标的占位简评。MA20=${indicators.ma20},RSI=${indicators.rsi14},量比=${indicators.volRatio}。`
+        content = `AI 生成暂不可用。基于本地指标，MA20=${indicators.ma20},RSI=${indicators.rsi14},量比=${indicators.volRatio}；新闻与基本面需稍后重试补充。`
         signal = stopLoss.status === 'danger' ? 'yellow' : 'green'
       }
+    } else {
+      signal = 'yellow'
+      content = `当前状态暂不生成 AI 简评。基于 ${historyState.sampleSize} 个交易日样本，MA20=${indicators.ma20},RSI14=${indicators.rsi14},量比=${indicators.volRatio}，建议先确认标的状态与研究目标。`
     }
 
     // 7. 原子 upsert 简评与自动笔记
@@ -225,6 +353,17 @@ export class DailyBriefService {
       .orderBy(desc(stockBriefs.trade_date))
       .limit(days)
     return rows as StockBriefRow[]
+  }
+
+  private async fetchNewsContext(stock: DailyBriefStockContext): Promise<string> {
+    const query = `${stock.code} ${stock.name} 最新消息 财报 基本面 行业 景气 风险`
+    try {
+      const result = await this.searchClient.search({ query, maxResults: 5 })
+      return formatDailyBriefNewsContext(result.results)
+    } catch (cause) {
+      this.logger.warn(`[brief] MiniMax 搜索不可用,降级无新闻上下文: ${(cause as Error).message}`)
+      return formatDailyBriefNewsContext([])
+    }
   }
 
   /**
